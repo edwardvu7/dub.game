@@ -30,6 +30,13 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
   game to windowed or borderless, and a Windows notification appears once the game leaves fullscreen.
   Borderless fullscreen is fine. Checked by unit tests with a stand-in PowerShell; not yet on Windows.
 
+## Changed on the `ui-changes` branch
+- Overlay is a compact 340 x 600 panel at the left edge, voice settings only (no title, no last line).
+- Launch turns voices on for the game if needed, then starts it. While the app is running, the Ren'Py
+  hook (version 4) keeps the game's fullscreen preference off so the overlay can show. UNVERIFIED on
+  a real game.
+- The Games list rescans Steam when the window regains focus (at most every 20 seconds).
+
 ## Not verified yet (needs a real Windows machine)
 - The app has never been started in Electron. `npm install` and `npm start` are the first real run.
 - Overlay over a real game: windowed, borderless, and the exclusive-fullscreen warning.

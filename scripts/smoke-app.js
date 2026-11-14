@@ -139,12 +139,12 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   check(typeof shortcuts['Shift+F2'] === 'function', 'Shift+F2 is registered');
   shortcuts['Shift+F2']();
   check(overlay.visible && events('overlay:toggle').length === 1, 'Shift+F2 shows the overlay and tells it to refresh');
-  check(overlay.bounds && overlay.bounds.x === 1920 - 460 && overlay.bounds.height === 1040, 'overlay docks to the right edge of the screen in use');
+  check(overlay.bounds && overlay.bounds.x === 16 && overlay.bounds.width === 340 && overlay.bounds.height === 600 && overlay.bounds.y === 220, 'overlay is a compact panel at the left edge of the screen in use');
   shortcuts['Shift+F2']();
   check(!overlay.visible, 'Shift+F2 again hides it');
   cursor = { x: 3000, y: 500 }; // the game is on the second monitor
   shortcuts['Shift+F2']();
-  check(overlay.bounds.x === 1920 + 2560 - 460 && overlay.bounds.height === 1400, 'overlay follows the game to a second monitor');
+  check(overlay.bounds.x === 1920 + 16 && overlay.bounds.y === 400, 'overlay follows the game to a second monitor');
   shortcuts['Shift+F2']();
   overlay.webContents.emit('render-process-gone');
   check(overlay.reloaded === 1, 'a crashed overlay page reloads itself');

@@ -9,26 +9,12 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="overlay">
-  <aside class="panel" aria-label="Voice tuning">
-    <header class="panel-head">
-      <div class="wordmark" aria-label="dub.game">dub<span class="wordmark-dot">.</span>game</div>
-      <button class="btn btn-quiet" id="overlay-close" type="button" title="Shift + F2 or Esc">Hide</button>
-    </header>
-
-    <section class="heard" aria-live="polite">
-      <div class="meter" id="heard-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="heard-text">
-        <span class="now-speaker" id="heard-speaker">Waiting for a line</span>
-        <span class="now-line" id="heard-line">Advance the dialogue and the speaker shows up here.</span>
-      </div>
-    </section>
-
+  <aside class="panel" aria-label="Voice settings">
     <div class="panel-scroll">
       <div id="cards-host"></div>
     </div>
-
     <p class="panel-error" id="overlay-error" role="alert" hidden></p>
-    <footer class="panel-foot">Changes apply to the next line. Your picks are never overwritten.</footer>
+    <button class="panel-hide" id="overlay-close" type="button" title="Hide (Shift + F2 or Esc)" aria-label="Hide voice settings">Hide</button>
   </aside>
 
   <script src="fake-dub.js"></script>
