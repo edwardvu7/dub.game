@@ -3,7 +3,8 @@ AI voice-over for visual novels. Casts a unique voice for every character with G
 
 ## Install (players)
 
-1. Open the repo's **Releases** page and download `dub.game-Setup-<version>.exe`.
+1. Download the installer: https://github.com/edwardvu7/dub.game/releases/latest/download/dub.game-Setup.exe
+   (this link always gives the newest release).
 2. Run it. Windows may say "Windows protected your PC" because the app isn't code-signed yet:
    click **More info**, then **Run anyway**.
 3. dub.game opens on Settings. Paste your ElevenLabs and Gemini keys (each has a **Get a key** button).
@@ -27,7 +28,8 @@ Installers are built by GitHub on a Windows machine, so nobody needs to build lo
    git tag v0.2.0
    git push origin v0.2.0
    ```
-3. Wait about 10 minutes. The installer appears on the Releases page under `v0.2.0`.
+3. Wait about 10 minutes. The installer appears on the Releases page under `v0.2.0`, and the
+   download link above (also used by the website) switches to it automatically.
 
 For a test build without a release: Actions tab, **Build Windows installer**, **Run workflow**. The
 installer is attached to that run.

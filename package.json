@@ -58,7 +58,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "shortcutName": "dub.game",
-      "artifactName": "dub.game-Setup-${version}.${ext}",
+      "artifactName": "dub.game-Setup.${ext}",
       "runAfterFinish": true
     },
     "mac": {
