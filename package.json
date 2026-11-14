@@ -19,6 +19,7 @@
     "smoke": "node scripts/smoke-app.js",
     "smoke:hook": "python scripts/smoke-hook.py",
     "smoke:godot": "node scripts/smoke-godot.js",
+    "smoke:godot-generic": "node scripts/smoke-godot-generic.js",
     "smoke:godot-generic": "node scripts/smoke-godot-generic.js"
   },
   "devDependencies": {

@@ -75,3 +75,11 @@ npm start
 ```
 Then: Settings (paste both keys, green checks) → Games (switch a game on, Launch) → advance dialogue.
 Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: application/json" -d '{"speaker":"Sylvie","text":"Hi!","engine":"renpy"}'`
+
+## Generic Godot hook (checked on Godot 4.1.4, the version Until Then reports)
+- Run in a packed game with `override.cfg`: the hook loads, connects and reports labels.
+- Fixed: text boxes named Bubble/Balloon/TextBox are found automatically, and a node the player picks
+  once keeps matching when the game re-creates it under an engine-numbered name (`@VBoxContainer@5`).
+  `npm run smoke:godot-generic` (needs `GODOT_BIN`) covers both.
+- UNVERIFIED on Until Then itself: its node names are unknown, text drawn without Label/RichTextLabel
+  nodes cannot be read, and a game with the pack embedded in the .exe is not detected.

@@ -3,7 +3,7 @@
 extends Node
 
 const BASE_URL := "http://127.0.0.1:8000"
-const VERSION := 1
+const VERSION := 2
 const MAX_LABELS := 512
 var _labels: Array[WeakRef] = []
 var _config: Dictionary = {}
@@ -67,6 +67,14 @@ func _visible(node: CanvasItem) -> bool:
 		parent = parent.get_parent()
 	return true
 
+# Games build a fresh text box per line, so the engine numbers the nodes ("@VBoxContainer@5",
+# "Bubble2"). Dropping those numbers lets a node the player picked once match every later copy.
+func _stable(node_path: String) -> String:
+	var parts := PackedStringArray()
+	for part in node_path.split("/"):
+		parts.append(part.rstrip("0123456789").rstrip("@"))
+	return "/".join(parts)
+
 func _score(node: Node) -> int:
 	var context := ""
 	var parent := node
@@ -83,10 +91,10 @@ func _score(node: Node) -> int:
 	var own := str(node.name).to_lower()
 	if own in ["name", "title"]:
 		return 0
-	for word in ["speaker", "charactername", "name_label", "namelabel"]:
+	for word in ["speaker", "charactername", "name_label", "namelabel", "nametag", "name_tag"]:
 		if word in own:
 			return 0
-	for word in ["narrat", "subtitle", "caption", "dialog", "speech", "cutscene", "conversation"]:
+	for word in ["narrat", "subtitle", "caption", "dialog", "speech", "cutscene", "conversation", "bubble", "balloon", "textbox", "text_box"]:
 		if word in context:
 			return 10 + mini(_text(node).length(), 200)
 	return 0
@@ -94,14 +102,16 @@ func _score(node: Node) -> int:
 func _speaker(node: Node, labels: Array) -> String:
 	var chosen := str(_config.get("speakerPath", ""))
 	if not chosen.is_empty():
+		# With several text boxes on screen, the name beside this line wins.
+		var found: Node = null
 		for other in labels:
-			if str(other.get_path()) == chosen:
-				return _text(other).left(100)
-		return "Narrator"
+			if _stable(str(other.get_path())) == _stable(chosen) and (found == null or other.get_parent() == node.get_parent()):
+				found = other
+		return _text(found).left(100) if found != null else "Narrator"
 	# Only a nearby explicitly named speaker label is evidence of a speaker.
 	for other in labels:
 		var name_lower := str(other.name).to_lower()
-		if other != node and other.get_parent() == node.get_parent() and ("speaker" in name_lower or name_lower in ["name", "namelabel", "charactername"]):
+		if other != node and other.get_parent() == node.get_parent() and ("speaker" in name_lower or name_lower in ["name", "namelabel", "charactername", "nametag", "name_tag"]):
 			return _text(other).left(100)
 	return "Narrator"
 
@@ -123,6 +133,7 @@ func _process(delta: float) -> void:
 	var best: Node = null
 	var best_score := 0
 	var chosen := str(_config.get("textPath", ""))
+	var chosen_stable := _stable(chosen)
 	for ref in _labels:
 		var node = ref.get_ref()
 		if not is_instance_valid(node) or not node.is_inside_tree() or not _visible(node):
@@ -132,7 +143,7 @@ func _process(delta: float) -> void:
 			continue
 		visible.append(node)
 		var node_path := str(node.get_path())
-		var score := _score(node) if chosen.is_empty() else (1000 if node_path == chosen else 0)
+		var score := _score(node) if chosen.is_empty() else (1001 if node_path == chosen else (1000 if _stable(node_path) == chosen_stable else 0))
 		if diagnostics.size() < 80:
 			diagnostics.append({"path": node_path, "text": text.left(120), "candidate": score > 0})
 		if score > best_score:
