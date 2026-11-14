@@ -3,7 +3,9 @@
 // Gemini never reads game text live; it only builds profiles.
 const crypto = require('node:crypto');
 
-const MODEL = 'gemini-2.5-flash';
+// gemini-2.5-flash was retired for new API keys (Nov 2026). A GEMINI_MODEL environment variable
+// overrides this without a code change if Google retires this one too.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const GENDERS = ['female', 'male', 'neutral'];
 const AGES = ['child', 'teen', 'young_adult', 'adult', 'elder'];
@@ -64,9 +66,10 @@ function buildRequest(characters, catalog, opts = {}) {
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema,
+        // Ignored by Gemini 3.x models (Google's docs); kept for older models set via GEMINI_MODEL.
         temperature: opts.avoidVoiceId ? 1.0 : 0.6,
-        // UNVERIFIED: thinkingBudget 0 turns 2.5 Flash "thinking" off for speed.
-        thinkingConfig: { thinkingBudget: 0 },
+        // UNVERIFIED: "low" is the fastest thinking level on Gemini 3.x; profiling needs little reasoning.
+        thinkingConfig: { thinkingLevel: 'low' },
       },
     },
   };

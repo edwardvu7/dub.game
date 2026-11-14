@@ -32,7 +32,7 @@ test('profiler: request shape (model, header, JSON mode, schema with catalog enu
   const profile = await profiler.profileCharacter({ speaker: 'Sylvie', samples: ['Um... hi.'] }, catalog, KEY, { fetch });
 
   const call = fetch.calls[0];
-  assert.equal(call.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+  assert.equal(call.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent');
   assert.equal(call.init.method, 'POST');
   assert.equal(call.init.headers['x-goog-api-key'], KEY);
   assert.ok(!call.url.includes(KEY), 'key travels in a header, not the URL');
