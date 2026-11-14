@@ -21,7 +21,7 @@ code against the contracts below (or fake data), never edit their folder.
 ## Stack
 
 - Electron, plain JavaScript (CommonJS in `main/`, no bundler). Node 20+.
-- `npm start` runs the app. `npm test` runs `node --test` over `test/`.
+- `npm start` runs the app. `npm test` runs `node --test` (picks up `test/*.test.js`).
 - Windows is the demo target; code must not crash on macOS/Linux (dev machines).
 
 ## Contracts
