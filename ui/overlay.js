@@ -31,7 +31,6 @@
 
   // The main process turns close() into hide(), so the overlay reopens instantly.
   const hide = () => window.close();
-  $('overlay-close').addEventListener('click', hide);
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     // Esc inside an open dropdown should close the dropdown, not the overlay.
