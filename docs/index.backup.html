@@ -10,33 +10,39 @@
   <link rel="stylesheet" href="https://use.typekit.net/ins2wgm.css" />
   <style>
     :root {
-      /* Exact 9-Stop Emerald & Sage Swatch Palette */
-      --g-100: #c4dacb; /* Lightest sage mist */
+      /* 9-Stop Swatch Palette — Light-First Architecture */
+      --g-100: #c4dacb; /* Lightest sage */
       --g-200: #a4c6b3; /* Soft mint */
       --g-300: #82b49b; /* Seafoam sage */
       --g-400: #62a286; /* Mid jade */
-      --g-500: #458e72; /* Vibrant emerald accent */
+      --g-500: #458e72; /* Rich emerald */
       --g-600: #316d56; /* Deep jade */
-      --g-700: #224d3d; /* Pine surface */
-      --g-800: #143529; /* Dark forest */
-      --g-900: #071a12; /* Obsidian forest base */
+      --g-700: #224d3d; /* Pine highlight */
+      --g-800: #143529; /* Dark forest highlight */
+      --g-900: #071a12; /* Obsidian forest ink */
 
-      /* Liquid Glass Surface Tokens */
-      --glass-bg: rgba(20, 53, 41, 0.36);
-      --glass-bg-strong: rgba(12, 34, 25, 0.56);
-      --glass-border: rgba(196, 218, 203, 0.22);
-      --glass-border-bright: rgba(196, 218, 203, 0.48);
-      --glass-highlight: rgba(255, 255, 255, 0.18);
-      --glass-shadow: 0 24px 48px -12px rgba(3, 12, 8, 0.65);
+      /* Solid Architectural Surfaces (No Glass) */
+      --card-surface: #d5e6db;
+      --card-recessed: #b8d2c1;
+      --border-hairline: rgba(7, 26, 18, 0.14);
+      --border-strong: rgba(7, 26, 18, 0.32);
 
-      /* Typography */
-      --text: #f2f8f4;
-      --text-muted: rgba(196, 218, 203, 0.78);
-      --text-subtle: rgba(164, 198, 179, 0.54);
+      /* High-Contrast Warm Terracotta Accent (Complementary to Sage) */
+      --accent: #c85a32;
+      --accent-hover: #b04b25;
+
+      /* Typography & Hierarchy */
+      --ink: #071a12;
+      --ink-secondary: #143529;
+      --ink-muted: #224d3d;
+      --ink-on-dark: #eef6f0;
+      --ink-on-dark-muted: #a4c6b3;
+
       --font-display: "forma-djr-display", "Forma DJR Display", "Forma", "Geist Sans", -apple-system, BlinkMacSystemFont, sans-serif;
       --font-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: "Geist Mono", monospace;
 
+      /* Emil Kowalski Spring & Out-Expo Curves */
       --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
@@ -50,38 +56,25 @@
 
     html {
       scroll-behavior: smooth;
-      background: var(--g-900);
-      color: var(--text);
+      background-color: var(--g-100);
+      color: var(--ink);
     }
 
     body {
       font-family: var(--font-sans);
-      background: var(--g-900);
-      color: var(--text);
+      /* Continuous Light-First Swatch Gradient Across Full Page */
+      background: linear-gradient(
+        180deg,
+        #d2e5d8 0%,
+        var(--g-100) 28%,
+        var(--g-200) 68%,
+        var(--g-300) 100%
+      );
+      background-attachment: fixed;
+      color: var(--ink);
       line-height: 1.45;
-      overflow-x: hidden;
       min-height: 100vh;
-      position: relative;
-    }
-
-    /* Fullscreen WebGL ShaderGradient Background */
-    #shader-canvas {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: -2;
-      pointer-events: none;
-      display: block;
-    }
-
-    /* Subtle Ambient Vignette Overlay */
-    .ambient-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      pointer-events: none;
-      background: radial-gradient(circle at 50% 25%, transparent 20%, rgba(7, 26, 18, 0.55) 100%);
+      overflow-x: hidden;
     }
 
     .container {
@@ -90,57 +83,13 @@
       padding: 0 28px;
     }
 
-    /* Liquid Glass Specular Card Mixin */
-    .liquid-glass {
-      position: relative;
-      background: linear-gradient(
-        135deg,
-        rgba(196, 218, 203, 0.13) 0%,
-        rgba(34, 77, 61, 0.28) 50%,
-        rgba(7, 26, 18, 0.48) 100%
-      );
-      backdrop-filter: blur(24px) saturate(165%);
-      -webkit-backdrop-filter: blur(24px) saturate(165%);
-      border: 1px solid var(--glass-border);
-      box-shadow:
-        inset 0 1px 1px 0 var(--glass-highlight),
-        inset 0 -1px 1px 0 rgba(7, 26, 18, 0.5),
-        var(--glass-shadow);
-      overflow: hidden;
-    }
-
-    /* Interactive Cursor Specular Glare */
-    .liquid-glass::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(
-        420px circle at var(--mx, 50%) var(--my, 0%),
-        rgba(196, 218, 203, 0.18),
-        transparent 55%
-      );
-      opacity: 0;
-      transition: opacity 300ms var(--ease-out);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .liquid-glass:hover::before {
-      opacity: 1;
-    }
-
-    .liquid-glass > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Scroll Reveal Animations */
+    /* Smooth Scroll Reveal */
     .reveal {
       opacity: 0;
-      transform: translateY(22px);
+      transform: translateY(18px);
       transition:
-        opacity 680ms var(--ease-out),
-        transform 680ms var(--ease-out);
+        opacity 640ms var(--ease-out),
+        transform 640ms var(--ease-out);
       transition-delay: var(--delay, 0ms);
       will-change: opacity, transform;
     }
@@ -158,19 +107,15 @@
       }
     }
 
-    /* Minimal Floating Liquid Glass Header */
+    /* Clean, Unboxed Minimalist Header */
     header {
-      padding-top: 22px;
-      position: sticky;
-      top: 0;
-      z-index: 50;
+      height: 84px;
+      display: flex;
+      align-items: center;
     }
 
     .nav-bar {
       width: 100%;
-      height: 62px;
-      padding: 0 22px;
-      border-radius: 999px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -179,63 +124,61 @@
     .brand {
       display: inline-flex;
       align-items: baseline;
-      color: var(--text);
+      color: var(--ink);
       text-decoration: none;
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       letter-spacing: -0.03em;
     }
 
     .brand-accent {
-      color: var(--g-300);
+      color: var(--accent);
     }
 
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 32px;
+      gap: 36px;
     }
 
     .nav-link {
-      color: var(--text-muted);
+      color: var(--ink-secondary);
       text-decoration: none;
-      font-size: 0.94rem;
+      font-size: 0.96rem;
       font-weight: 600;
       letter-spacing: -0.01em;
-      transition: color 160ms var(--ease-out);
+      transition: color 150ms var(--ease-out);
     }
 
     .nav-link:hover {
-      color: var(--g-100);
+      color: var(--accent);
     }
 
     .github-icon-link {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: var(--g-100);
-      opacity: 0.88;
-      transition: color 160ms var(--ease-out), transform 160ms var(--ease-out), opacity 160ms var(--ease-out);
+      color: var(--ink);
+      transition: color 150ms var(--ease-out), transform 150ms var(--ease-out);
     }
 
     .github-icon-link:hover {
-      color: #ffffff;
-      opacity: 1;
+      color: var(--accent);
       transform: translateY(-1px);
     }
 
     .github-icon-link svg {
-      width: 21px;
-      height: 21px;
+      width: 22px;
+      height: 22px;
       fill: currentColor;
     }
 
     /* Hero Section */
     .hero {
-      padding: 76px 0 68px;
+      padding: 68px 0 64px;
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-columns: 1.08fr 0.92fr;
       gap: 48px;
       align-items: center;
     }
@@ -243,25 +186,27 @@
     h1 {
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: clamp(3rem, 5.5vw, 4.5rem);
+      font-size: clamp(2.95rem, 5.4vw, 4.45rem);
       line-height: 1.01;
       letter-spacing: -0.035em;
       margin-bottom: 18px;
-      color: var(--text);
+      color: var(--ink);
     }
 
+    /* Dark Forest Highlight Phrase + Terracotta Period */
     h1 span {
-      background: linear-gradient(135deg, var(--g-100) 0%, var(--g-300) 55%, var(--g-400) 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      color: var(--g-700);
+    }
+
+    h1 .dot {
+      color: var(--accent);
     }
 
     .lead {
       font-size: 1.16rem;
-      color: var(--text-muted);
-      font-weight: 400;
-      max-width: 380px;
+      color: var(--ink-muted);
+      font-weight: 500;
+      max-width: 370px;
       margin-bottom: 32px;
       letter-spacing: -0.01em;
     }
@@ -272,52 +217,49 @@
       gap: 16px;
     }
 
-    /* Liquid Glass Primary CTA Button */
+    /* Deep Forest Highlight Button */
     .btn-download {
-      position: relative;
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      background: linear-gradient(135deg, var(--g-100) 0%, var(--g-200) 100%);
-      color: var(--g-900);
-      padding: 13px 24px;
-      border-radius: 999px;
+      background: var(--g-900);
+      color: var(--ink-on-dark);
+      padding: 14px 24px;
+      border-radius: 10px;
       text-decoration: none;
       font-weight: 600;
       font-size: 0.95rem;
       letter-spacing: -0.015em;
-      border: 1px solid rgba(255, 255, 255, 0.65);
-      box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, 0.9),
-        0 12px 32px -6px rgba(7, 26, 18, 0.65);
+      box-shadow: 0 8px 20px -6px rgba(7, 26, 18, 0.28);
       transition:
-        transform 180ms var(--ease-out),
-        box-shadow 180ms var(--ease-out),
-        filter 180ms var(--ease-out);
+        transform 160ms var(--ease-out),
+        background-color 160ms var(--ease-out),
+        box-shadow 160ms var(--ease-out);
     }
 
     .btn-download:hover {
-      transform: translateY(-2px);
-      filter: brightness(1.04);
-      box-shadow:
-        inset 0 1px 1px #ffffff,
-        0 16px 36px -6px rgba(69, 142, 114, 0.45);
+      background: var(--g-800);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px -6px rgba(7, 26, 18, 0.36);
     }
 
     .btn-download:active {
-      transform: scale(0.98);
+      transform: scale(0.97);
     }
 
     .btn-download svg {
       width: 17px;
       height: 17px;
-      stroke: currentColor;
+      stroke: var(--accent);
     }
 
-    /* Interactive Voice Overlay Card */
+    /* Solid Architectural Overlay Card (Dark Forest Used as Highlight) */
     .panel {
-      border-radius: 18px;
+      background: var(--card-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
       padding: 22px;
+      box-shadow: 0 16px 36px -12px rgba(7, 26, 18, 0.14);
     }
 
     .panel-bar {
@@ -326,22 +268,23 @@
       align-items: center;
       padding-bottom: 14px;
       margin-bottom: 16px;
-      border-bottom: 1px solid var(--glass-border);
+      border-bottom: 1px solid var(--border-hairline);
       font-family: var(--font-mono);
       font-size: 0.75rem;
+      font-weight: 600;
       letter-spacing: 0.04em;
-      color: var(--text-muted);
+      color: var(--ink-muted);
     }
 
+    /* Dark Forest Highlight Badge */
     kbd {
       font-family: var(--font-mono);
       font-size: 0.73rem;
-      background: var(--glass-bg-strong);
-      border: 1px solid var(--glass-border-bright);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
-      border-radius: 6px;
+      background: var(--g-900);
+      color: var(--ink-on-dark);
+      border-radius: 5px;
       padding: 3px 8px;
-      color: var(--g-100);
+      font-weight: 500;
     }
 
     .tabs {
@@ -352,25 +295,25 @@
     }
 
     .tab {
-      background: rgba(7, 26, 18, 0.28);
-      border: 1px solid var(--glass-border);
-      color: var(--text-muted);
+      background: var(--card-recessed);
+      border: 1px solid var(--border-hairline);
+      color: var(--ink-secondary);
       padding: 9px 11px;
-      border-radius: 10px;
+      border-radius: 8px;
       font-family: var(--font-sans);
       font-size: 0.82rem;
       font-weight: 600;
       text-align: left;
       cursor: pointer;
       transition:
-        border-color 160ms var(--ease-out),
-        background-color 160ms var(--ease-out),
-        color 160ms var(--ease-out),
-        transform 160ms var(--ease-out);
+        background-color 150ms var(--ease-out),
+        border-color 150ms var(--ease-out),
+        color 150ms var(--ease-out),
+        transform 150ms var(--ease-out);
     }
 
     .tab:hover {
-      border-color: var(--glass-border-bright);
+      border-color: var(--border-strong);
     }
 
     .tab small {
@@ -378,26 +321,27 @@
       font-family: var(--font-mono);
       font-size: 0.68rem;
       font-weight: 400;
-      color: var(--text-subtle);
+      color: var(--ink-muted);
       margin-top: 2px;
     }
 
+    /* Dark Forest Active State Highlight */
     .tab.active {
-      background: rgba(98, 162, 134, 0.24);
-      border-color: var(--g-200);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-      color: var(--text);
+      background: var(--g-900);
+      border-color: var(--g-900);
+      color: var(--ink-on-dark);
     }
 
     .tab.active small {
-      color: var(--g-100);
+      color: var(--g-200);
     }
 
+    /* Dark Forest Quote Highlight Box */
     .quote-box {
-      background: var(--glass-bg-strong);
-      border: 1px solid var(--glass-border);
-      border-radius: 11px;
-      padding: 14px;
+      background: var(--g-900);
+      color: var(--ink-on-dark);
+      border-radius: 10px;
+      padding: 15px 16px;
       margin-bottom: 16px;
     }
 
@@ -406,19 +350,20 @@
       font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: var(--g-300);
+      color: var(--accent);
+      font-weight: 600;
       margin-bottom: 4px;
     }
 
     .quote-line {
       font-size: 0.98rem;
       font-weight: 500;
-      color: var(--text);
+      color: var(--ink-on-dark);
     }
 
     .sliders {
       display: grid;
-      gap: 11px;
+      gap: 10px;
     }
 
     .slider-row {
@@ -430,8 +375,8 @@
     }
 
     .slider-name {
-      color: var(--text-muted);
-      font-weight: 500;
+      color: var(--ink-secondary);
+      font-weight: 600;
     }
 
     .slider-val {
@@ -439,7 +384,8 @@
       font-variant-numeric: tabular-nums;
       text-align: right;
       font-size: 0.76rem;
-      color: var(--g-100);
+      font-weight: 600;
+      color: var(--ink);
     }
 
     input[type="range"] {
@@ -447,8 +393,8 @@
       appearance: none;
       width: 100%;
       height: 5px;
-      background: rgba(7, 26, 18, 0.65);
-      border: 1px solid rgba(196, 218, 203, 0.16);
+      background: var(--card-recessed);
+      border: 1px solid var(--border-hairline);
       border-radius: 999px;
       outline: none;
     }
@@ -459,29 +405,29 @@
       width: 15px;
       height: 15px;
       border-radius: 50%;
-      background: var(--g-100);
-      border: 2px solid var(--g-600);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      background: var(--g-900);
+      border: 2px solid var(--accent);
       cursor: pointer;
       transition: transform 140ms var(--ease-out);
     }
 
     input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.18);
+      transform: scale(1.16);
     }
 
     /* Scannable 4-Step Strip */
     .section {
       padding: 48px 0;
-      border-top: 1px solid var(--glass-border);
+      border-top: 1px solid var(--border-hairline);
     }
 
     .section-label {
       font-family: var(--font-mono);
       font-size: 0.75rem;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--g-200);
+      color: var(--ink-muted);
       margin-bottom: 20px;
     }
 
@@ -492,22 +438,30 @@
     }
 
     .step-card {
-      border-radius: 16px;
+      background: var(--card-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 12px;
       padding: 20px;
       transition:
-        transform 240ms var(--ease-out),
-        border-color 240ms var(--ease-out);
+        transform 200ms var(--ease-out),
+        border-color 200ms var(--ease-out),
+        background-color 200ms var(--ease-out),
+        color 200ms var(--ease-out);
     }
 
+    /* Dark Forest Highlight on Card Hover */
     .step-card:hover {
-      transform: translateY(-3px);
-      border-color: var(--glass-border-bright);
+      transform: translateY(-2px);
+      background: var(--g-900);
+      border-color: var(--g-900);
+      color: var(--ink-on-dark);
     }
 
     .step-idx {
       font-family: var(--font-mono);
       font-size: 0.75rem;
-      color: var(--g-300);
+      font-weight: 600;
+      color: var(--accent);
       margin-bottom: 10px;
     }
 
@@ -517,12 +471,16 @@
       font-weight: 700;
       letter-spacing: -0.02em;
       margin-bottom: 4px;
-      color: var(--text);
     }
 
     .step-card p {
       font-size: 0.86rem;
-      color: var(--text-muted);
+      color: var(--ink-muted);
+      transition: color 200ms var(--ease-out);
+    }
+
+    .step-card:hover p {
+      color: var(--ink-on-dark-muted);
     }
 
     /* Engine Strip */
@@ -533,45 +491,48 @@
     }
 
     .engine-pill {
-      border-radius: 14px;
-      padding: 15px 18px;
+      background: var(--card-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 14px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-weight: 600;
       font-size: 0.92rem;
+      color: var(--ink);
       transition:
-        transform 220ms var(--ease-out),
-        border-color 220ms var(--ease-out);
+        transform 180ms var(--ease-out),
+        border-color 180ms var(--ease-out);
     }
 
     .engine-pill:hover {
       transform: translateY(-2px);
-      border-color: var(--glass-border-bright);
+      border-color: var(--border-strong);
     }
 
     .badge {
       font-family: var(--font-mono);
       font-size: 0.7rem;
-      font-weight: 500;
+      font-weight: 600;
       padding: 3px 9px;
       border-radius: 999px;
-      background: rgba(7, 26, 18, 0.45);
-      border: 1px solid var(--glass-border);
-      color: var(--g-200);
+      background: var(--card-recessed);
+      border: 1px solid var(--border-hairline);
+      color: var(--ink-secondary);
     }
 
+    /* Dark Forest Highlight Badge for Full Support */
     .badge-full {
-      background: var(--g-100);
-      border-color: #ffffff;
-      color: var(--g-900);
-      font-weight: 600;
+      background: var(--g-900);
+      border-color: var(--g-900);
+      color: var(--ink-on-dark);
     }
 
-    /* Ultra-Clean Footer */
+    /* Minimal Footer */
     footer {
       padding: 28px 0 44px;
-      border-top: 1px solid var(--glass-border);
+      border-top: 1px solid var(--border-hairline);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -582,14 +543,14 @@
       font-weight: 700;
       font-size: 1.15rem;
       letter-spacing: -0.02em;
-      color: var(--text);
+      color: var(--ink);
       text-decoration: none;
     }
 
     @media (max-width: 840px) {
       .hero {
         grid-template-columns: 1fr;
-        padding: 44px 0;
+        padding: 40px 0;
       }
       .steps-grid,
       .engines-grid {
@@ -603,29 +564,15 @@
         grid-template-columns: 1fr;
       }
       .nav-links {
-        gap: 18px;
+        gap: 20px;
       }
     }
   </style>
 </head>
 <body>
-  <!-- SVG Liquid Glass Refraction Filter -->
-  <svg width="0" height="0" style="position: absolute; pointer-events: none;" aria-hidden="true">
-    <defs>
-      <filter id="liquid-refraction" x="-10%" y="-10%" width="120%" height="120%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="2" result="noise" />
-        <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </defs>
-  </svg>
-
-  <!-- Live WebGL ShaderGradient Canvas -->
-  <canvas id="shader-canvas" aria-hidden="true"></canvas>
-  <div class="ambient-overlay" aria-hidden="true"></div>
-
   <div class="container">
     <header class="reveal" style="--delay: 0ms;">
-      <nav class="nav-bar liquid-glass" aria-label="Primary">
+      <nav class="nav-bar" aria-label="Primary">
         <a href="#" class="brand">
           dub<span class="brand-accent">.game</span>
         </a>
@@ -645,7 +592,7 @@
     <main>
       <section class="hero">
         <div class="reveal" style="--delay: 60ms;">
-          <h1>Voice every <span>visual novel.</span></h1>
+          <h1>Voice every <span>visual novel</span><span class="dot">.</span></h1>
           <p class="lead">One-click Steam hook. Real-time character voices.</p>
           <div class="actions">
             <a href="https://github.com/edwardvu7/dub.game" class="btn-download" target="_blank" rel="noopener noreferrer">
@@ -659,7 +606,7 @@
           </div>
         </div>
 
-        <aside class="panel liquid-glass reveal" style="--delay: 140ms;" aria-label="Overlay Tuning Preview">
+        <aside class="panel reveal" style="--delay: 140ms;" aria-label="Overlay Tuning Preview">
           <div class="panel-bar">
             <span>IN-GAME OVERLAY</span>
             <kbd>Shift + F2</kbd>
@@ -708,22 +655,22 @@
       <section class="section" id="pipeline">
         <div class="section-label reveal">Pipeline</div>
         <div class="steps-grid">
-          <article class="step-card liquid-glass reveal" style="--delay: 0ms;">
+          <article class="step-card reveal" style="--delay: 0ms;">
             <div class="step-idx">01</div>
             <h2>Scan Library</h2>
             <p>Auto-detects installed Steam games.</p>
           </article>
-          <article class="step-card liquid-glass reveal" style="--delay: 70ms;">
+          <article class="step-card reveal" style="--delay: 70ms;">
             <div class="step-idx">02</div>
             <h2>Hook Script</h2>
             <p>Captures exact dialogue lines.</p>
           </article>
-          <article class="step-card liquid-glass reveal" style="--delay: 140ms;">
+          <article class="step-card reveal" style="--delay: 140ms;">
             <div class="step-idx">03</div>
             <h2>Cast Voices</h2>
             <p>Profiles every character once.</p>
           </article>
-          <article class="step-card liquid-glass reveal" style="--delay: 210ms;">
+          <article class="step-card reveal" style="--delay: 210ms;">
             <div class="step-idx">04</div>
             <h2>Tune Live</h2>
             <p>Adjust sliders mid-scene.</p>
@@ -734,19 +681,19 @@
       <section class="section" id="engines">
         <div class="section-label reveal">Engines</div>
         <div class="engines-grid">
-          <div class="engine-pill liquid-glass reveal" style="--delay: 0ms;">
+          <div class="engine-pill reveal" style="--delay: 0ms;">
             <span>Ren'Py</span>
             <span class="badge badge-full">Full</span>
           </div>
-          <div class="engine-pill liquid-glass reveal" style="--delay: 60ms;">
+          <div class="engine-pill reveal" style="--delay: 60ms;">
             <span>Godot</span>
             <span class="badge">Beta</span>
           </div>
-          <div class="engine-pill liquid-glass reveal" style="--delay: 120ms;">
+          <div class="engine-pill reveal" style="--delay: 120ms;">
             <span>RPG Maker</span>
             <span class="badge">Beta</span>
           </div>
-          <div class="engine-pill liquid-glass reveal" style="--delay: 180ms;">
+          <div class="engine-pill reveal" style="--delay: 180ms;">
             <span>Unity</span>
             <span class="badge">Beta</span>
           </div>
@@ -765,165 +712,6 @@
   </div>
 
   <script>
-    // 1. WebGL ShaderGradient Engine (Using Your 9-Stop Emerald Palette)
-    (function initShaderGradient() {
-      const canvas = document.getElementById("shader-canvas");
-      const gl = canvas.getContext("webgl", { antialias: false, depth: false });
-      if (!gl) return;
-
-      const vsSource = `
-        attribute vec2 a_pos;
-        void main() {
-          gl_Position = vec4(a_pos, 0.0, 1.0);
-        }
-      `;
-
-      const fsSource = `
-        precision mediump float;
-        uniform vec2 u_res;
-        uniform float u_time;
-        uniform vec2 u_mouse;
-
-        // 2D Simplex-like organic wave noise
-        float hash(vec2 p) {
-          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-        }
-
-        float noise(vec2 p) {
-          vec2 i = floor(p);
-          vec2 f = fract(p);
-          vec2 u = f * f * (3.0 - 2.0 * f);
-          return mix(
-            mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
-            mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-            u.y
-          );
-        }
-
-        float fbm(vec2 p) {
-          float v = 0.0;
-          float a = 0.5;
-          mat2 rot = mat2(0.8, -0.6, 0.6, 0.8);
-          for (int i = 0; i < 4; i++) {
-            v += a * noise(p);
-            p = rot * p * 2.02;
-            a *= 0.5;
-          }
-          return v;
-        }
-
-        void main() {
-          vec2 uv = gl_FragCoord.xy / u_res.xy;
-          vec2 p = uv * 1.8;
-          p.x *= u_res.x / u_res.y;
-
-          float t = u_time * 0.16;
-          vec2 mouseOffset = (u_mouse - 0.5) * 0.35;
-
-          vec2 q = vec2(
-            fbm(p + vec2(0.0, 0.0) + t * 0.4 + mouseOffset),
-            fbm(p + vec2(5.2, 1.3) - t * 0.3)
-          );
-
-          vec2 r = vec2(
-            fbm(p + 2.2 * q + vec2(1.7, 9.2) + t * 0.25),
-            fbm(p + 2.2 * q + vec2(8.3, 2.8) + t * 0.2)
-          );
-
-          float f = fbm(p + r * 1.6);
-
-          // Exact Swatch Colors Normalized to RGB [0..1]
-          vec3 c900 = vec3(0.027, 0.102, 0.071); // #071A12
-          vec3 c800 = vec3(0.078, 0.208, 0.161); // #143529
-          vec3 c700 = vec3(0.133, 0.302, 0.239); // #224D3D
-          vec3 c600 = vec3(0.192, 0.427, 0.337); // #316D56
-          vec3 c500 = vec3(0.271, 0.557, 0.447); // #458E72
-          vec3 c300 = vec3(0.510, 0.706, 0.608); // #82B49B
-
-          vec3 col = mix(c900, c800, smoothstep(0.0, 0.45, f));
-          col = mix(col, c700, smoothstep(0.25, 0.7, dot(q, q)));
-          col = mix(col, c600, smoothstep(0.35, 0.85, r.y));
-          col = mix(col, c500, smoothstep(0.58, 0.98, f * r.x * 1.55));
-          col += c300 * pow(clamp(f * r.y, 0.0, 1.0), 4.0) * 0.28;
-
-          // Subtle ShaderGradient film grain
-          float grain = (hash(uv * u_res.xy + fract(u_time)) - 0.5) * 0.022;
-          col += grain;
-
-          gl_FragColor = vec4(col, 1.0);
-        }
-      `;
-
-      function compile(type, src) {
-        const s = gl.createShader(type);
-        gl.shaderSource(s, src);
-        gl.compileShader(s);
-        return s;
-      }
-
-      const prog = gl.createProgram();
-      gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
-      gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
-      gl.linkProgram(prog);
-      gl.useProgram(prog);
-
-      const buf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-      gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-        gl.STATIC_DRAW
-      );
-
-      const posLoc = gl.getAttribLocation(prog, "a_pos");
-      gl.enableVertexAttribArray(posLoc);
-      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-      const uRes = gl.getUniformLocation(prog, "u_res");
-      const uTime = gl.getUniformLocation(prog, "u_time");
-      const uMouse = gl.getUniformLocation(prog, "u_mouse");
-
-      let mouseX = 0.5, mouseY = 0.5;
-      let targetX = 0.5, targetY = 0.5;
-
-      window.addEventListener("pointermove", (e) => {
-        targetX = e.clientX / window.innerWidth;
-        targetY = 1.0 - e.clientY / window.innerHeight;
-      });
-
-      function resize() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-        canvas.width = window.innerWidth * dpr;
-        canvas.height = window.innerHeight * dpr;
-        gl.viewport(0, 0, canvas.width, canvas.height);
-      }
-
-      window.addEventListener("resize", resize);
-      resize();
-
-      const start = performance.now();
-      function render(now) {
-        mouseX += (targetX - mouseX) * 0.05;
-        mouseY += (targetY - mouseY) * 0.05;
-        gl.uniform2f(uRes, canvas.width, canvas.height);
-        gl.uniform1f(uTime, (now - start) * 0.001);
-        gl.uniform2f(uMouse, mouseX, mouseY);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        requestAnimationFrame(render);
-      }
-      requestAnimationFrame(render);
-    })();
-
-    // 2. Liquid Glass Specular Glare Tracking
-    document.querySelectorAll(".liquid-glass").forEach((card) => {
-      card.addEventListener("pointermove", (e) => {
-        const rect = card.getBoundingClientRect();
-        card.style.setProperty("--mx", `${e.clientX - rect.left}px`);
-        card.style.setProperty("--my", `${e.clientY - rect.top}px`);
-      });
-    });
-
-    // 3. Interactive Voice Overlay Preview
     const profiles = {
       sylvie: {
         speaker: "Sylvie",
@@ -982,7 +770,6 @@
       input.addEventListener("input", updateReadouts);
     });
 
-    // 4. Smooth Scroll Reveal Observer
     const revealEls = document.querySelectorAll(".reveal");
     const revealObserver = new IntersectionObserver(
       (entries) => {
@@ -998,7 +785,6 @@
 
     revealEls.forEach((el) => revealObserver.observe(el));
 
-    // 5. Smooth Anchor Scrolling
     document.querySelectorAll("a[data-scroll]").forEach((link) => {
       link.addEventListener("click", (e) => {
         const targetId = link.getAttribute("href");
