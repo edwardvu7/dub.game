@@ -83,7 +83,11 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1180, height: 780, minWidth: 880, minHeight: 600,
     backgroundColor: '#0b0d10', title: 'dub.game', show: false,
-    icon: APP_ICON, // taskbar and title bar; the installed .exe gets build/icon.png
+    icon: APP_ICON, // taskbar; the installed .exe gets build/icon.png
+    // No title bar: the app fills the window. Windows keeps its own minimise/maximise/close
+    // buttons in the top-right corner; ui/index.html makes the top strip draggable.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#0b0d10', symbolColor: '#99a0ab', height: 34 },
     webPreferences: webPreferences(),
   });
   lockDown(mainWindow);
