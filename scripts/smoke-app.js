@@ -66,9 +66,12 @@ class FakeWindow extends EventEmitter {
   constructor(opts) { super(); this.opts = opts; this.visible = false; this.webContents = new FakeWebContents(this); windows.push(this); }
   loadFile(f) { this.file = f; this.webContents.url = 'file://' + f; setImmediate(() => { this.emit('ready-to-show'); this.webContents.emit('did-finish-load'); }); return Promise.resolve(); }
   show() { this.visible = true; } hide() { this.visible = false; } isVisible() { return this.visible; }
-  isDestroyed() { return false; } isMinimized() { return false; } restore() {} focus() {}
+  isDestroyed() { return false; } isMinimized() { return false; } restore() {}
   setAlwaysOnTop() {} setIgnoreMouseEvents() {} setVisibleOnAllWorkspaces() {}
+  setBounds(b) { this.bounds = b; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() {}
 }
+const displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }, { workArea: { x: 1920, y: 0, width: 2560, height: 1400 } }];
+let cursor = { x: 100, y: 100 };
 const handlers = {};
 const shortcuts = {};
 const app = new EventEmitter();
@@ -79,6 +82,7 @@ Object.assign(app, {
   requestSingleInstanceLock: () => true,
   whenReady: () => Promise.resolve(),
   quit: () => log('app.quit() called'),
+  setAppUserModelId() {},
 });
 const electron = {
   app, BrowserWindow: FakeWindow,
@@ -87,7 +91,12 @@ const electron = {
   shell: { openExternal: (u) => calls.push('openExternal ' + u) },
   dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }), showErrorBox: (t, m) => problems.push('ERROR BOX ' + m) },
   safeStorage: { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from('enc:' + s), decryptString: (b) => b.toString().slice(4) },
-  screen: { getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }) },
+  screen: {
+    getPrimaryDisplay: () => displays[0],
+    getCursorScreenPoint: () => cursor,
+    getDisplayNearestPoint: (p) => displays.find((d) => p.x >= d.workArea.x && p.x < d.workArea.x + d.workArea.width) || displays[0],
+  },
+  Notification: Object.assign(function () { return { show() {} }; }, { isSupported: () => true }),
   clipboard: { readText: () => '' },
   Menu: { setApplicationMenu() {} },
 };
@@ -130,8 +139,15 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   check(typeof shortcuts['Shift+F2'] === 'function', 'Shift+F2 is registered');
   shortcuts['Shift+F2']();
   check(overlay.visible && events('overlay:toggle').length === 1, 'Shift+F2 shows the overlay and tells it to refresh');
+  check(overlay.bounds && overlay.bounds.x === 1920 - 460 && overlay.bounds.height === 1040, 'overlay docks to the right edge of the screen in use');
   shortcuts['Shift+F2']();
   check(!overlay.visible, 'Shift+F2 again hides it');
+  cursor = { x: 3000, y: 500 }; // the game is on the second monitor
+  shortcuts['Shift+F2']();
+  check(overlay.bounds.x === 1920 + 2560 - 460 && overlay.bounds.height === 1400, 'overlay follows the game to a second monitor');
+  shortcuts['Shift+F2']();
+  overlay.webContents.emit('render-process-gone');
+  check(overlay.reloaded === 1, 'a crashed overlay page reloads itself');
 
   // 4. Settings: env keys count, no key ever leaves main
   const s = await invoke('settings:get');

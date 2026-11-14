@@ -2,7 +2,7 @@
 // Electron entry point: windows, hotkey, localhost server, and wiring of the testable modules.
 const path = require('node:path');
 const { app, BrowserWindow, globalShortcut, ipcMain, shell, dialog, safeStorage, screen,
-  clipboard, Menu } = require('electron');
+  clipboard, Menu, Notification } = require('electron');
 
 const { loadEnv } = require('./env');
 const { createServer, PORT, HOST } = require('./server');
@@ -15,6 +15,7 @@ const { createHandlers, registerIpc } = require('./ipc');
 const { createGames } = require('./steam');
 const tts = require('./tts');
 const profiler = require('./profiler');
+const { createFullscreenCheck, EXCLUSIVE_MESSAGE } = require('./fullscreen');
 const catalog = require('../voices_catalog.json');
 
 const ROOT = path.join(__dirname, '..');
@@ -94,24 +95,52 @@ function createMainWindow() {
   mainWindow.on('closed', () => { mainWindow = null; app.quit(); });
 }
 
-// A see-through, always-on-top panel docked to the right edge of the primary display.
-// UNVERIFIED: shows over windowed/borderless games; not over exclusive fullscreen.
+// A see-through, always-on-top panel docked to the right edge of the screen the player is using.
+// UNVERIFIED: shows over windowed/borderless games; not over exclusive fullscreen (see fullscreen.js).
+const OVERLAY_WIDTH = 460;
+const fullscreenCheck = createFullscreenCheck();
+let lastFullscreenWarning = 0;
+
+// The display under the mouse is the one the game is on (the player just used it).
+function overlayBounds() {
+  let display;
+  try { display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { /* fall back */ }
+  const area = (display || screen.getPrimaryDisplay()).workArea;
+  const width = Math.min(OVERLAY_WIDTH, area.width);
+  return { x: area.x + area.width - width, y: area.y, width, height: area.height };
+}
+
 function createOverlayWindow() {
-  const area = screen.getPrimaryDisplay().workArea;
-  const width = Math.min(460, area.width);
   overlayWindow = new BrowserWindow({
-    x: area.x + area.width - width, y: area.y, width, height: area.height,
+    ...overlayBounds(),
     transparent: true, frame: false, resizable: false, movable: false, minimizable: false,
     maximizable: false, fullscreenable: false, skipTaskbar: true, hasShadow: false, show: false,
     alwaysOnTop: true, title: 'dub.game overlay',
     webPreferences: webPreferences(),
   });
   overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   lockDown(overlayWindow);
   overlayWindow.loadFile(path.join(ROOT, 'ui', 'overlay.html'));
-  // The overlay's close button calls window.close(): hide instead, so it reopens instantly.
+  // The overlay's Hide button calls window.close(): hide instead, so it reopens instantly.
   overlayWindow.on('close', (event) => {
     if (!quitting) { event.preventDefault(); overlayWindow.hide(); }
+  });
+  // If the overlay page ever crashes, reload it so Shift+F2 keeps working.
+  overlayWindow.webContents.on('render-process-gone', () => {
+    if (!quitting && overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.reload();
+  });
+}
+
+function warnIfExclusiveFullscreen() {
+  fullscreenCheck().then((state) => {
+    if (state !== 'exclusive' || Date.now() - lastFullscreenWarning < 60000) return;
+    lastFullscreenWarning = Date.now();
+    emit('app:status', { level: 'warn', message: EXCLUSIVE_MESSAGE });
+    // Windows holds notifications back during exclusive fullscreen and shows them afterwards.
+    try {
+      if (Notification.isSupported()) new Notification({ title: 'dub.game overlay is hidden', body: EXCLUSIVE_MESSAGE }).show();
+    } catch { /* the main-window message is enough */ }
   });
 }
 
@@ -119,13 +148,19 @@ function toggleOverlay() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   if (overlayWindow.isVisible()) {
     overlayWindow.hide();
-  } else {
-    overlayWindow.show();
-    send(overlayWindow, 'overlay:toggle');
+    return;
   }
+  // Re-placed on every open: the game may be on another monitor, or the resolution changed.
+  overlayWindow.setBounds(overlayBounds());
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver'); // Windows can drop topmost after a hide
+  overlayWindow.show();
+  overlayWindow.focus();
+  send(overlayWindow, 'overlay:toggle');
+  warnIfExclusiveFullscreen();
 }
 
 async function start() {
+  if (process.platform === 'win32') app.setAppUserModelId('game.dub.app');
   Menu.setApplicationMenu(null);
   const userData = app.getPath('userData');
 

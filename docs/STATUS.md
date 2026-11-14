@@ -11,7 +11,7 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 - `npm run smoke:hook`: runs `dubgame.rpy` against a stand-in Ren'Py and checks what reaches the app:
   speaker names (including dynamic names and narration), tag stripping, skipping, /stop, never
   blocking the game, and staying silent when the app is closed. All pass.
-- `npm test`: 63 pass, 0 fail, 1 skipped (A's permission test only runs on Windows).
+- `npm test`: 67 pass, 0 fail, 1 skipped (A's permission test only runs on Windows).
 - The Ren'Py hook compiles (`npm run check:hook`).
 - Every IPC channel the UI uses is allowed by `main/preload.js` (guarded by `test/ui.lib.test.js`).
 - The UI pages were clicked through in Chrome against `ui/fake-dub.js`: keys, games, cards, audio, toasts.
@@ -21,9 +21,18 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
   old line then played over the current one. The hook now sends from one thread, in order, and skips
   lines that are already outdated; the app also drops a line older than the newest (hook version 3).
 
+## Overlay (Shift+F2)
+- Opens on the monitor under the mouse (the one the game is on), docked to the right edge, sized to
+  that screen every time it opens, so resolution changes and second monitors work.
+- Re-asserts always-on-top each time it opens, focuses itself, and reloads if its page crashes.
+- Exclusive fullscreen check (`main/fullscreen.js`): on Windows, opening the overlay asks Windows
+  whether a game is in exclusive (Direct3D) fullscreen. If so, the main window shows how to switch the
+  game to windowed or borderless, and a Windows notification appears once the game leaves fullscreen.
+  Borderless fullscreen is fine. Checked by unit tests with a stand-in PowerShell; not yet on Windows.
+
 ## Not verified yet (needs a real Windows machine)
 - The app has never been started in Electron. `npm install` and `npm start` are the first real run.
-- Overlay: transparency, always-on-top over a game, and the Shift+F2 hotkey.
+- Overlay over a real game: windowed, borderless, and the exclusive-fullscreen warning.
 - Steam scan against a real library, and installing the hook into a real game.
 - The Ren'Py hook against a real game (speaker names, Ren'Py 7 vs 8).
 - Real ElevenLabs and Gemini calls, including the model IDs.
