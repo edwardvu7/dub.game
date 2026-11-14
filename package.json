@@ -1,0 +1,14 @@
+{
+  "name": "dub-game",
+  "version": "0.1.0",
+  "description": "AI voice-over for visual novels: Gemini casts a voice per character, ElevenLabs speaks every line.",
+  "main": "main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/",
+    "dist": "electron-builder --win"
+  },
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}
