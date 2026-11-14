@@ -38,7 +38,7 @@ for name, mod in [("renpy.ast", ast), ("renpy.character", character_mod), ("renp
     sys.modules[name] = mod
 def substitute(t): return re.sub(r"\[(\w+)\]", lambda m: str(getattr(store, m.group(1), m.group(0))), t)
 renpy = types.SimpleNamespace(substitute=substitute)
-config = types.SimpleNamespace(all_character_callbacks=[], start_callbacks=[], interact_callbacks=[], skipping=None)
+config = types.SimpleNamespace(all_character_callbacks=[], start_callbacks=[], interact_callbacks=[], skipping=None, basedir="/games/The Question/")
 game_mod.preferences = types.SimpleNamespace(fullscreen=False)
 
 import os
@@ -95,7 +95,9 @@ burst = [b for p, b in got if p == "/line"]
 seqs = [b["seq"] for b in burst]
 check(burst and burst[-1]["text"] == "burst 49", "a burst of 50 clicks always ends on the newest line (%d of 50 sent)" % len(burst))
 check(seqs == sorted(seqs), "lines reach the app in order")
-check(lines[0] == {"speaker": "Sylvie", "text": "Welcome back, Ana. I missed you{really}}.", "engine": "renpy", "seq": 1}, "line 1: " + json.dumps(lines[0]))
+check(lines[0] == {"speaker": "Sylvie", "text": "Welcome back, Ana. I missed you{really}}.", "engine": "renpy", "game": "renpy:The Question", "seq": 1}, "line 1: " + json.dumps(lines[0]))
+check(chars and chars[0].get("game") == "renpy:The Question", "the cast is tagged with the game too")
+check(stops and all(b.get("game") == "renpy:The Question" for b in stops), "so is /stop")
 check(lines[1]["speaker"] == "Narrator", "narration is sent as Narrator")
 check(len(lines) == 4, "all 4 lines at reading pace arrive: %d" % len(lines))
 check(lines[2]["speaker"] == "Ana", "dynamic player name resolved for a line")

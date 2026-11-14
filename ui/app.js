@@ -222,13 +222,119 @@
     scanning = false;
   });
 
-  // ---------- Voices ----------
+  // ---------- Voices (one cast per game) ----------
   let cards = null;
   let currentSpeaker = null;
+  const gamePick = $('voices-game');
+  const resetButton = $('voices-reset');
+  const FOLLOW = ''; // picker value: follow the game that is playing
+
+  function paintGamePicker(store) {
+    const ids = L.gameIds(store);
+    const games = store.games || {};
+    const chosen = gamePick.value;
+    const options = [];
+    const now = document.createElement('option');
+    now.value = FOLLOW;
+    now.textContent = store.current ? 'Playing now: ' + L.gameLabel(store.current, games[store.current]) : 'Playing now';
+    options.push(now);
+    for (const id of ids) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      const count = Object.keys(L.voicesFor(store, id)).length;
+      opt.textContent = L.gameLabel(id, games[id]) + ' (' + count + (count === 1 ? ' voice)' : ' voices)');
+      options.push(opt);
+    }
+    if (document.activeElement !== gamePick) {
+      gamePick.replaceChildren(...options);
+      gamePick.value = ids.includes(chosen) ? chosen : FOLLOW;
+    }
+    gamePick.disabled = ids.length === 0;
+    resetButton.hidden = !(cards && cards.game());
+  }
+
+  gamePick.addEventListener('change', () => {
+    if (cards) cards.setGame(gamePick.value || null);
+    disarmReset();
+  });
+
+  // Reset needs a second click within a few seconds: it forgets every voice of the game.
+  let resetTimer = null;
+  function disarmReset() {
+    clearTimeout(resetTimer);
+    resetButton.dataset.armed = '';
+    resetButton.textContent = 'Reset voices';
+  }
+  resetButton.addEventListener('click', async () => {
+    const game = cards && cards.game();
+    if (!game) return;
+    if (!resetButton.dataset.armed) {
+      resetButton.dataset.armed = '1';
+      resetButton.textContent = 'Click again to reset';
+      resetTimer = setTimeout(disarmReset, 4000);
+      return;
+    }
+    disarmReset();
+    try {
+      await dub.invoke('voices:clearGame', { game });
+      gamePick.value = FOLLOW;
+      cards.setGame(null);
+      toast('Voices reset. The next line from that game picks them again.', 'note');
+    } catch (e) { fail(e); }
+  });
+
   openers.voices = () => {
-    cards = window.DubCards.mount($('cards-host'), { dub, onError: (m) => toast(m, 'error') });
+    cards = window.DubCards.mount($('cards-host'), {
+      dub, onError: (m) => toast(m, 'error'), onStore: paintGamePicker,
+      emptyText: 'No characters for this game yet. Voices appear here as soon as it sends its first line.',
+    });
     cards.setCurrent(currentSpeaker);
   };
+
+  // ---------- Usage (cost control) ----------
+  function paintUsage(u) {
+    if (!u) return;
+    const s = u.session || {};
+    $('usage-session').textContent = L.formatCount(s.chars) + ' characters' +
+      (s.cached ? ', ' + L.formatCount(s.cached) + (s.cached === 1 ? ' line' : ' lines') + ' replayed free' : '');
+    $('usage-month').textContent = L.formatCount(u.monthChars) + ' characters' +
+      (u.limit ? ' of ' + L.formatCount(u.limit) : '') + (u.overLimit ? '. Limit reached: new lines are not spoken.' : '');
+    const field = $('usage-limit');
+    if (document.activeElement !== field) field.value = u.limit ? String(u.limit) : '';
+  }
+  $('usage-limit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const out = $('usage-limit-result');
+    const raw = $('usage-limit').value.trim();
+    const n = raw === '' ? 0 : Number(raw);
+    if (!Number.isFinite(n) || n < 0) {
+      out.dataset.tone = 'bad';
+      out.textContent = 'Enter a number of characters, or leave it empty for no limit.';
+      return;
+    }
+    try {
+      const u = await dub.invoke('usage:setLimit', n);
+      paintUsage(u);
+      out.dataset.tone = 'ok';
+      out.textContent = u.limit ? 'Saved. dub.game stops after ' + L.formatCount(u.limit) + ' characters this month.' : 'Saved. No monthly limit.';
+    } catch (err) {
+      out.dataset.tone = 'bad';
+      out.textContent = L.errorText(err);
+    }
+  });
+  $('usage-plan-check').addEventListener('click', async () => {
+    const button = $('usage-plan-check');
+    button.disabled = true;
+    $('usage-plan').textContent = 'Checking…';
+    try {
+      $('usage-plan').textContent = L.planSummary(await dub.invoke('usage:plan'));
+    } catch (e) {
+      $('usage-plan').textContent = L.errorText(e);
+    } finally {
+      button.disabled = false;
+    }
+  });
+  dub.on('usage:changed', paintUsage);
 
   // ---------- Settings ----------
   const HAS = { elevenlabs: 'hasElevenLabsKey', gemini: 'hasGeminiKey' };
@@ -399,6 +505,7 @@
   (async () => {
     try {
       paintSettings(await dub.invoke('settings:get'));
+      paintUsage(await dub.invoke('usage:get'));
     } catch (e) {
       fail(e);
     }

@@ -125,3 +125,17 @@ test('testKey: ok, restricted-but-valid, invalid, offline', async () => {
   assert.deepEqual(await profiler.testKey(KEY, { fetch: async () => res(400) }), { ok: false, error: 'Gemini 400: API key not valid' });
   assert.equal((await profiler.testKey('', {})).ok, false);
 });
+
+test('tts.subscription: reads the plan quota, and explains a key without permission', async () => {
+  const { subscription } = require('../main/tts');
+  const ok = await subscription('k', { fetch: async (url) => {
+    assert.match(url, /\/v1\/user\/subscription$/);
+    return { ok: true, json: async () => ({ character_count: 1200, character_limit: 10000, next_character_count_reset_unix: 1796000000, tier: 'free' }) };
+  } });
+  assert.deepEqual(ok, { ok: true, used: 1200, limit: 10000, tier: 'free', resetAt: 1796000000000 });
+  const denied = await subscription('k', { fetch: async () => ({ ok: false, status: 401,
+    text: async () => JSON.stringify({ detail: { status: 'missing_permissions', message: 'missing_permissions' } }) }) });
+  assert.equal(denied.ok, false);
+  assert.match(denied.error, /User: read/);
+  assert.equal((await subscription('')).ok, false);
+});

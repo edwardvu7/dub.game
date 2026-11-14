@@ -45,7 +45,14 @@
       <header class="view-head">
         <div>
           <h1>Voices</h1>
-          <p class="lede">Every character dub.game has heard. Change a voice and the next line uses it.</p>
+          <p class="lede">Each game keeps its own cast. Change a voice and the next line uses it.</p>
+        </div>
+        <div class="view-tools">
+          <label class="game-pick">
+            <span class="field-label">Game</span>
+            <select class="select" id="voices-game" aria-label="Game"></select>
+          </label>
+          <button class="btn btn-quiet" id="voices-reset" type="button" hidden>Reset voices</button>
         </div>
       </header>
       <div id="cards-host"></div>
@@ -96,6 +103,25 @@
         </div>
         <p class="keyrow-result" data-role="result" role="status"></p>
       </form>
+
+      <section class="usage" aria-labelledby="usage-title">
+        <div class="keyrow-head">
+          <h2 id="usage-title">Usage</h2>
+        </div>
+        <p class="keyrow-what">ElevenLabs charges per character spoken. Lines dub.game has spoken before replay from this computer for free.</p>
+        <dl class="usage-stats">
+          <div><dt>This session</dt><dd id="usage-session">0 characters</dd></div>
+          <div><dt>This month</dt><dd id="usage-month">0 characters</dd></div>
+          <div><dt>ElevenLabs plan</dt><dd><span id="usage-plan">Not checked yet.</span> <button class="btn btn-quiet btn-small" id="usage-plan-check" type="button">Check</button></dd></div>
+        </dl>
+        <form class="usage-limit" id="usage-limit-form" autocomplete="off">
+          <label for="usage-limit">Stop speaking new lines after</label>
+          <input class="input input-number" type="number" id="usage-limit" min="0" step="1000" inputmode="numeric" placeholder="No limit">
+          <span>characters a month</span>
+          <button class="btn" type="submit">Save</button>
+        </form>
+        <p class="keyrow-result" id="usage-limit-result" role="status"></p>
+      </section>
 
       <div class="switches">
         <label class="switch">

@@ -19,7 +19,7 @@ function createClipboardWatcher({ readText, onLine, intervalMs = 200, timers = g
     if (text === last) return;
     last = text;
     if (text.length < 2 || text.length > 2000) return;
-    onLine({ speaker: 'unknown', text, engine: 'clipboard' });
+    onLine({ speaker: 'unknown', text, engine: 'clipboard', game: 'clipboard' });
   }
 
   return {

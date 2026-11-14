@@ -7,6 +7,8 @@ extends Node
 const URL := "http://127.0.0.1:8000/line"
 const HEALTH := "http://127.0.0.1:8000/health"
 var seen := {}
+# "godot:<folder the game's .exe is in>", so each game keeps its own voices in the app.
+var game_id := "godot:" + OS.get_executable_path().get_base_dir().get_file()
 
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
@@ -51,6 +53,6 @@ func _check(n: Node, text: String) -> void:
     add_child(req)
     req.request_completed.connect(func(_a, _b, _c, _d): req.queue_free())
     var body := JSON.stringify({"speaker": "unknown", "text": text,
-        "engine": "godot", "source": str(n.get_path())})
+        "engine": "godot", "game": game_id, "source": str(n.get_path())})
     if req.request(URL, ["Content-Type: application/json"], HTTPClient.METHOD_POST, body) != OK:
         req.queue_free()

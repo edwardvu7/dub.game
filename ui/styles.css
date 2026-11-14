@@ -180,7 +180,7 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
 .game[data-status="off"] .game-art img { filter: saturate(0.35) brightness(0.8); }
 .game[data-status="soon"] .game-art img { filter: grayscale(1) brightness(0.55); }
 .game[data-status="soon"] .game-name { color: var(--dim); }
-.tag-soon { color: var(--dim); }
+.tag-soon, .tag-muted { color: var(--dim); }
 .game-initials { font: 700 40px/1 var(--display); color: var(--line); }
 .game-badge { position: absolute; top: 8px; left: 8px; background: var(--desk); }
 .game-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; flex: 1; }
@@ -207,6 +207,7 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
 }
 .card.is-speaking { border-left-color: var(--tally); }
 .card.is-busy { opacity: 0.7; }
+.card.is-muted .faders, .card.is-muted .field, .card.is-muted .card-about { opacity: 0.45; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .card-name { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card.is-speaking .card-name::after {
@@ -218,7 +219,8 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
 .faders { display: flex; flex-direction: column; gap: 4px; }
 .fader { display: grid; grid-template-columns: 68px 1fr 46px; align-items: center; gap: 10px; }
 .fader-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--paper); font-size: 12.5px; }
-.card-actions { display: flex; gap: 8px; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.card-mute { margin-left: auto; }
 
 /* ---------- Settings ---------- */
 .guide { margin: 0 0 22px; padding-left: 20px; color: var(--dim); max-width: 62ch; }
@@ -237,6 +239,19 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
 .keyrow-result[data-tone="ok"]::before { content: "\2713\00a0"; }
 .keyrow-result[data-tone="bad"] { color: var(--bad); }
 .switches { display: flex; flex-direction: column; gap: 18px; max-width: 760px; margin-top: 26px; }
+.usage {
+  max-width: 760px; margin-top: 26px; padding: 16px 18px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m);
+}
+.usage-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; margin: 0 0 14px; }
+.usage-stats dt { color: var(--dim); font-size: 12.5px; }
+.usage-stats dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.usage-limit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
+.input-number { width: 130px; font-variant-numeric: tabular-nums; }
+.btn-small { min-height: 0; padding: 2px 8px; font-size: 12.5px; }
+/* Voices tab: which game's cast is shown */
+.game-pick { display: flex; align-items: center; gap: 8px; }
+.game-pick .select { width: auto; min-width: 220px; max-width: 320px; }
 
 /* ---------- Now-playing bar and the level meter ---------- */
 .now {

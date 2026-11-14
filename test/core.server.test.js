@@ -80,3 +80,11 @@ test('server: /stop, empty text, bad input and other routes', async () => {
   assert.deepEqual(stops, [{ engine: 'renpy', seq: 4 }, { engine: 'renpy', seq: undefined }]);
   assert.deepEqual(lines, [], 'blank text is acknowledged but never spoken');
 });
+
+test('server: game id is passed on for per-game voices, and optional', () => {
+  const { normalizeLine, normalizeCharacters } = require('../main/server');
+  assert.equal(normalizeLine({ text: 'Hi', game: ' renpy:DDLC ' }).game, 'renpy:DDLC');
+  assert.equal(normalizeLine({ text: 'Hi' }).game, undefined, 'old hooks still work');
+  assert.equal(normalizeLine({ text: 'Hi', game: 42 }).game, undefined);
+  assert.equal(normalizeCharacters({ game: 'godot:X', characters: [] }).game, 'godot:X');
+});

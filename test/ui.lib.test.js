@@ -138,3 +138,24 @@ test('pages load their scripts in dependency order and ship no inline script or 
     assert.ok(fs.existsSync(path.join(UI, 'styles.css')));
   }
 });
+
+test('voices per game: labels, picker order and lookup', () => {
+  const store = { current: 'renpy:B', games: {
+    'renpy:A': { name: 'Alpha Story', voices: { X: {} } },
+    'renpy:B': { name: 'renpy:B', voices: { Y: {}, Z: {} } },
+    clipboard: { name: 'clipboard', voices: {} } } };
+  assert.equal(L.gameLabel('renpy:B', store.games['renpy:B']), 'B', 'unnamed: the folder name');
+  assert.equal(L.gameLabel('renpy:A', store.games['renpy:A']), 'Alpha Story');
+  assert.equal(L.gameLabel('clipboard', store.games.clipboard), 'Clipboard (other games)');
+  assert.equal(L.gameLabel('renpy:unknown'), 'Unknown game');
+  assert.deepEqual(L.gameIds(store), ['renpy:B', 'renpy:A', 'clipboard'], 'current game first');
+  assert.deepEqual(Object.keys(L.voicesFor(store, 'renpy:B')), ['Y', 'Z']);
+  assert.deepEqual(L.voicesFor(store, 'nope'), {});
+  assert.deepEqual(L.voicesFor(null, 'x'), {});
+});
+
+test('usage: counts and the ElevenLabs plan line', () => {
+  assert.equal(L.formatCount(12345.4), '12,345');
+  assert.match(L.planSummary({ ok: true, used: 2500, limit: 10000 }), /^Used 2,500 of 10,000 characters \(25%\)\.$/);
+  assert.equal(L.planSummary({ ok: false, error: 'No key.' }), 'No key.');
+});

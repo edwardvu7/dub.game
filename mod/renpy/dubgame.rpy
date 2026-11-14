@@ -5,9 +5,10 @@
 # it never changes the game's own files, and the game runs normally when the app is closed.
 #
 # Contract (see CLAUDE.md):
-#   POST /line        {speaker, text, engine: "renpy", seq}
-#   POST /stop        {engine: "renpy", seq}            (player clicked past the line)
-#   POST /characters  {engine: "renpy", characters: [{speaker, samples}]}   (once, at launch)
+#   POST /line        {speaker, text, engine: "renpy", game, seq}
+#   POST /stop        {engine: "renpy", game, seq}      (player clicked past the line)
+#   POST /characters  {engine: "renpy", game, characters: [{speaker, samples}]}   (once, at launch)
+#   game is "renpy:<game folder name>", so each game keeps its own voices in the app.
 #   GET  /health      (once, at launch) is the app running? If so, go borderless fullscreen.
 #
 # Display mode: the dub.game overlay can sit on top of a windowed or borderless game, but not
@@ -18,7 +19,7 @@
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
-# DUBGAME_HOOK_VERSION 5
+# DUBGAME_HOOK_VERSION 6
 
 init -999 python:
     import json as _dubgame_json
@@ -35,6 +36,19 @@ init -999 python:
     _dubgame_TIMEOUT = 2
     _dubgame_text_type = type(u"")
     _dubgame_state = {"seq": 0, "sent_characters": False, "app_running": False}
+
+    def _dubgame_game_id():
+        # The folder the game is installed in (config.basedir), the same name Steam uses.
+        try:
+            import os as _os
+            base = _os.path.basename(_os.path.normpath(config.basedir))
+            if base:
+                return u"renpy:" + (base if isinstance(base, type(u"")) else base.decode("utf-8", "replace"))
+        except Exception:
+            pass
+        return u"renpy:unknown"
+
+    _dubgame_game = _dubgame_game_id()
 
     # One sender thread, in order. Separate threads per line could reach the app out of order
     # when the player clicks fast, and an old line would then play over the current one.
@@ -162,11 +176,12 @@ init -999 python:
                     "speaker": _dubgame_speaker(),
                     "text": text,
                     "engine": "renpy",
+                    "game": _dubgame_game,
                     "seq": _dubgame_state["seq"],
                 })
             elif event == "end":
                 # The player moved on. The app ignores this if a newer line already arrived.
-                _dubgame_post("/stop", {"engine": "renpy", "seq": _dubgame_state["seq"]})
+                _dubgame_post("/stop", {"engine": "renpy", "game": _dubgame_game, "seq": _dubgame_state["seq"]})
         except Exception:
             pass  # never crash the game
 
@@ -222,7 +237,7 @@ init -999 python:
                     req = _dubgame_Request(
                         _dubgame_URL + "/characters",
                         data=_dubgame_json.dumps(
-                            {"engine": "renpy", "characters": characters}).encode("utf-8"),
+                            {"engine": "renpy", "game": _dubgame_game, "characters": characters}).encode("utf-8"),
                         headers={"Content-Type": "application/json"})
                     _dubgame_urlopen(req, timeout=_dubgame_TIMEOUT).read()
             except Exception:

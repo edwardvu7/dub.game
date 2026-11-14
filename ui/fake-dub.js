@@ -30,7 +30,7 @@
     { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', description: 'deep, steady adult man, American' },
     { voice_id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'warm older man, British' },
   ];
-  const voices = {
+  const cast = {
     Sylvie: { speaker: 'Sylvie', gender: 'female', age_range: 'young_adult', personality: 'Gentle and shy childhood friend.',
       voice_id: 'EXAVITQu4vr4xnSDxMaL', stability: 0.5, style: 0.3, speed: 1.0, reason: 'Soft, warm voice fits her.', locked: false },
     Marcus: { speaker: 'Marcus', gender: 'male', age_range: 'adult', personality: 'Dry, tired detective who has seen it all.',
@@ -38,6 +38,15 @@
     Narrator: { speaker: 'Narrator', gender: 'neutral', age_range: 'adult', personality: '',
       voice_id: 'JBFqnCBsd6RMkjVDRZzb', stability: 0.6, style: 0.1, speed: 1.0, reason: 'One calm voice for narration.', locked: false },
   };
+  const store = { current: 'renpy:The Question', games: {
+    'renpy:The Question': { name: 'The Question', voices: cast },
+    'renpy:DDLC': { name: 'Doki Doki Literature Club', voices: {
+      Sayori: { speaker: 'Sayori', gender: 'female', age_range: 'teen', personality: 'Cheerful and clumsy.',
+        voice_id: '21m00Tcm4TlvDq8ikWAM', stability: 0.4, style: 0.5, speed: 1.05, reason: 'Bright and quick.', locked: false } } },
+  } };
+  const voicesOf = (a) => store.games[(a && a.game) || store.current].voices;
+  const usage = { session: { chars: 1840, gemini: 2, lines: 31, cached: 6 }, month: '2026-11', monthChars: 12650,
+    monthGemini: 9, totalChars: 40210, limit: 0, byGame: {}, overLimit: false };
   let settings = { hasElevenLabsKey: false, hasGeminiKey: false, narration: true, clipboardMode: false };
   const game = (a) => {
     const g = games.find((x) => x.appid === String(a.appid));
@@ -57,21 +66,33 @@
       return copy(g);
     },
     'games:launch': (a) => { game(a); return true; },
-    'voices:get': () => copy(voices),
+    'voices:get': () => copy(store),
     'voices:catalog': () => copy(catalog),
     'voices:update': (a) => {
-      voices[a.speaker] = { ...voices[a.speaker], ...a.patch, locked: true };
-      emit('voices:changed', copy(voices));
+      const voices = voicesOf(a);
+      const locks = Object.keys(a.patch || {}).some((k) => k !== 'muted');
+      voices[a.speaker] = { ...voices[a.speaker], ...a.patch, locked: voices[a.speaker].locked || locks };
+      emit('voices:changed', copy(store));
       return copy(voices[a.speaker]);
     },
     'voices:reroll': async (a) => {
       await wait(700);
       const pick = catalog[Math.floor(Math.random() * catalog.length)];
+      const voices = voicesOf(a);
       voices[a.speaker] = { ...voices[a.speaker], voice_id: pick.voice_id, locked: false, reason: 'Re-rolled.' };
-      emit('voices:changed', copy(voices));
+      emit('voices:changed', copy(store));
       return copy(voices[a.speaker]);
     },
     'voices:preview': async () => { await wait(300); return true; },
+    'voices:clearGame': (a) => {
+      delete store.games[a.game];
+      if (store.current === a.game) store.current = null;
+      emit('voices:changed', copy(store));
+      return true;
+    },
+    'usage:get': () => copy(usage),
+    'usage:setLimit': (n) => { usage.limit = Number(n) > 0 ? Math.round(Number(n)) : 0; usage.overLimit = !!usage.limit && usage.monthChars >= usage.limit; return copy(usage); },
+    'usage:plan': async () => { await wait(400); return { ok: true, used: 12650, limit: 30000, tier: 'starter', resetAt: Date.parse('2026-12-01') }; },
     'settings:get': () => copy(settings),
     'settings:setKeys': (a) => {
       if (typeof a.elevenlabs === 'string') settings.hasElevenLabsKey = !!a.elevenlabs.trim();
@@ -105,5 +126,5 @@
     { speaker: 'Narrator', text: 'The rain had not let up since morning.' },
   ];
   let i = 0;
-  setInterval(() => emit('line:received', { ...script[i++ % script.length], engine: 'renpy' }), 5000);
+  setInterval(() => emit('line:received', { ...script[i++ % script.length], engine: 'renpy', game: 'renpy:The Question' }), 5000);
 })();

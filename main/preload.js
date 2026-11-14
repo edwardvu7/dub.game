@@ -6,12 +6,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const INVOKE = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch',
-  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview',
+  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
+  'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
   'settings:setClipboardMode',
 ];
 const EVENTS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'overlay:toggle', 'games:changed',
-  'app:status'];
+  'usage:changed', 'app:status'];
 
 contextBridge.exposeInMainWorld('dub', {
   invoke(channel, arg) {

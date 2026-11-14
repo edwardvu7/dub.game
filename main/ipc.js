@@ -4,15 +4,21 @@
 
 const INVOKE_CHANNELS = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch',
-  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview',
+  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
+  'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
   'settings:setClipboardMode',
 ];
 const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'games:changed',
-  'overlay:toggle', 'app:status'];
+  'usage:changed', 'overlay:toggle', 'app:status'];
 
-/** createHandlers({games, voices, settings, pipeline, catalog, onClipboardMode?}) */
-function createHandlers({ games, voices, settings, pipeline, catalog, onClipboardMode }) {
+/**
+ * createHandlers({games, voices, settings, pipeline, catalog, usage?, plan?, onClipboardMode?})
+ * voices is the per-game store; voice channels take an optional `game` (default: the current game).
+ * plan() asks ElevenLabs how much of the account's monthly quota is used.
+ */
+function createHandlers({ games, voices, settings, pipeline, catalog, usage, plan, onClipboardMode }) {
+  const gameArg = (arg) => (arg && typeof arg.game === 'string' && arg.game ? arg.game : (voices.current() || 'unknown'));
   const need = (arg, field) => {
     if (!arg || typeof arg !== 'object' || arg[field] === undefined) throw new Error(`Missing "${field}"`);
     return arg;
@@ -26,9 +32,17 @@ function createHandlers({ games, voices, settings, pipeline, catalog, onClipboar
 
     'voices:get': () => voices.all(),
     'voices:catalog': () => catalog,
-    'voices:update': (arg) => voices.update(String(need(arg, 'speaker').speaker), arg.patch || {}),
-    'voices:reroll': (arg) => pipeline.reroll({ speaker: String(need(arg, 'speaker').speaker) }),
-    'voices:preview': (arg) => pipeline.preview({ speaker: String(need(arg, 'speaker').speaker), text: arg.text }),
+    'voices:update': (arg) => voices.forGame(gameArg(arg)).update(String(need(arg, 'speaker').speaker), arg.patch || {}),
+    'voices:reroll': (arg) => pipeline.reroll({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) }),
+    'voices:preview': (arg) => pipeline.preview({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), text: arg.text }),
+    'voices:clearGame': (arg) => voices.clearGame(String(need(arg, 'game').game)),
+
+    'usage:get': () => (usage ? usage.get() : null),
+    'usage:setLimit': (arg) => {
+      if (!usage) throw new Error('Usage tracking is off.');
+      return usage.setLimit(Number(arg));
+    },
+    'usage:plan': () => (plan ? plan() : { ok: false, error: 'Not available.' }),
 
     'settings:get': () => settings.getPublic(),
     'settings:setKeys': (arg) => settings.setKeys(arg || {}),

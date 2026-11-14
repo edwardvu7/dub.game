@@ -1,9 +1,10 @@
-// Character cards: one per speaker in voices.json. Shared by the overlay and the main window's
-// Voices tab. Cards are keyed by speaker and patched in place, so a voices:changed event never
-// rebuilds a card the player is in the middle of adjusting.
+// Character cards: one per speaker of one game in voices.json. Shared by the overlay and the main
+// window's Voices tab. Cards are keyed by speaker and patched in place, so a voices:changed event
+// never rebuilds a card the player is in the middle of adjusting. Voices are saved per game: the
+// cards show the game that is playing, unless the host picks another one with setGame().
 (function () {
   'use strict';
-  const { SLIDERS, formatSlider, sortSpeakers, voiceLabel, errorText } = window.DubLib;
+  const { SLIDERS, formatSlider, sortSpeakers, voiceLabel, errorText, voicesFor } = window.DubLib;
 
   function el(tag, cls, text) {
     const node = document.createElement(tag);
@@ -13,15 +14,21 @@
   }
 
   /**
-   * mount(container, { dub, onError, emptyText }) -> { refresh, setCurrent, destroy }
+   * mount(container, { dub, onError, emptyText, onStore }) -> { refresh, setCurrent, setGame, game, destroy }
    * dub: window.dub. onError(message): how the host window shows a failure.
+   * onStore(store): called with every new {current, games} snapshot (for a game picker).
    */
   function mount(container, opts) {
     const dub = opts.dub;
     const onError = opts.onError || (() => {});
+    const onStore = opts.onStore || (() => {});
     const cards = new Map(); // speaker -> { root, controls... }
     let catalog = [];
+    let store = { current: null, games: {} };
+    let pinned = null; // a game the host picked; null follows the game that is playing
     let voices = {};
+    const gameId = () => pinned || store.current;
+    const target = (speaker) => ({ game: gameId(), speaker });
     let current = null; // speaker of the line being spoken
     let destroyed = false;
 
@@ -81,7 +88,7 @@
       const card = { root, badge, about, select, sliders: {}, busy: false };
 
       select.addEventListener('change', () => run(card, null, () =>
-        dub.invoke('voices:update', { speaker, patch: { voice_id: select.value } })));
+        dub.invoke('voices:update', { ...target(speaker), patch: { voice_id: select.value } })));
 
       const faders = el('div', 'faders');
       for (const def of SLIDERS) {
@@ -102,7 +109,7 @@
         input.addEventListener('change', async () => {
           const slot = card.sliders[def.key];
           try {
-            await dub.invoke('voices:update', { speaker, patch: { [def.key]: Number(input.value) } });
+            await dub.invoke('voices:update', { ...target(speaker), patch: { [def.key]: Number(input.value) } });
           } catch (e) {
             onError(errorText(e));
           } finally {
@@ -119,13 +126,19 @@
       const preview = el('button', 'btn', 'Preview');
       preview.type = 'button';
       preview.addEventListener('click', () => run(card, preview, () =>
-        dub.invoke('voices:preview', { speaker })));
+        dub.invoke('voices:preview', target(speaker))));
       const reroll = el('button', 'btn btn-quiet', 'Re-roll with AI');
       reroll.type = 'button';
       reroll.title = 'Ask Gemini for a different voice. This replaces your own settings.';
       reroll.addEventListener('click', () => run(card, reroll, () =>
-        dub.invoke('voices:reroll', { speaker })));
-      actions.append(preview, reroll);
+        dub.invoke('voices:reroll', target(speaker))));
+      // Muted characters are skipped: nothing is sent to ElevenLabs for them.
+      const mute = el('button', 'btn btn-quiet card-mute', 'Mute');
+      mute.type = 'button';
+      mute.addEventListener('click', () => run(card, mute, () =>
+        dub.invoke('voices:update', { ...target(speaker), patch: { muted: !(voices[speaker] && voices[speaker].muted) } })));
+      card.mute = mute;
+      actions.append(preview, reroll, mute);
 
       root.append(head, about, voiceRow, faders, actions);
       return card;
@@ -134,8 +147,12 @@
     function patch(speaker, profile) {
       const card = cards.get(speaker);
       if (!card) return;
-      card.badge.textContent = profile.locked ? 'Your pick' : 'AI pick';
-      card.badge.className = 'tag ' + (profile.locked ? 'tag-yours' : 'tag-ai');
+      card.badge.textContent = profile.muted ? 'Muted' : (profile.locked ? 'Your pick' : 'AI pick');
+      card.badge.className = 'tag ' + (profile.muted ? 'tag-muted' : (profile.locked ? 'tag-yours' : 'tag-ai'));
+      card.root.classList.toggle('is-muted', !!profile.muted);
+      card.mute.textContent = profile.muted ? 'Unmute' : 'Mute';
+      card.mute.setAttribute('aria-pressed', profile.muted ? 'true' : 'false');
+      card.mute.title = profile.muted ? 'Speak this character again.' : 'Stop speaking this character. Saves ElevenLabs credits.';
       card.badge.title = profile.locked
         ? 'You set this voice. dub.game will not change it.'
         : (profile.reason || 'Chosen automatically.');
@@ -152,6 +169,7 @@
 
     function render() {
       if (destroyed) return;
+      voices = voicesFor(store, gameId());
       const order = sortSpeakers(voices, current);
       for (const [speaker, card] of cards) {
         if (!Object.prototype.hasOwnProperty.call(voices, speaker)) {
@@ -177,17 +195,25 @@
           dub.invoke('voices:get'),
         ]);
         catalog = Array.isArray(cat) ? cat : [];
-        voices = all && typeof all === 'object' ? all : {};
-        render();
+        accept(all);
       } catch (e) {
         onError(errorText(e));
       }
     }
 
-    const off = dub.on('voices:changed', (all) => {
-      voices = all && typeof all === 'object' ? all : {};
+    function accept(all) {
+      store = all && typeof all === 'object' && all.games ? all : { current: null, games: {} };
+      // A different game's cards are different characters: start the list fresh.
+      if (list.dataset.game !== String(gameId())) {
+        for (const card of cards.values()) card.root.remove();
+        cards.clear();
+        list.dataset.game = String(gameId());
+      }
       render();
-    });
+      onStore(store);
+    }
+
+    const off = dub.on('voices:changed', accept);
 
     refresh();
 
@@ -199,6 +225,12 @@
         current = speaker || null;
         render();
       },
+      /** Show one game's voices; null follows the game that is playing. */
+      setGame(id) {
+        pinned = id || null;
+        accept(store);
+      },
+      game: gameId,
       destroy() { destroyed = true; off(); container.replaceChildren(); cards.clear(); },
     };
   }

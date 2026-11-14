@@ -69,4 +69,32 @@ async function testKey(key, deps = {}) {
   }
 }
 
-module.exports = { speak, testKey, buildRequest, MODEL, MIME };
+/**
+ * subscription(key, {fetch?}) -> {ok, used, limit, resetAt?} | {ok:false, error}
+ * How many characters of the account's quota are used this billing period. Free to call.
+ * UNVERIFIED: needs the key's "user read" permission; a text-to-speech-only key gets 401.
+ */
+async function subscription(key, deps = {}) {
+  if (!key) return { ok: false, error: 'No ElevenLabs key.' };
+  const doFetch = deps.fetch || globalThis.fetch;
+  try {
+    const res = await doFetch(`${API}/v1/user/subscription`, { headers: { 'xi-api-key': key } });
+    if (!res.ok) {
+      const msg = await errorText(res);
+      if (res.status === 401 && /missing_permissions/i.test(msg)) {
+        return { ok: false, error: 'This key cannot read your plan. Give it the "User: read" permission on ElevenLabs to see it here.' };
+      }
+      return { ok: false, error: msg };
+    }
+    const j = await res.json();
+    const used = Number(j.character_count);
+    const limit = Number(j.character_limit);
+    if (!Number.isFinite(used) || !Number.isFinite(limit)) return { ok: false, error: 'Unexpected reply from ElevenLabs.' };
+    const reset = Number(j.next_character_count_reset_unix);
+    return { ok: true, used, limit, tier: j.tier || null, resetAt: Number.isFinite(reset) && reset > 0 ? reset * 1000 : null };
+  } catch (e) {
+    return { ok: false, error: 'Could not reach ElevenLabs: ' + e.message };
+  }
+}
+
+module.exports = { speak, testKey, subscription, buildRequest, MODEL, MIME };

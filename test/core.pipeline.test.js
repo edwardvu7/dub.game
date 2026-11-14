@@ -18,10 +18,11 @@ function rig(over = {}) {
   const state = { narration: true };
   const events = [];
   const calls = { speak: [], one: [], many: [] };
-  const voices = createVoiceStore({ file: path.join(dir, 'voices.json'), catalogIds: catalog.map((v) => v.voice_id) });
+  const store = createVoiceStore({ file: path.join(dir, 'voices.json'), catalogIds: catalog.map((v) => v.voice_id) });
+  const voices = store.forGame('unknown'); // lines without a game land here
   const cache = createCache({ dir: path.join(dir, 'cache') });
   const pipeline = createPipeline({
-    voices, cache, catalog,
+    voices: store, cache, catalog, usage: over.usage,
     settings: { getKey: (p) => keys[p], narration: () => state.narration },
     emit: (channel, payload) => events.push({ channel, payload }),
     speak: over.speak || (async (params, key) => { calls.speak.push({ params, key }); return Buffer.from('mp3:' + params.text); }),
@@ -30,7 +31,7 @@ function rig(over = {}) {
     profileCharacters: over.profileCharacters || (async (list) => { calls.many.push(list); return list.map((c, i) => profileFor(c.speaker, i + 2)); }),
   });
   const of = (channel) => events.filter((e) => e.channel === channel).map((e) => e.payload);
-  return { dir, keys, state, events, calls, voices, cache, pipeline, of };
+  return { dir, keys, state, events, calls, store, voices, cache, pipeline, of };
 }
 
 test('pipeline: first line profiles the character once, speaks, and emits audio:play', async () => {
@@ -39,12 +40,12 @@ test('pipeline: first line profiles the character once, speaks, and emits audio:
   await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Again.', engine: 'renpy' });
   assert.equal(r.calls.one.length, 1, 'Gemini is asked once per character');
   assert.deepEqual(r.calls.one[0].c, { speaker: 'Sylvie', samples: ['Hi!'] });
-  assert.deepEqual(r.of('line:received')[0], { speaker: 'Sylvie', text: 'Hi!', engine: 'renpy' });
+  assert.deepEqual(r.of('line:received')[0], { speaker: 'Sylvie', text: 'Hi!', engine: 'renpy', game: 'unknown' });
   assert.deepEqual(r.of('audio:play')[0], { speaker: 'Sylvie', text: 'Hi!', mime: 'audio/mpeg',
     data: Buffer.from('mp3:Hi!').toString('base64') });
   assert.equal(r.calls.speak[0].key, 'el-test');
   assert.equal(r.calls.speak[0].params.voice_id, catalog[1].voice_id);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(r.dir, 'voices.json'), 'utf8')).Sylvie.voice_id, catalog[1].voice_id);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(r.dir, 'voices.json'), 'utf8')).games.unknown.voices.Sylvie.voice_id, catalog[1].voice_id);
   assert.ok(r.of('voices:changed').length === 0, 'store change events are wired by main/index.js, not the pipeline');
 });
 
@@ -182,4 +183,88 @@ test('pipeline: a line that arrives after a newer one is dropped; a restarted ga
   assert.equal(r.of('audio:play').pop().text, 'Hello again.');
   await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'No seq.', engine: 'clipboard' });
   assert.equal(r.of('audio:play').pop().text, 'No seq.', 'sources without seq are unaffected');
+});
+
+test('per game: two games keep separate voices for the same speaker name', async () => {
+  let n = 0;
+  const r = rig({ profileCharacter: async (c) => profileFor(c.speaker, ++n) });
+  await r.pipeline.handleLine({ speaker: 'Mom', text: 'Dinner!', game: 'renpy:GameA' });
+  await r.pipeline.handleLine({ speaker: 'Mom', text: 'Homework!', game: 'renpy:GameB' });
+  const all = r.store.all();
+  assert.equal(all.current, 'renpy:GameB', 'the game that spoke last is current');
+  assert.equal(all.games['renpy:GameA'].voices.Mom.voice_id, catalog[1].voice_id);
+  assert.equal(all.games['renpy:GameB'].voices.Mom.voice_id, catalog[2].voice_id, 'GameB asked Gemini for its own Mom');
+  r.store.forGame('renpy:GameA').update('Mom', { speed: 1.2 });
+  assert.equal(r.store.forGame('renpy:GameB').get('Mom').locked, false, 'locking in one game does not touch the other');
+  assert.deepEqual(r.of('line:received').map((l) => l.game), ['renpy:GameA', 'renpy:GameB']);
+  await r.pipeline.handleLine({ speaker: 'Mom', text: 'Old hook, no game field.' });
+  assert.equal(r.calls.speak.at(-1).params.voice_id, catalog[2].voice_id, 'a line without a game uses the current game');
+});
+
+test('per game: the display name comes from the Steam scan', async () => {
+  const dir = tmpDir();
+  const store = createVoiceStore({ file: path.join(dir, 'voices.json') });
+  const p = createPipeline({ voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog,
+    settings: { getKey: () => '', narration: () => true }, emit: () => {},
+    gameName: (id) => (id === 'renpy:DDLC' ? 'Doki Doki Literature Club' : null) });
+  await p.handleCharacters({ game: 'renpy:DDLC', characters: [{ speaker: 'Sayori', samples: [] }] });
+  assert.equal(store.all().games['renpy:DDLC'].name, 'Doki Doki Literature Club');
+});
+
+test('per game: voices saved before games were tracked go to the first game voiced', () => {
+  const file = path.join(tmpDir(), 'voices.json');
+  fs.writeFileSync(file, JSON.stringify({ Sylvie: { ...profileFor('Sylvie', 3), locked: true } }));
+  const store = createVoiceStore({ file });
+  assert.equal(store.all().games.legacy.voices.Sylvie.voice_id, catalog[3].voice_id);
+  store.setCurrent('renpy:The Question', 'The Question');
+  const all = store.all();
+  assert.equal(all.games.legacy, undefined);
+  assert.equal(all.games['renpy:The Question'].voices.Sylvie.locked, true, 'the player\'s pick survives the upgrade');
+  assert.equal(all.games['renpy:The Question'].name, 'The Question');
+});
+
+test('per game: clearGame forgets one game only', async () => {
+  const r = rig();
+  await r.pipeline.handleLine({ speaker: 'A', text: 'x', game: 'g1' });
+  await r.pipeline.handleLine({ speaker: 'A', text: 'y', game: 'g2' });
+  assert.equal(r.store.clearGame('g1'), true);
+  assert.deepEqual(Object.keys(r.store.all().games), ['g2']);
+});
+
+test('cost: a muted character is not sent to ElevenLabs', async () => {
+  const r = rig();
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'One.' });
+  r.voices.update('Sylvie', { muted: true });
+  assert.equal(r.voices.get('Sylvie').locked, false, 'muting does not lock the voice');
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Two.' });
+  assert.equal(r.calls.speak.length, 1);
+  assert.equal(r.of('audio:play').length, 1);
+});
+
+test('cost: characters are counted, cache hits are free, and the monthly limit stops new lines', async () => {
+  const { createUsage } = require('../main/usage');
+  let t = Date.parse('2026-11-14T12:00:00Z');
+  const file = path.join(tmpDir(), 'usage.json');
+  const usage = createUsage({ file, now: () => t });
+  const r = rig({ usage });
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Hello there.', game: 'renpy:Q' }); // 12 chars
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Hello there.', game: 'renpy:Q' }); // cached
+  let u = usage.get();
+  assert.equal(u.session.chars, 12);
+  assert.equal(u.session.cached, 1);
+  assert.equal(u.monthChars, 12);
+  assert.equal(u.byGame['renpy:Q'], 12);
+  assert.equal(u.session.gemini, 1, 'one Gemini call for Sylvie');
+  usage.setLimit(20);
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'This one is far too long.', game: 'renpy:Q' });
+  assert.equal(r.calls.speak.length, 1, 'over the limit: not sent');
+  assert.ok(r.of('app:status').some((s) => /limit/i.test(s.message)));
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Hello there.', game: 'renpy:Q' });
+  assert.equal(r.of('audio:play').length, 3, 'cached lines still play over the limit');
+  assert.equal(createUsage({ file, now: () => t }).get().monthChars, 12, 'saved to disk');
+  t = Date.parse('2026-12-01T00:00:01Z');
+  u = usage.get();
+  assert.equal(u.monthChars, 0, 'a new month starts at zero');
+  assert.equal(u.totalChars, 12);
+  assert.equal(u.limit, 20, 'the limit carries over');
 });

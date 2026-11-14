@@ -9,6 +9,7 @@ const { createServer, PORT, HOST } = require('./server');
 const { createVoiceStore } = require('./voices');
 const { createCache } = require('./cache');
 const { createSettings } = require('./settings');
+const { createUsage } = require('./usage');
 const { createOverlayPosition, constrainToGame } = require('./overlay-position');
 const { createPipeline } = require('./pipeline');
 const { createClipboardWatcher } = require('./clipboard');
@@ -237,8 +238,21 @@ async function start() {
     catalogIds: catalog.map((v) => v.voice_id),
   });
   voices.onChange((all) => emit('voices:changed', all));
+  const usage = createUsage({ file: path.join(userData, 'usage.json') });
+  usage.onChange((snap) => emit('usage:changed', snap));
   const cache = createCache({ dir: path.join(userData, 'cache') });
-  const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log });
+  // Hooks name a game "<engine>:<folder>"; the Steam scan knows the folder's real name.
+  let knownGames = [];
+  const remember = (list) => { if (Array.isArray(list)) knownGames = list; return list; };
+  const gameName = (id) => {
+    const [engine, ...rest] = String(id).split(':');
+    const folder = rest.join(':').toLowerCase();
+    if (!folder) return null;
+    const hit = knownGames.find((g) => g.installDir && path.basename(g.installDir).toLowerCase() === folder &&
+      (!engine || g.engine === engine || String(g.engine).startsWith(engine)));
+    return hit ? hit.name : null;
+  };
+  const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName });
 
   gameTracker = createGameWindowTracker({
     onFrame: (frame) => {
@@ -268,7 +282,7 @@ async function start() {
     includeBeta: process.env.DUBGAME_BETA === '1',
     // Godot/RPG Maker/Unity games are listed only when Steam tags them as story-driven.
     tagCheck: createTagCheck({ file: path.join(userData, 'steam-tags.json') }),
-    onChange: (list) => emit('games:changed', list),
+    onChange: (list) => emit('games:changed', remember(list)),
     pickFolder: async () => {
       const result = await dialog.showOpenDialog(mainWindow, {
         title: 'Pick the game folder', properties: ['openDirectory'] });
@@ -282,8 +296,17 @@ async function start() {
   });
   if (settings.clipboardMode()) clipboardWatcher.start();
 
+  games.list().then(remember, () => {});
+  const trackedGames = {
+    ...games,
+    list: () => games.list().then(remember),
+    rescan: () => games.rescan().then(remember),
+    addFolder: () => games.addFolder().then(remember),
+  };
+
   registerIpc(ipcMain, createHandlers({
-    games, voices, settings, pipeline, catalog,
+    games: trackedGames, voices, settings, pipeline, catalog, usage,
+    plan: () => tts.subscription(settings.getKey('elevenlabs')),
     onClipboardMode: (on) => (on ? clipboardWatcher.start() : clipboardWatcher.stop()),
   }), {
     isTrusted: (event) => {
@@ -295,7 +318,7 @@ async function start() {
   const server = createServer({
     log,
     onLine: (line) => pipeline.handleLine(line),
-    onCharacters: (payload) => { pipeline.seedSamples(payload.characters); return pipeline.handleCharacters(payload); },
+    onCharacters: (payload) => pipeline.handleCharacters(payload),
     onStop: (stop) => pipeline.handleStop(stop),
   });
   try {

@@ -81,9 +81,10 @@ test('env: parses .env without overriding real environment variables', () => {
 
 test('voices store: update locks and validates; setAuto respects the lock; changes are announced', () => {
   const file = path.join(tmpDir(), 'voices.json');
-  const store = createVoiceStore({ file, catalogIds: catalog.map((v) => v.voice_id) });
+  const root = createVoiceStore({ file, catalogIds: catalog.map((v) => v.voice_id) });
+  const store = root.forGame('renpy:Test');
   const changes = [];
-  store.onChange((all) => changes.push(all));
+  root.onChange((all) => changes.push(all.games['renpy:Test'].voices));
   store.setAuto({ speaker: 'Sylvie', voice_id: catalog[0].voice_id, stability: 0.5, style: 0.3, speed: 1, locked: true });
   assert.equal(store.get('Sylvie').locked, false, 'auto profiles are never born locked');
   const p = store.update('Sylvie', { stability: 3, speed: 0.1, voice_id: catalog[2].voice_id, speaker: 'Hacked', personality: 'x' });
@@ -94,9 +95,10 @@ test('voices store: update locks and validates; setAuto respects the lock; chang
   assert.equal(changes.length, 2);
   assert.equal(changes[1].Sylvie.locked, true);
   assert.equal(store.get('toString'), null);
-  assert.equal(createVoiceStore({ file }).get('Sylvie').locked, true, 'persists');
+  assert.equal(createVoiceStore({ file }).forGame('renpy:Test').get('Sylvie').locked, true, 'persists');
+  assert.equal(store.update('Sylvie', { muted: true }).muted, true, 'muting is allowed');
   write(file, '{broken');
-  assert.deepEqual(createVoiceStore({ file }).all(), {});
+  assert.deepEqual(createVoiceStore({ file }).all(), { current: null, games: {} });
 });
 
 test('cache: key depends on voice, settings and text; round trip on disk', () => {
@@ -123,7 +125,8 @@ test('ipc: every contract channel has a handler and settings handlers never retu
   const handlers = createHandlers({
     settings, catalog,
     games: { list: track('list', []), rescan: track('rescan', []), addFolder: track('addFolder', []), setEnabled: track('setEnabled', {}), launch: track('launch', true) },
-    voices: { all: track('all', {}), update: (s, p) => { calls.push(['update', s, p]); return { speaker: s, locked: true }; } },
+    voices: { all: track('all', {}), current: () => 'renpy:Test', clearGame: track('clearGame', true),
+      forGame: (g) => ({ update: (s, p) => { calls.push(['update', g, s, p]); return { speaker: s, locked: true }; } }) },
     pipeline: { reroll: track('reroll', {}), preview: track('preview', true) },
     onClipboardMode: (on) => clip.push(on),
   });
@@ -147,7 +150,9 @@ test('ipc: every contract channel has a handler and settings handlers never retu
   await registered['games:setEnabled']({ ok: true }, { appid: 1001, enabled: 1 });
   assert.deepEqual(calls.at(-1), ['setEnabled', { appid: '1001', enabled: true }]);
   await registered['voices:update']({ ok: true }, { speaker: 'Sylvie', patch: { speed: 1.1 } });
-  assert.deepEqual(calls.at(-1), ['update', 'Sylvie', { speed: 1.1 }]);
+  assert.deepEqual(calls.at(-1), ['update', 'renpy:Test', 'Sylvie', { speed: 1.1 }], 'no game: the current one');
+  await registered['voices:update']({ ok: true }, { game: 'renpy:Other', speaker: 'Sylvie', patch: {} });
+  assert.equal(calls.at(-1)[1], 'renpy:Other');
   await assert.rejects(() => registered['games:launch']({ ok: true }, {}), /Missing "appid"/);
   assert.equal((await registered['settings:setClipboardMode']({ ok: true }, true)).clipboardMode, true);
   assert.deepEqual(clip, [true]);
@@ -198,8 +203,8 @@ test('clipboard mode: new text becomes an "unknown" line; repeats, short strings
   tickFn();
   for (const text of ['First line.', 'First line.', 'a', '  Second\n line. ', '']) { current = text; tickFn(); }
   assert.deepEqual(lines, [
-    { speaker: 'unknown', text: 'First line.', engine: 'clipboard' },
-    { speaker: 'unknown', text: 'Second line.', engine: 'clipboard' }]);
+    { speaker: 'unknown', text: 'First line.', engine: 'clipboard', game: 'clipboard' },
+    { speaker: 'unknown', text: 'Second line.', engine: 'clipboard', game: 'clipboard' }]);
   w.stop();
   assert.equal(w.running(), false);
 });

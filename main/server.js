@@ -21,6 +21,13 @@ function readBody(req) {
   });
 }
 
+// Stable id for per-game voices, e.g. "renpy:DDLC" (engine + game folder name). Hooks older than
+// this field leave it out; the pipeline then uses the game that was active last.
+function normalizeGame(body) {
+  const g = body && typeof body.game === 'string' ? body.game.trim().slice(0, 200) : '';
+  return g || undefined;
+}
+
 function normalizeLine(body) {
   if (!body || typeof body.text !== 'string') return null;
   const text = body.text.trim();
@@ -28,6 +35,8 @@ function normalizeLine(body) {
   const speaker = typeof body.speaker === 'string' && body.speaker.trim() ? body.speaker.trim() : 'Narrator';
   const line = { speaker, text, engine: typeof body.engine === 'string' && body.engine ? body.engine : 'renpy' };
   if (typeof body.source === 'string') line.source = body.source;
+  const game = normalizeGame(body);
+  if (game) line.game = game;
   if (Number.isFinite(body.seq)) line.seq = body.seq;
   return line;
 }
@@ -45,7 +54,10 @@ function normalizeCharacters(body) {
       ? c.samples.filter((s) => typeof s === 'string' && s.trim()).slice(0, 8).map((s) => s.trim().slice(0, 300)) : [];
     characters.push({ speaker, samples });
   }
-  return { engine: typeof body.engine === 'string' && body.engine ? body.engine : 'renpy', characters };
+  const out = { engine: typeof body.engine === 'string' && body.engine ? body.engine : 'renpy', characters };
+  const game = normalizeGame(body);
+  if (game) out.game = game;
+  return out;
 }
 
 /**
@@ -111,4 +123,4 @@ function createServer(handlers = {}) {
   };
 }
 
-module.exports = { createServer, normalizeLine, normalizeCharacters, HOST, PORT };
+module.exports = { createServer, normalizeLine, normalizeCharacters, normalizeGame, HOST, PORT };

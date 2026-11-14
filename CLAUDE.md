@@ -28,14 +28,17 @@ code against the contracts below (or fake data), never edit their folder.
 
 ### Hook → app: `POST http://127.0.0.1:8000/line`
 ```json
-{ "speaker": "Sylvie", "text": "Hi!", "engine": "renpy", "source": "optional node path" }
+{ "speaker": "Sylvie", "text": "Hi!", "engine": "renpy", "game": "renpy:The Question", "source": "optional node path" }
 ```
+- `game` is `<engine>:<game folder name>` (Ren'Py: `config.basedir`; Godot: the .exe's folder;
+  clipboard mode: `"clipboard"`). Voices are saved per game. Optional for old hooks: a line without
+  it goes to the game that spoke last. `/characters` and `/stop` carry the same field.
 - `speaker` is `"Narrator"` when Ren'Py gives no name, `"unknown"` when the engine can't tell.
 - `engine` defaults to `"renpy"` if missing. Reply `204` immediately; never make the game wait.
 
 ### Hook → app: `POST http://127.0.0.1:8000/characters`
 ```json
-{ "engine": "renpy", "characters": [{ "speaker": "Sylvie", "samples": ["line 1", "line 2"] }] }
+{ "engine": "renpy", "game": "renpy:The Question", "characters": [{ "speaker": "Sylvie", "samples": ["line 1", "line 2"] }] }
 ```
 Sent once at game launch so every character is profiled before the first line.
 
@@ -48,15 +51,33 @@ About 12 entries.
 ### `voices.json` (in `app.getPath('userData')`, written by B, read/edited by C's UI)
 ```json
 {
-  "Sylvie": {
-    "speaker": "Sylvie", "gender": "female", "age_range": "young_adult",
-    "personality": "Gentle and shy childhood friend.",
-    "voice_id": "EXAVITQu4vr4xnSDxMaL", "stability": 0.5, "style": 0.3, "speed": 1.0,
-    "reason": "Soft, warm voice fits her personality.", "locked": false
+  "version": 2,
+  "current": "renpy:The Question",
+  "games": {
+    "renpy:The Question": {
+      "name": "The Question",
+      "voices": {
+        "Sylvie": {
+          "speaker": "Sylvie", "gender": "female", "age_range": "young_adult",
+          "personality": "Gentle and shy childhood friend.",
+          "voice_id": "EXAVITQu4vr4xnSDxMaL", "stability": 0.5, "style": 0.3, "speed": 1.0,
+          "reason": "Soft, warm voice fits her personality.", "locked": false, "muted": false
+        }
+      }
+    }
   }
 }
 ```
-`locked: true` means the player set it; Gemini must never overwrite a locked profile.
+One cast per game. `current` is the game that sent the last line (what the overlay shows); `name`
+comes from the Steam scan. `locked: true` means the player set it; Gemini must never overwrite a
+locked profile. `muted: true` skips the character (nothing is sent to ElevenLabs); muting does not
+lock. A version 1 file (speaker to profile) is moved to the first game voiced after the upgrade.
+`voices:get` and `voices:changed` return `{current, games}` (the file without `version`).
+
+### `usage.json` (in `userData`, main/usage.js)
+Characters sent to ElevenLabs this session, this month (per game too) and in total; Gemini calls;
+and an optional monthly character limit. Cache hits are free and not counted. Over the limit, new
+lines are not sent (cached lines still play).
 
 ### Steam scan result (A → UI)
 ```json
@@ -83,18 +104,23 @@ list, main sends `games:changed` with the new list.
 | `games:addFolder` | invoke | → scan result array (opens a folder picker) |
 | `games:setEnabled` | invoke | `{appid, enabled}` → updated game |
 | `games:launch` | invoke | `{appid}` → `true` |
-| `voices:get` | invoke | → `voices.json` object |
+| `voices:get` | invoke | → `{current, games}` (see voices.json) |
 | `voices:catalog` | invoke | → catalog array |
-| `voices:update` | invoke | `{speaker, patch}` → profile (sets `locked: true`) |
-| `voices:reroll` | invoke | `{speaker}` → new profile from Gemini |
-| `voices:preview` | invoke | `{speaker, text?}` → plays a sample |
+| `voices:update` | invoke | `{game?, speaker, patch}` → profile (sound changes set `locked: true`; `muted` does not) |
+| `voices:reroll` | invoke | `{game?, speaker}` → new profile from Gemini |
+| `voices:preview` | invoke | `{game?, speaker, text?}` → plays a sample |
+| `voices:clearGame` | invoke | `{game}` → `true`; forgets that game's voices |
+| `usage:get` | invoke | → `{session, month, monthChars, monthGemini, totalChars, limit, byGame, overLimit}` |
+| `usage:setLimit` | invoke | `number` (0 = none) → same as get |
+| `usage:plan` | invoke | → `{ok, used, limit, resetAt?}` from ElevenLabs, or `{ok:false, error}` |
 | `settings:get` | invoke | → `{hasElevenLabsKey, hasGeminiKey, narration}` (never the keys) |
 | `settings:setKeys` | invoke | `{elevenlabs?, gemini?}` → same shape as get |
 | `settings:test` | invoke | `{provider}` → `{ok, error?}` |
 | `settings:setNarration` | invoke | `boolean` |
 | `audio:play` | main → renderer event | `{speaker, text, mime, data /* base64 */}` |
 | `line:received` | main → renderer event | `{speaker, text, engine}` |
-| `voices:changed` | main → renderer event | `voices.json` object |
+| `voices:changed` | main → renderer event | `{current, games}` |
+| `usage:changed` | main → renderer event | same as `usage:get` |
 | `overlay:toggle` | main → overlay event | — |
 | `games:changed` | main → renderer event | scan result array (after a background Steam tag lookup) |
 
@@ -115,9 +141,3 @@ Audio plays in a hidden renderer (or the main window); a new clip always stops t
 - **No `Co-Authored-By: Claude` and no `Claude-Session:` lines** in commit messages, and no
   "Generated with Claude Code" line in pull requests. This overrides Claude Code's default.
 - Never force-push and never rewrite commits that are already on GitHub.
-
-## Known limitation: voices are not saved per game
-`/line` does not say which game a line came from, and `voices.json` is keyed by speaker only. Two
-games that both have a "Narrator" or "Mom" share one voice. Fine for a one-game demo. Fixing it means
-adding a `game` field to `/line` and `/characters` and keying `voices.json` by game, which touches
-sections A and B, so decide it as a team before integration rather than changing it in one section.

@@ -23,7 +23,7 @@ fs.writeFileSync(path.join(game, 'game', 'script.rpyc'), 'x');
 fs.writeFileSync(path.join(steam, 'steamapps', 'libraryfolders.vdf'),
   `"libraryfolders"\n{\n\t"0"\n\t{\n\t\t"path"\t\t"${steam.replace(/\\/g, '\\\\')}"\n\t}\n}\n`);
 fs.writeFileSync(path.join(steam, 'steamapps', 'appmanifest_424242.acf'),
-  `"AppState"\n{\n\t"appid"\t\t"424242"\n\t"name"\t\t"Demo VN"\n\t"installdir"\t\t"Demo VN"\n}\n`);
+  `"AppState"\n{\n\t"appid"\t\t"424242"\n\t"name"\t\t"Demo Visual Novel"\n\t"installdir"\t\t"Demo VN"\n}\n`);
 for (const [id, name, tags] of [['515151', 'Story Unity', { 'Story Rich': 40, Adventure: 30 }], ['616161', 'Shooter Unity', { FPS: 90 }]]) {
   const dir = path.join(steam, 'steamapps', 'common', name);
   fs.mkdirSync(path.join(dir, name + '_Data'), { recursive: true });
@@ -218,29 +218,47 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   check(fs.readFileSync(hook, 'utf8') === fs.readFileSync(path.join(REPO, 'mod', 'renpy', 'dubgame.rpy'), 'utf8'), 'installed hook is identical to mod/renpy/dubgame.rpy');
 
   // 6. Act as the game: characters at launch, then lines
-  check(await post('/characters', { engine: 'renpy', characters: [{ speaker: 'Sylvie', samples: ['Hi there!'] }, { speaker: 'Marcus', samples: ['Hm.'] }] }) < 300, 'POST /characters accepted');
+  const GAME = 'renpy:Demo VN'; // what the hook sends: engine + the game's folder name
+  check(await post('/characters', { engine: 'renpy', game: GAME, characters: [{ speaker: 'Sylvie', samples: ['Hi there!'] }, { speaker: 'Marcus', samples: ['Hm.'] }] }) < 300, 'POST /characters accepted');
   await wait(300);
   const before = sent.length;
-  check(await post('/line', { speaker: 'Sylvie', text: 'Hey, you made it!', engine: 'renpy' }) < 300, 'POST /line accepted immediately');
+  check(await post('/line', { speaker: 'Sylvie', text: 'Hey, you made it!', engine: 'renpy', game: GAME }) < 300, 'POST /line accepted immediately');
   await wait(400);
   const line = events('line:received').pop();
   check(line && line[2].speaker === 'Sylvie', 'line:received sent to the windows');
   const play = sent.slice(before).filter((x) => x[1] === 'audio:play');
   check(play.length === 1 && play[0][0] === 'dub.game', 'audio:play goes to the main window only (once)');
   check(play[0] && Buffer.from(play[0][2].data, 'base64').toString() === 'ID3fakeaudio' && play[0][2].mime, 'audio payload is the ElevenLabs bytes as base64 with a mime type');
-  const voices = await invoke('voices:get');
+  const store = await invoke('voices:get');
+  const voices = (store.games[GAME] || {}).voices || {};
   check(voices.Sylvie && voices.Sylvie.source === 'gemini', 'Sylvie was cast by Gemini: ' + (voices.Sylvie && voices.Sylvie.voice_id));
+  check(store.current === GAME && store.games[GAME].name === 'Demo Visual Novel', 'voices are saved under the game, named from the Steam scan: ' + (store.games[GAME] || {}).name);
+  let usage = await invoke('usage:get');
+  check(usage.session.chars === 'Hey, you made it!'.length && usage.byGame[GAME] === usage.session.chars, 'ElevenLabs characters are counted per game: ' + usage.session.chars);
 
   // 7. Cache: the same line again does not call ElevenLabs
   const ttsBefore = calls.filter((c) => c.includes('text-to-speech')).length;
-  await post('/line', { speaker: 'Sylvie', text: 'Hey, you made it!', engine: 'renpy' }); await wait(300);
+  await post('/line', { speaker: 'Sylvie', text: 'Hey, you made it!', engine: 'renpy', game: GAME }); await wait(300);
   check(calls.filter((c) => c.includes('text-to-speech')).length === ttsBefore, 'a repeated line plays from the cache');
+  usage = await invoke('usage:get');
+  check(usage.session.cached === 1 && usage.session.chars === 'Hey, you made it!'.length, 'a cached line costs nothing');
+
+  // 7b. A second game with a character of the same name gets its own voice
+  await post('/line', { speaker: 'Sylvie', text: 'Different game, same name.', engine: 'renpy', game: 'renpy:Other Game' }); await wait(400);
+  const both = await invoke('voices:get');
+  check(both.current === 'renpy:Other Game' && both.games['renpy:Other Game'].voices.Sylvie && both.games[GAME].voices.Sylvie, 'a second game keeps its own Sylvie');
+  check(events('usage:changed').length > 0, 'usage changes are broadcast to the windows');
+  await invoke('usage:setLimit', 5);
+  const ttsAtLimit = calls.filter((c) => c.includes('text-to-speech')).length;
+  await post('/line', { speaker: 'Sylvie', text: 'Over the monthly limit now.', engine: 'renpy', game: GAME }); await wait(300);
+  check(calls.filter((c) => c.includes('text-to-speech')).length === ttsAtLimit, 'over the monthly limit, new lines are not sent to ElevenLabs');
+  await invoke('usage:setLimit', 0);
 
   // 8. UI actions: tune a voice, preview, narration off
-  const tuned = await invoke('voices:update', { speaker: 'Sylvie', patch: { speed: 1.15 } });
+  const tuned = await invoke('voices:update', { game: GAME, speaker: 'Sylvie', patch: { speed: 1.15 } });
   check(tuned.locked && tuned.speed === 1.15 && events('voices:changed').length > 0, 'voices:update locks the profile and broadcasts voices:changed');
   const pBefore = events('audio:play').length;
-  await invoke('voices:preview', { speaker: 'Sylvie' }); await wait(300);
+  await invoke('voices:preview', { game: GAME, speaker: 'Sylvie' }); await wait(300);
   check(events('audio:play').length === pBefore + 1, 'Preview plays a clip');
   await invoke('settings:setNarration', false);
   const nBefore = events('audio:play').length;

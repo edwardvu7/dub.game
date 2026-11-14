@@ -152,7 +152,49 @@
     return { tone: 'off', text: 'Voices are off.' };
   }
 
+  // ---------- Voices per game (voices:get -> {current, games: {id: {name, voices}}}) ----------
+
+  /** A readable name for a game id like "renpy:DDLC" when the scan did not name it. */
+  function gameLabel(id, entry) {
+    if (entry && entry.name && entry.name !== id) return entry.name;
+    if (id === 'clipboard') return 'Clipboard (other games)';
+    if (id === 'unknown' || !id) return 'Unknown game';
+    const rest = String(id).split(':').slice(1).join(':');
+    return rest && rest !== 'unknown' ? rest : 'Unknown game';
+  }
+
+  /** Game ids to offer in a picker: the current game first, then by name. */
+  function gameIds(store) {
+    const games = (store && store.games) || {};
+    const current = store && store.current;
+    return Object.keys(games).sort((a, b) => {
+      if (a === current) return -1;
+      if (b === current) return 1;
+      return gameLabel(a, games[a]).localeCompare(gameLabel(b, games[b]));
+    });
+  }
+
+  /** speaker -> profile for one game ({} when it has none). */
+  function voicesFor(store, id) {
+    const g = store && store.games && id && store.games[id];
+    return (g && g.voices) || {};
+  }
+
+  /** 12345 -> "12,345" */
+  function formatCount(n) {
+    return Math.round(Number(n) || 0).toLocaleString('en-US');
+  }
+
+  /** "Used 1,200 of 10,000 characters (12%)" for the ElevenLabs plan. */
+  function planSummary(plan) {
+    if (!plan || !plan.ok) return (plan && plan.error) || 'Unknown.';
+    const pct = plan.limit > 0 ? Math.round((plan.used / plan.limit) * 100) : 0;
+    let text = 'Used ' + formatCount(plan.used) + ' of ' + formatCount(plan.limit) + ' characters (' + pct + '%)';
+    if (plan.resetAt) text += ', resets ' + new Date(plan.resetAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return text + '.';
+  }
+
   return { SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
     sortSpeakers, initials, voiceLabel, errorText, base64ToBytes, keyState, needsSetup,
-    gamesSummary, gameHint, engineName };
+    gamesSummary, gameHint, engineName, gameLabel, gameIds, voicesFor, formatCount, planSummary };
 });

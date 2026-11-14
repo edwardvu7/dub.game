@@ -47,6 +47,16 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
   been called live yet; the reply format comes from its documentation.
 - The Games list rescans Steam when the window regains focus (at most every 20 seconds).
 
+## Voices per game and cost control
+- Hooks (Ren'Py v6, Godot) send `game`: `<engine>:<folder>`. voices.json keeps one cast per game, so
+  two games' "Mom" never share a voice. Voices saved before this change move to the first game voiced.
+  The Voices tab has a game picker (defaults to the game playing now) and "Reset voices". The overlay
+  shows the game playing now.
+- Usage (Settings): ElevenLabs characters this session and month, lines replayed free from the cache,
+  the ElevenLabs plan quota (Check button; UNVERIFIED: needs the key's "User: read" permission), and a
+  monthly character limit. Over the limit new lines are skipped; cached lines still play.
+- Mute per character (cards in the overlay and Voices tab): a muted character is not sent to ElevenLabs.
+
 ## Not verified yet (needs a real Windows machine)
 - The app has never been started in Electron. `npm install` and `npm start` are the first real run.
 - Overlay over a real game: windowed, borderless, and the exclusive-fullscreen warning.
