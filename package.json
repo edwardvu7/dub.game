@@ -1,14 +1,67 @@
 {
   "name": "dub-game",
+  "productName": "dub.game",
   "version": "0.1.0",
   "description": "AI voice-over for visual novels: Gemini casts a voice per character, ElevenLabs speaks every line.",
   "main": "main/index.js",
+  "author": "dub.game team",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/",
-    "dist": "electron-builder --win"
+    "test": "node --test",
+    "check:hook": "python3 scripts/check-rpy.py mod/renpy/dubgame.rpy",
+    "dist": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
   },
-  "license": "MIT",
-  "devDependencies": {},
-  "dependencies": {}
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
+  },
+  "dependencies": {},
+  "build": {
+    "appId": "game.dub.app",
+    "productName": "dub.game",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**/*",
+      "ui/**/*",
+      "mod/**/*",
+      "voices_catalog.json",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "mod/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "dub.game"
+    },
+    "mac": {
+      "category": "public.app-category.games"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game"
+    }
+  }
 }
