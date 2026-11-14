@@ -161,7 +161,6 @@
       border-radius: 8px;
     }
 
-    /* High-Contrast Dark Forest Pill so #E0F8C7 Pops Crisp on Light Background */
     .brand-accent {
       background: var(--g-900);
       color: var(--accent);
@@ -222,7 +221,7 @@
       fill: currentColor;
     }
 
-    /* Hero Section — Balanced Asymmetry & Generous Breathing Room */
+    /* Hero Section */
     .hero {
       padding: var(--space-18) 0 var(--space-24);
       display: grid;
@@ -268,7 +267,6 @@
       gap: var(--space-4);
     }
 
-    /* Deep Forest Button with #E0F8C7 Accent Icon & Text */
     .btn-download {
       display: inline-flex;
       align-items: center;
@@ -465,7 +463,7 @@
       transform: scale(1.16);
     }
 
-    /* Section Architecture — Clean Vertical Cadence */
+    /* Section Architecture */
     .section {
       padding: var(--space-18) 0;
       border-top: 1px solid var(--border-hairline);
@@ -590,6 +588,101 @@
       color: var(--accent);
     }
 
+    /* Team / About Us Strip (Real Name First, Then Username) */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-5);
+    }
+
+    .team-card {
+      background: var(--card-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 14px;
+      padding: var(--space-6);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      text-decoration: none;
+      color: var(--ink);
+      transition:
+        transform 200ms var(--ease-out),
+        border-color 200ms var(--ease-out),
+        background-color 200ms var(--ease-out),
+        color 200ms var(--ease-out);
+    }
+
+    .team-card:hover {
+      transform: translateY(-3px);
+      background: var(--g-900);
+      border-color: var(--g-900);
+      color: var(--ink-on-dark);
+    }
+
+    .team-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--g-900);
+      background: var(--card-recessed);
+      flex-shrink: 0;
+      transition: border-color 200ms var(--ease-out);
+    }
+
+    .team-card:hover .team-avatar {
+      border-color: var(--accent);
+    }
+
+    .team-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .team-role {
+      display: inline-block;
+      align-self: flex-start;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: var(--g-900);
+      color: var(--accent);
+      padding: 2px 7px;
+      border-radius: 5px;
+      margin-bottom: 6px;
+      transition: background-color 200ms var(--ease-out);
+    }
+
+    .team-card:hover .team-role {
+      background: var(--g-800);
+    }
+
+    .team-name {
+      font-family: var(--font-display);
+      font-size: 1.18rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .team-handle {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      transition: color 200ms var(--ease-out);
+    }
+
+    .team-card:hover .team-handle {
+      color: var(--ink-on-dark-muted);
+    }
+
     /* Minimal Footer */
     footer {
       padding: var(--space-10) 0 var(--space-16);
@@ -627,6 +720,9 @@
       .engines-grid {
         grid-template-columns: repeat(2, 1fr);
       }
+      .team-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 540px) {
@@ -654,6 +750,7 @@
         <div class="nav-links">
           <a href="#pipeline" class="nav-link" data-scroll>Pipeline</a>
           <a href="#engines" class="nav-link" data-scroll>Engines</a>
+          <a href="#about" class="nav-link" data-scroll>About</a>
           <a href="https://github.com/edwardvu7/dub.game" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
@@ -773,6 +870,38 @@
           </div>
         </div>
       </section>
+
+      <section class="section" id="about">
+        <div class="section-label reveal">About Us</div>
+        <div class="team-grid">
+          <a href="https://github.com/edwardvu7" class="team-card reveal" style="--delay: 0ms;" target="_blank" rel="noopener noreferrer" data-gh-user="edwardvu7">
+            <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="Edward Vu" width="56" height="56" loading="lazy" />
+            <div class="team-meta">
+              <span class="team-role">Engine Hooks</span>
+              <div class="team-name">Edward Vu</div>
+              <div class="team-handle">@edwardvu7</div>
+            </div>
+          </a>
+
+          <a href="https://github.com/chadscheeks" class="team-card reveal" style="--delay: 70ms;" target="_blank" rel="noopener noreferrer" data-gh-user="chadscheeks">
+            <img class="team-avatar" src="https://github.com/chadscheeks.png?size=160" onerror="this.src='logo.png'" alt="Alexander Miller" width="56" height="56" loading="lazy" />
+            <div class="team-meta">
+              <span class="team-role">Core &amp; Voice Pipeline</span>
+              <div class="team-name">Alexander Miller</div>
+              <div class="team-handle">@chadscheeks</div>
+            </div>
+          </a>
+
+          <a href="https://github.com/Crazeematt" class="team-card reveal" style="--delay: 140ms;" target="_blank" rel="noopener noreferrer" data-gh-user="Crazeematt">
+            <img class="team-avatar" src="https://github.com/Crazeematt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
+            <div class="team-meta">
+              <span class="team-role">Overlay &amp; UI</span>
+              <div class="team-name" id="name-Crazeematt">Charles</div>
+              <div class="team-handle">@Crazeematt</div>
+            </div>
+          </a>
+        </div>
+      </section>
     </main>
 
     <footer class="reveal">
@@ -843,6 +972,17 @@
     [slStability, slStyle, slSpeed].forEach((input) => {
       input.addEventListener("input", updateReadouts);
     });
+
+    // Automatically hydrate Crazeematt's full display name from GitHub's public API if set
+    fetch("https://api.github.com/users/Crazeematt")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => {
+        if (user && user.name) {
+          const el = document.getElementById("name-Crazeematt");
+          if (el) el.textContent = user.name;
+        }
+      })
+      .catch(() => {});
 
     const revealEls = document.querySelectorAll(".reveal");
     const revealObserver = new IntersectionObserver(
