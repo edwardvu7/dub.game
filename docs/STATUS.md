@@ -37,6 +37,9 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
   a real game.
 - Godot, RPG Maker and Unity games are listed as "Coming soon" (engine name on the badge, no voices
   switch or Launch). Only Ren'Py games can be voiced.
+- Those Godot/RPG Maker/Unity Steam games are listed only when Steam tags them as story-driven
+  (Visual Novel, Story Rich, ...), checked with SteamSpy and cached. UNVERIFIED: SteamSpy has not
+  been called live yet; the reply format comes from its documentation.
 - The Games list rescans Steam when the window regains focus (at most every 20 seconds).
 
 ## Not verified yet (needs a real Windows machine)

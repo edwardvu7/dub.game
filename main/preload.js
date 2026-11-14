@@ -10,7 +10,7 @@ const INVOKE = [
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
   'settings:setClipboardMode',
 ];
-const EVENTS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'overlay:toggle',
+const EVENTS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'overlay:toggle', 'games:changed',
   'app:status'];
 
 contextBridge.exposeInMainWorld('dub', {

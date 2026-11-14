@@ -110,6 +110,7 @@ function channelsUsed() {
     // Channels passed indirectly, e.g. loadGames('games:rescan') or bindSwitch(id, 'settings:x').
     for (const m of src.matchAll(/'((?:games|settings):[A-Za-z]+)'/g)) invoke.add(m[1]);
   }
+  for (const ch of events) invoke.delete(ch); // e.g. games:changed is an event, not an invoke
   return { invoke, events };
 }
 

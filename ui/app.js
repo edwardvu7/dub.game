@@ -382,6 +382,12 @@
     });
   });
   dub.on('audio:stop', stopAudio);
+  // A background Steam tag lookup found more story games to list.
+  dub.on('games:changed', (list) => {
+    if (!Array.isArray(list)) return;
+    games = list;
+    renderGames();
+  });
   dub.on('line:received', showLine);
   dub.on('app:status', (s) => {
     if (s && s.message) toast(s.message, s.level === 'error' ? 'error' : 'note');

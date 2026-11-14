@@ -67,6 +67,11 @@ About 12 entries.
 `support` is `"full"` (Ren'Py), `"beta"` (Godot adapter, only with `DUBGAME_BETA=1`) or `"soon"`
 (Godot, RPG Maker MV/MZ, Unity: listed so players see them, but voices can't be switched on and
 `games:setEnabled` refuses them). Other engines are never returned.
+Steam games on Godot, RPG Maker and Unity are listed only when their Steam community tags include
+Visual Novel, Story Rich, Interactive Fiction, Choose Your Own Adventure, Dating Sim or Otome
+(`main/steam/tags.js`, via SteamSpy's public API, cached in `userData/steam-tags.json`). Ren'Py games
+and folders added by hand are always listed. Lookups run in the background; when they change the
+list, main sends `games:changed` with the new list.
 
 ### IPC (renderer ↔ main) — exposed through `main/preload.js` as `window.dub`
 `window.dub.invoke(channel, arg) → Promise` and `window.dub.on(channel, fn) → unsubscribe`.
@@ -91,6 +96,7 @@ About 12 entries.
 | `line:received` | main → renderer event | `{speaker, text, engine}` |
 | `voices:changed` | main → renderer event | `voices.json` object |
 | `overlay:toggle` | main → overlay event | — |
+| `games:changed` | main → renderer event | scan result array (after a background Steam tag lookup) |
 
 Audio plays in a hidden renderer (or the main window); a new clip always stops the previous one.
 

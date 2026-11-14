@@ -13,6 +13,7 @@ const { createPipeline } = require('./pipeline');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
 const { createGames } = require('./steam');
+const { createTagCheck } = require('./steam/tags');
 const tts = require('./tts');
 const profiler = require('./profiler');
 const { createFullscreenCheck, EXCLUSIVE_MESSAGE } = require('./fullscreen');
@@ -185,6 +186,9 @@ async function start() {
     modDir: path.join(ROOT, 'mod'),
     shell,
     includeBeta: process.env.DUBGAME_BETA === '1',
+    // Godot/RPG Maker/Unity games are listed only when Steam tags them as story-driven.
+    tagCheck: createTagCheck({ file: path.join(userData, 'steam-tags.json') }),
+    onChange: (list) => emit('games:changed', list),
     pickFolder: async () => {
       const result = await dialog.showOpenDialog(mainWindow, {
         title: 'Pick the game folder', properties: ['openDirectory'] });

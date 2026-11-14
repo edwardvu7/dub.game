@@ -7,13 +7,39 @@ const { createState } = require('./state');
 const { launchGame } = require('./launch');
 
 /**
- * createGames({userData, modDir?, shell, pickFolder?, steamPath?, includeBeta?, scanOptions?})
+ * createGames({userData, modDir?, shell, pickFolder?, steamPath?, includeBeta?, scanOptions?,
+ *   tagCheck?, onChange?})
  * pickFolder: async () => string|null (the main process passes a dialog wrapper).
+ * tagCheck: from ./tags. When given, Steam games on engines other than Ren'Py are listed only if
+ *   their Steam tags say they are story-driven. onChange(list) fires when a background tag
+ *   lookup changes what is listed.
  */
 function createGames(opts) {
   const state = createState({ file: path.join(opts.userData, 'games.json') });
   const includeBeta = !!opts.includeBeta;
-  let cache = null;
+  let cache = null;   // every detected game, before the story filter
+  let generation = 0; // a newer rescan makes an older background lookup's result stale
+
+  // Ren'Py is a visual-novel engine, so its games are always listed. Godot, RPG Maker and Unity
+  // also make shooters and platformers, so their Steam games need a story tag. A folder the player
+  // added by hand is always listed: they chose it.
+  function listed(game) {
+    if (!opts.tagCheck || game.engine === 'renpy' || String(game.appid).startsWith('local:')) return true;
+    return opts.tagCheck.known(game.appid) === 'story';
+  }
+  const visible = () => cache.filter(listed).map(decorate);
+
+  function checkTagsInBackground() {
+    if (!opts.tagCheck) return;
+    const mine = generation;
+    const pending = cache.filter((g) => g.engine !== 'renpy' && !String(g.appid).startsWith('local:') &&
+      opts.tagCheck.known(g.appid) === undefined).map((g) => g.appid);
+    if (!pending.length) return;
+    opts.tagCheck.lookup(pending).then((kinds) => {
+      if (mine !== generation) return;
+      if ([...kinds.values()].includes('story') && opts.onChange) opts.onChange(visible());
+    }).catch(() => {});
+  }
 
   function decorate(game) {
     const enabled = state.isEnabled(game.appid);
@@ -36,12 +62,14 @@ function createGames(opts) {
       if (g) local.push(g);
     }
     cache = [...steamGames, ...local];
-    return cache.map(decorate);
+    generation++;
+    checkTagsInBackground();
+    return visible();
   }
 
   async function list() {
     if (!cache) return rescan();
-    return cache.map(decorate);
+    return visible();
   }
 
   async function find(appid) {
