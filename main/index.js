@@ -25,6 +25,7 @@ const HOTKEY = 'Shift+F2';
 const EXTERNAL_HOSTS = ['elevenlabs.io', 'aistudio.google.com', 'store.steampowered.com'];
 
 let mainWindow = null;
+const APP_ICON = path.join(ROOT, 'ui', 'logo.png');
 let overlayWindow = null;
 let quitting = false;
 const pendingStatus = [];
@@ -81,6 +82,7 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1180, height: 780, minWidth: 880, minHeight: 600,
     backgroundColor: '#0b0d10', title: 'dub.game', show: false,
+    icon: APP_ICON, // taskbar and title bar; the installed .exe gets build/icon.png
     webPreferences: webPreferences(),
   });
   lockDown(mainWindow);

@@ -58,7 +58,8 @@ kbd {
   background: var(--panel);
   border-right: 1px solid var(--line);
 }
-.wordmark { font: 700 22px/1 var(--display); letter-spacing: 0.02em; padding: 0 8px; }
+.wordmark { display: flex; align-items: center; gap: 10px; font: 700 22px/1 var(--display); letter-spacing: 0.02em; padding: 0 8px; }
+.wordmark-logo { flex: none; width: 30px; height: 30px; border-radius: 7px; }
 .wordmark-dot { color: var(--tally); }
 .tabs { display: flex; flex-direction: column; gap: 2px; }
 .tab {
