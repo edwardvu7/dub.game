@@ -588,7 +588,7 @@
       color: var(--accent);
     }
 
-    /* Team / About Us Strip (3 Human Builders) */
+    /* Team / About Us Strip (Real Name First, Then Username) */
     .team-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -874,29 +874,29 @@
       <section class="section" id="about">
         <div class="section-label reveal">About Us</div>
         <div class="team-grid">
-          <a href="https://github.com/edwardvu7" class="team-card reveal" style="--delay: 0ms;" target="_blank" rel="noopener noreferrer">
-            <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="edwardvu7" width="56" height="56" loading="lazy" />
+          <a href="https://github.com/edwardvu7" class="team-card reveal" style="--delay: 0ms;" target="_blank" rel="noopener noreferrer" data-gh-user="edwardvu7">
+            <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="Edward Vu" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Engine Hooks</span>
-              <div class="team-name">edwardvu7</div>
+              <div class="team-name">Edward Vu</div>
               <div class="team-handle">@edwardvu7</div>
             </div>
           </a>
 
-          <a href="https://github.com/chadscheeks" class="team-card reveal" style="--delay: 70ms;" target="_blank" rel="noopener noreferrer">
-            <img class="team-avatar" src="https://github.com/chadscheeks.png?size=160" onerror="this.src='logo.png'" alt="chadscheeks" width="56" height="56" loading="lazy" />
+          <a href="https://github.com/chadscheeks" class="team-card reveal" style="--delay: 70ms;" target="_blank" rel="noopener noreferrer" data-gh-user="chadscheeks">
+            <img class="team-avatar" src="https://github.com/chadscheeks.png?size=160" onerror="this.src='logo.png'" alt="Alexander Miller" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Core &amp; Voice Pipeline</span>
-              <div class="team-name">chadscheeks</div>
+              <div class="team-name">Alexander Miller</div>
               <div class="team-handle">@chadscheeks</div>
             </div>
           </a>
 
-          <a href="https://github.com/Crazeematt" class="team-card reveal" style="--delay: 140ms;" target="_blank" rel="noopener noreferrer">
-            <img class="team-avatar" src="https://github.com/Crazeematt.png?size=160" onerror="this.src='logo.png'" alt="Crazeematt" width="56" height="56" loading="lazy" />
+          <a href="https://github.com/Crazeematt" class="team-card reveal" style="--delay: 140ms;" target="_blank" rel="noopener noreferrer" data-gh-user="Crazeematt">
+            <img class="team-avatar" src="https://github.com/Crazeematt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Overlay &amp; UI</span>
-              <div class="team-name">Crazeematt</div>
+              <div class="team-name" id="name-Crazeematt">Matthew</div>
               <div class="team-handle">@Crazeematt</div>
             </div>
           </a>
@@ -972,6 +972,17 @@
     [slStability, slStyle, slSpeed].forEach((input) => {
       input.addEventListener("input", updateReadouts);
     });
+
+    // Automatically hydrate Crazeematt's full display name from GitHub's public API if set
+    fetch("https://api.github.com/users/Crazeematt")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => {
+        if (user && user.name) {
+          const el = document.getElementById("name-Crazeematt");
+          if (el) el.textContent = user.name;
+        }
+      })
+      .catch(() => {});
 
     const revealEls = document.querySelectorAll(".reveal");
     const revealObserver = new IntersectionObserver(
