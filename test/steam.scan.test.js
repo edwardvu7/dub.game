@@ -131,16 +131,18 @@ test('install: permission denied names the folder', { skip: process.platform ===
   } finally { fs.chmodSync(path.join(game.installDir, 'game'), 0o755); }
 });
 
-test('install: Godot beta files, and a game\'s own override.cfg is never overwritten or deleted', () => {
+test('install: Godot generic files preserve and restore the original override.cfg', () => {
   const t = fakeSteam();
   const game = { appid: '2002', engine: 'godot', installDir: path.join(t.common2, 'GodotStory') };
+  write(path.join(game.installDir, 'project.godot'), 'config_version=5');
   install.installHook(game);
-  assert.ok(fs.existsSync(path.join(game.installDir, 'dubgame.gd')));
+  assert.ok(fs.existsSync(path.join(game.installDir, '_dubgame_generic.gd')));
   assert.ok(install.isHookInstalled(game));
   install.uninstallHook(game);
   assert.ok(!fs.existsSync(path.join(game.installDir, 'override.cfg')));
   write(path.join(game.installDir, 'override.cfg'), '[application]\nconfig/name="Theirs"\n');
-  assert.throws(() => install.installHook(game), /will not overwrite/);
+  install.installHook(game);
+  assert.match(fs.readFileSync(path.join(game.installDir, 'override.cfg'), 'utf8'), /config\/name="Theirs"/);
   install.uninstallHook(game);
   assert.ok(fs.existsSync(path.join(game.installDir, 'override.cfg')));
 });

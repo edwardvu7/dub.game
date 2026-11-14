@@ -3,7 +3,7 @@
 // registerIpc attaches it to Electron's ipcMain.
 
 const INVOKE_CHANNELS = [
-  'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch',
+  'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
   'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
@@ -28,6 +28,7 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'games:rescan': () => games.rescan(),
     'games:addFolder': () => games.addFolder(),
     'games:setEnabled': (arg) => games.setEnabled({ appid: String(need(arg, 'appid').appid), enabled: !!arg.enabled }),
+    'games:godotConfig': (arg) => games.configureGodot({ ...need(arg, 'appid'), appid: String(arg.appid) }),
     'games:launch': (arg) => games.launch({ appid: String(need(arg, 'appid').appid) }),
 
     'voices:get': () => voices.all(),

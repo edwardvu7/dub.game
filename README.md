@@ -51,8 +51,12 @@ When all three sections are done, Fable 5 merges them into `main`. It only combi
 
 Use **Add Folder** for a Godot source project (`project.godot`) or exported desktop
 game (executable plus `.pck`). Select the Godot 4 executable on first source-project
-launch. There is no bundled demo game. Voice dubbing requires integration with the
-game's dialogue system; launching alone does not add voices.
+launch. There is no bundled demo game. For Godot 4, enable **Voices** with the game
+closed, then launch it. The generic hook reads live Label/RichTextLabel nodes, with
+no screen capture. Check for **Connected**; if automatic detection misses text, use
+**Choose dialogue text** while the dialogue is visible. Enable Narration in Settings
+for unnamed cutscene text. Compatibility varies by game; Until Then is unverified.
+See [setup, compatibility and review](docs/GODOT-GENERIC.md).
 
 On Windows, games launched here are tracked when their window takes focus. The
 launcher requests borderless positioning on that window's actual monitor. Shift+F2

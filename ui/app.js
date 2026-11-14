@@ -92,10 +92,33 @@
     launch.type = 'button';
     launch.title = 'Turns voices on for this game and starts it in a window, so the overlay can show.';
     row.append(toggle, repair, launch);
-    body.append(name, hint, row);
+    const diagnostic = document.createElement('details');
+    diagnostic.className = 'godot-diagnostics';
+    diagnostic.append(el('summary', '', 'Choose dialogue text'));
+    const explanation = el('p', '', 'Auto selects likely dialogue. If it misses text, keep that text visible in the game, then choose its node. No images are captured.');
+    const textNode = document.createElement('select');
+    const speakerNode = document.createElement('select');
+    textNode.setAttribute('aria-label', 'Dialogue node');
+    speakerNode.setAttribute('aria-label', 'Speaker node');
+    const save = el('button', 'btn btn-quiet', 'Save selection');
+    save.type = 'button';
+    const nodeCount = el('p', '');
+    diagnostic.append(explanation, el('label', '', 'Dialogue'), textNode,
+      el('label', '', 'Speaker (optional)'), speakerNode, save, nodeCount);
+    body.append(name, hint, row, diagnostic);
     root.append(art, body);
 
-    const tile = { root, img, fallback, badge, name, hint, box, repair, launch, busy: false };
+    const tile = { root, img, fallback, badge, name, hint, box, repair, launch, diagnostic, textNode, speakerNode, nodeCount, dirty: false, busy: false };
+    textNode.onchange = speakerNode.onchange = () => { tile.dirty = true; };
+    save.onclick = async () => {
+      try {
+        const updated = await dub.invoke('games:godotConfig', { appid, textPath: textNode.value, speakerPath: speakerNode.value });
+        tile.dirty = false;
+        games = games.map(g => g.appid === appid ? updated : g);
+        renderGames();
+        toast('Saved. The running hook refreshes within a second.', 'note');
+      } catch (e) { fail(e); }
+    };
 
     async function setEnabled(enabled) {
       if (tile.busy) return;
@@ -161,10 +184,26 @@
     tile.box.setAttribute('aria-label', 'Voices for ' + game.name);
     tile.repair.hidden = status !== 'missing';
     // Coming-soon engines are listed so players see them, but nothing can be switched on yet.
-    tile.box.closest('.switch').hidden = status === 'soon' || game.engine === 'godot';
-    tile.repair.hidden = game.engine === 'godot' || status !== 'missing';
-    tile.launch.title = game.engine === 'godot' ? 'Launch with Godot. Voices require a game integration.' : 'Launch with voices';
+    tile.box.closest('.switch').hidden = status === 'soon';
+    tile.repair.hidden = status !== 'missing';
+    tile.launch.title = game.engine === 'godot' ? 'Launch Godot. Enable Voices first to install the generic hook.' : 'Launch with voices';
     tile.launch.hidden = status === 'soon' && game.engine !== 'godot';
+    tile.diagnostic.hidden = game.voiceMode !== 'generic' || !game.enabled;
+    if (game.voiceMode === 'generic' && !tile.dirty) {
+      const config = game.godotConfig || {};
+      for (const [select, key] of [[tile.textNode, 'textPath'], [tile.speakerNode, 'speakerPath']]) {
+        if (document.activeElement === select) continue;
+        select.replaceChildren();
+        select.append(new Option('Automatic', ''));
+        const labels = game.labels || [];
+        for (const item of labels) select.append(new Option(item.path + ' : ' + item.text, item.path));
+        if (config[key] && !labels.some(item => item.path === config[key]))
+          select.append(new Option(config[key] + ' (not visible now)', config[key]));
+        select.value = config[key] || '';
+      }
+      tile.nodeCount.textContent = (game.labels || []).length + ' visible text nodes reported.' +
+        (game.limitReached ? ' Scan limit reached; some nodes may be omitted.' : '');
+    }
   }
 
   function renderGames() {
@@ -186,6 +225,18 @@
       ? 'No games match "' + search.value.trim() + '".'
       : L.gamesSummary(games);
   }
+
+  let refreshingGodot = false;
+  setInterval(async () => {
+    if (refreshingGodot || !games.some(g => g.voiceMode === 'generic' && g.enabled)) return;
+    refreshingGodot = true;
+    try {
+      if ([...tiles.values()].some(t => t.busy)) return;
+      const list = await dub.invoke('games:list');
+      if (![...tiles.values()].some(t => t.busy)) { games = list; renderGames(); }
+    } catch { /* Existing status remains available if the app is closing. */ }
+    finally { refreshingGodot = false; }
+  }, 2000);
 
   async function loadGames(channel, button) {
     const label = button ? button.textContent : '';

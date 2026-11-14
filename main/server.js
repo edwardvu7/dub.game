@@ -84,7 +84,7 @@ function createServer(handlers = {}) {
     };
     if (req.method === 'GET' && (url === '/' || url === '/health')) return end(200, { ok: true, app: 'dub.game' });
     if (req.method !== 'POST') return end(405, { error: 'POST only' });
-    if (!['/line', '/characters', '/stop'].includes(url)) return end(404, { error: 'unknown path' });
+    if (!['/line', '/characters', '/stop', '/godot/hook'].includes(url)) return end(404, { error: 'unknown path' });
 
     let body;
     try {
@@ -93,7 +93,17 @@ function createServer(handlers = {}) {
     } catch (e) {
       return end(e.status || 400, { error: e.status ? e.message : 'invalid JSON' });
     }
-    if (url === '/line') {
+    if (url === '/godot/hook') {
+      if (!body || typeof body.appid !== 'string' || typeof body.token !== 'string' ||
+          !Array.isArray(body.labels)) return end(400, { error: 'Invalid hook report' });
+      const report = { appid: body.appid.slice(0, 1024), token: body.token.slice(0, 100),
+        version: body.version, selectedPath: String(body.selectedPath || '').slice(0, 1024),
+        limitReached: body.limitReached === true,
+        labels: body.labels.slice(0, 80).filter(x => x && typeof x.path === 'string' && typeof x.text === 'string')
+          .map(x => ({ path: x.path.slice(0, 1024), text: x.text.slice(0, 120), candidate: x.candidate === true })) };
+      end(204);
+      later(handlers.onGodotHook, report);
+    } else if (url === '/line') {
       const line = normalizeLine(body);
       if (!line && !(body && typeof body.text === 'string')) return end(400, { error: 'text is required' });
       end(204);

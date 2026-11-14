@@ -317,6 +317,7 @@ async function start() {
 
   const server = createServer({
     log,
+    onGodotHook: (payload) => games.reportGodotHook(payload),
     onLine: (line) => pipeline.handleLine(line),
     onCharacters: (payload) => pipeline.handleCharacters(payload),
     onStop: (stop) => pipeline.handleStop(stop),

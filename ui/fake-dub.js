@@ -65,6 +65,7 @@
       g.enabled = g.hookInstalled = !!a.enabled;
       return copy(g);
     },
+    'games:godotConfig': (a) => { const g = game(a); g.godotConfig = { textPath: a.textPath, speakerPath: a.speakerPath }; return g; },
     'games:launch': (a) => { game(a); return true; },
     'voices:get': () => copy(store),
     'voices:catalog': () => copy(catalog),

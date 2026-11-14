@@ -41,24 +41,25 @@ test('no demo is injected; added project picks Godot once and never writes a hoo
   const games = createGames(opts);
   assert.deepEqual(await games.list(), []);
   const [game] = await games.addFolder();
-  assert.equal(game.voiceMode, 'external');
-  assert.equal(L.gameStatus(game), 'launch');
+  assert.equal(game.voiceMode, 'generic');
+  assert.equal(L.gameStatus(game), 'off');
   assert.equal((await games.addFolder()).length, 1);
   await games.launch({ appid: game.appid });
   await createGames(opts).launch({ appid: game.appid });
   assert.equal(picks, 1, 'Godot path persists across app restarts');
   assert.deepEqual(calls[0], { cmd: exe, args: ['--path', dir] });
-  await assert.rejects(games.setEnabled({ appid: game.appid, enabled: true }), /No hook/);
+  // Launch alone never opts the user into injection.
+
   assert.equal(fs.existsSync(path.join(dir, 'override.cfg')), false);
 });
 
 test('user-added Godot project is launchable without claiming automatic voices', async () => {
   const games = createGames({ userData: tmpDir(), steamPath: tmpDir(), pickFolder: async () => project() });
   const [game] = await games.addFolder();
-  assert.equal(game.voiceMode, 'external');
+  assert.equal(game.voiceMode, 'generic');
   assert.equal(game.enabled, false);
-  assert.equal(L.gameStatus(game), 'launch');
-  assert.match(L.gameHint(game).text, /require.*integration/);
+  assert.equal(L.gameStatus(game), 'off');
+  assert.match(L.gameHint(game).text, /Enable before launching/);
   await assert.rejects(games.launch({ appid: game.appid }), /Select the Godot 4 executable/);
 });
 

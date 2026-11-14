@@ -5,7 +5,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const INVOKE = [
-  'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch',
+  'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
   'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',

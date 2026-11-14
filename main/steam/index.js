@@ -4,6 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const scan = require('./scan');
 const install = require('./install');
+const godot = require('./godot-hook');
 const { createState } = require('./state');
 const { launchGame } = require('./launch');
 
@@ -18,6 +19,8 @@ const { launchGame } = require('./launch');
 function createGames(opts) {
   const state = createState({ file: path.join(opts.userData, 'games.json') });
   const includeBeta = !!opts.includeBeta;
+  const reports = new Map();
+  const launches = new Map();
   let cache = null;   // every detected game, before the story filter
   let generation = 0; // a newer rescan makes an older background lookup's result stale
 
@@ -44,8 +47,17 @@ function createGames(opts) {
 
   function decorate(game) {
     if (game.engine === 'godot') {
-      return { ...game, voiceMode: 'external',
-        enabled: false, hookInstalled: false };
+      const enabled = state.isEnabled(game.appid);
+      const hookInstalled = godot.isInstalled(game);
+      const c = godot.config(game) || {};
+      const report = reports.get(game.appid);
+      const fresh = report && Date.now() - report.at < 6000;
+      const launched = launches.get(game.appid);
+      const hookStatus = fresh ? (report.selectedPath ? 'connected' : 'no-dialogue')
+        : launched && Date.now() - launched < 15000 ? 'waiting' : 'disconnected';
+      return { ...game, support: 'beta', voiceMode: 'generic', enabled, hookInstalled,
+        hookStatus, labels: fresh ? report.labels : [], limitReached: fresh && report.limitReached,
+        godotConfig: { textPath: c.textPath || '', speakerPath: c.speakerPath || '' } };
     }
     const enabled = state.isEnabled(game.appid);
     let hookInstalled = install.isHookInstalled(game);
@@ -102,10 +114,7 @@ function createGames(opts) {
     },
     async setEnabled({ appid, enabled }) {
       const game = await find(appid);
-      if (game.engine === 'godot') {
-        throw new Error('Godot voices are controlled by the game integration. No hook is installed by the launcher.');
-      }
-      if (enabled && game.support === 'soon') {
+      if (enabled && game.support === 'soon' && game.engine !== 'godot') {
         throw new Error(`Voices for ${game.name} aren't available yet. dub.game supports Ren'Py games for now.`);
       }
       if (enabled) install.installHook(game, { modDir: opts.modDir });
@@ -113,8 +122,28 @@ function createGames(opts) {
       state.setEnabled(game.appid, !!enabled);
       return decorate(game);
     },
+    async configureGodot({ appid, textPath, speakerPath }) {
+      const game = await find(appid);
+      if (game.engine !== 'godot') throw new Error('Not a Godot game.');
+      godot.configure(game, { textPath, speakerPath });
+      return decorate(game);
+    },
+    reportGodotHook(payload) {
+      const game = cache && cache.find(g => g.appid === payload.appid && g.engine === 'godot');
+      if (!game || !state.isEnabled(game.appid)) return false;
+      const c = godot.config(game);
+      if (!c || !c.token || payload.token !== c.token) return false;
+      reports.set(game.appid, { ...payload, token: undefined, at: Date.now() });
+      return true;
+    },
     async launch({ appid }) {
       const game = await find(appid);
+      if (game.engine === 'godot' && state.isEnabled(game.appid)) {
+        // Refresh only through the installer, which refuses to overwrite changed overrides.
+        godot.install(game, { modDir: opts.modDir });
+        reports.delete(game.appid);
+        launches.set(game.appid, Date.now());
+      }
       let godotExecutable = state.godotExecutable();
       if (game.engine === 'godot' && fs.existsSync(path.join(game.installDir, 'project.godot'))) {
         if (!godotExecutable || !fs.existsSync(godotExecutable)) {
