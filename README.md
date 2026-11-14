@@ -11,3 +11,5 @@ Three sections, one owner each, all building against the contracts in [`CLAUDE.m
 | C — UI + demo | `section/c-ui-demo` | [docs/sections/C-ui-and-demo.md](docs/sections/C-ui-and-demo.md) |
 
 Full plan: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+When all three sections are done, Fable 5 merges them into `main`. It only combines; it doesn't build the sections. See [docs/INTEGRATION.md](docs/INTEGRATION.md).
