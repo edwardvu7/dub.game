@@ -1,0 +1,7 @@
+[
+  {"game": "sample-game", "character": "Eileen", "text": "Hi! I'm Eileen. Welcome to the {b}demo{/b}."},
+  {"game": "sample-game", "character": "Lucy", "text": "Ugh. Do we really have to do this today?"},
+  {"game": "sample-game", "character": null, "text": "The rain kept falling against the window."},
+  {"game": "sample-game", "character": "Eileen", "text": "Come on, it'll be fun!{w} I promise."},
+  {"game": "sample-game", "character": "Old Man Hiro", "text": "Back in my day, we read our stories in silence."}
+]

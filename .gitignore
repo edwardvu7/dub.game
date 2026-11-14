@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# dub.game
+cache/
+*.mp3
+*.wav
+.DS_Store
+.idea/

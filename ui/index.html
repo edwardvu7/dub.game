@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dub.game</title>
+  <link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+  <header>
+    <h1>dub.game</h1>
+    <span id="game" class="muted">Waiting for a game…</span>
+    <label class="toggle"><input type="checkbox" id="enabled" checked> Voices on</label>
+    <label>Volume <input type="range" id="volume" min="0" max="1" step="0.05" value="1"></label>
+  </header>
+
+  <main id="characters">
+    <p class="muted">Start a game with the hook installed. Characters show up here as they speak.</p>
+  </main>
+
+  <template id="card">
+    <section class="card">
+      <div class="card-head">
+        <h2 class="name"></h2>
+        <span class="badge"></span>
+      </div>
+      <p class="desc muted"></p>
+      <label>Voice <select class="voice"></select></label>
+      <label>Stability <input type="range" class="stability" min="0" max="1" step="0.05"><output></output></label>
+      <label>Similarity <input type="range" class="similarity_boost" min="0" max="1" step="0.05"><output></output></label>
+      <label>Style <input type="range" class="style" min="0" max="1" step="0.05"><output></output></label>
+      <label>Speed <input type="range" class="speed" min="0.7" max="1.2" step="0.05"><output></output></label>
+      <div class="actions">
+        <button class="preview">Preview</button>
+        <button class="recast">Recast</button>
+        <label class="toggle"><input type="checkbox" class="mute"> Mute</label>
+      </div>
+    </section>
+  </template>
+
+  <script src="/ui/app.js"></script>
+</body>
+</html>
