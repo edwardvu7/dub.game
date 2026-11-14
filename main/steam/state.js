@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 function createState({ file }) {
-  let data = { enabled: [], folders: [] };
+  let data = { enabled: [], folders: [], godotExecutable: '' };
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     data = {
+      godotExecutable: typeof raw.godotExecutable === 'string' ? raw.godotExecutable : '',
       enabled: Array.isArray(raw.enabled) ? raw.enabled.map(String) : [],
       folders: Array.isArray(raw.folders) ? raw.folders.map(String) : [],
     };
@@ -21,6 +22,8 @@ function createState({ file }) {
   }
 
   return {
+    godotExecutable: () => data.godotExecutable,
+    setGodotExecutable(exe) { data.godotExecutable = exe; save(); },
     isEnabled: (appid) => data.enabled.includes(String(appid)),
     setEnabled(appid, on) {
       const id = String(appid);

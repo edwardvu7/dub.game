@@ -4,26 +4,25 @@ The supported demo path is a **source-level integration**: a Godot autoload send
 complete dialogue events to the existing dub.game desktop app. No API keys go in
 Godot. The app handles Gemini casting, ElevenLabs speech, caching, and playback.
 
-## Run the demo
+## Launch from dub.game
 
-1. At the repository root, run `npm ci`, then `npm start`.
-2. Configure ElevenLabs and Gemini in the app's Settings. ElevenLabs is required
-   for speech; without Gemini the app uses placeholder character voices.
-3. Import `mod/godot/demo/project.godot` in Godot 4 and press F6 with `demo.tscn`
-   open, or F5 to run the project. Alternatively, from the repository root:
-   `godot --path mod/godot/demo`.
-4. Click **Next line / Restart** to cycle through narration, Mira, and Rowan.
-   **Stop voice** stops playback. The app receives the cast at game startup.
-   Start dub.game before the demo so the cast can be registered.
+Use **Add Folder** for Godot projects (the folder with `project.godot`) or desktop
+exports (the folder containing the executable and `.pck`). Click Launch. For source
+projects, select the extracted Godot 4 executable when prompted; the path is saved.
+Exports use their own executable; Steam games use Steam. Embedded-pack exports
+without a separate `.pck` are not detected. No demo game is shipped or auto-added.
 
-Do not use Add Folder / Enable Hook for this demo. Its autoload is already built
-in, so it connects directly while the desktop app is open. Leave dub.game running
-in the background for voice playback. Menu and button labels are never voiced.
-The connection indicator confirms HTTP delivery, not completion of AI generation.
+On Windows the launcher tracks the game's foreground window and requests borderless
+placement on its current monitor. Shift+F2 opens the game-bounded overlay. See
+[window tracking](../../docs/GAME-WINDOW.md) for limitations and verification.
+
+Launching does not automatically add voices. The launcher never installs or removes
+the experimental Godot override hook. If previously installed, restore the game's
+original files before adding an integration. Godot runs separately from Electron.
 
 ## Add to your own Godot 4 project
 
-Copy `demo/dubgame.gd` into the project. Under Project Settings > Globals > Autoload
+Copy `bridge.gd` (rename it `dubgame.gd`) into the project. Under Project Settings > Globals > Autoload
 (the tab location varies by Godot version), add it with the name **DubGame**.
 Register your cast at startup:
 
@@ -52,8 +51,7 @@ skipping retains only the latest unsent dialogue and cast. Failures do not retry
 block the game, or accumulate an unbounded backlog. If the app starts later, the
 next line reconnects; call `register_characters` again if you want startup casting.
 A request already sent cannot be recalled; it may briefly reach the app before the
-new stop/line. Closing the demo allows 150 ms for a best-effort stop, not a delivery
-guarantee. Run one connected game at a time: the existing server shares speaker
+new stop/line. On game exit, send a best-effort stop before quitting; delivery is not guaranteed. Run one connected game at a time: the existing server shares speaker
 profiles and sequence state across games.
 
 Export the integrated project normally for a desktop target. The autoload is
@@ -70,7 +68,7 @@ Run `npm test` for the existing desktop app tests.
 
 Verified with Godot 4.6.3 on Linux. UNVERIFIED: live Gemini/ElevenLabs audio,
 Windows execution, exported desktop binaries, Godot 3, and browser/mobile exports.
-For demo rehearsal, run the Windows build with your keys, confirm two distinct
+For rehearsal, run the Windows build with your keys, confirm two distinct
 character voices, toggle narration, and skip a line while speech is playing.
 
 ## Existing experimental injection hook

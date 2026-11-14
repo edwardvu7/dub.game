@@ -122,6 +122,7 @@ function readManifests(library) {
 // can't be switched on yet. Godot's untested adapter is offered as "beta" only when asked for.
 function listing(detected, includeBeta) {
   if (!detected) return null;
+  if (detected.support === 'launch') return 'launch';
   if (detected.support === 'full') return 'full';
   if (detected.support === 'beta') return includeBeta ? 'beta' : 'soon';
   if (detected.support === 'soon') return 'soon';

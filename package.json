@@ -40,6 +40,7 @@
       "package.json"
     ],
     "asarUnpack": [
+      "main/windows/**/*",
       "mod/**/*"
     ],
     "win": {

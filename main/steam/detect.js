@@ -45,6 +45,10 @@ function detectEngine(installDir) {
   const renpyRoot = findRenpyRoot(installDir);
   if (renpyRoot) return { engine: 'renpy', support: 'full', hookDir: path.join(renpyRoot, 'game') };
 
+  if (isFile(path.join(installDir, 'project.godot'))) {
+    return { engine: 'godot', support: 'launch', hookDir: null };
+  }
+
   const entries = ls(installDir);
   const names = entries.map((e) => e.name);
 

@@ -42,3 +42,14 @@ function createOverlayPosition({ file } = {}) {
 }
 
 module.exports = { createOverlayPosition, displayKey };
+
+// All coordinates are Electron DIP, after converting the native game client rectangle.
+function constrainToGame(area, desired = {}) {
+  const width = Math.max(1, Math.min(Math.round(desired.width || 340), area.width));
+  const height = Math.max(1, Math.min(Math.round(desired.height || 600), area.height));
+  const x = Number.isFinite(desired.x) ? desired.x : area.x + 16;
+  const y = Number.isFinite(desired.y) ? desired.y : area.y + (area.height - height) / 2;
+  return { x: Math.round(clamp(x, area.x, area.x + area.width - width)),
+    y: Math.round(clamp(y, area.y, area.y + area.height - height)), width, height };
+}
+module.exports.constrainToGame = constrainToGame;
