@@ -122,14 +122,14 @@
         // Launch always means "launch with voices": the dub.game script has to be in the game
         // first. It is also what starts the game in borderless fullscreen so the overlay can show.
         const game = games.find((g) => g.appid === appid);
-        if (game && game.support === 'soon') return;
-        if (!game || L.gameStatus(game) !== 'on') {
+        if (game && game.support === 'soon' && game.engine !== 'godot') return;
+        if (game && game.engine !== 'godot' && L.gameStatus(game) !== 'on') {
           const updated = await dub.invoke('games:setEnabled', { appid, enabled: true });
           games = games.map((g) => (g.appid === appid ? updated : g));
           renderGames();
         }
         await dub.invoke('games:launch', { appid });
-        toast('Starting ' + name.textContent + ' in a window, so the overlay can show. Press Shift + F2 in the game to change voices.', 'note');
+        toast('Starting ' + name.textContent + '. Press Shift + F2 for the voice overlay.', 'note');
       } catch (e) {
         fail(e);
       } finally {
@@ -161,8 +161,10 @@
     tile.box.setAttribute('aria-label', 'Voices for ' + game.name);
     tile.repair.hidden = status !== 'missing';
     // Coming-soon engines are listed so players see them, but nothing can be switched on yet.
-    tile.box.closest('.switch').hidden = status === 'soon';
-    tile.launch.hidden = status === 'soon';
+    tile.box.closest('.switch').hidden = status === 'soon' || game.engine === 'godot';
+    tile.repair.hidden = game.engine === 'godot' || status !== 'missing';
+    tile.launch.title = game.engine === 'godot' ? 'Launch with Godot. Voices require a game integration.' : 'Launch with voices';
+    tile.launch.hidden = status === 'soon' && game.engine !== 'godot';
   }
 
   function renderGames() {

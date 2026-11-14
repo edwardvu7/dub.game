@@ -1,6 +1,7 @@
 'use strict';
 // Electron entry point: windows, hotkey, localhost server, and wiring of the testable modules.
 const path = require('node:path');
+const fs = require('node:fs');
 const { app, BrowserWindow, globalShortcut, ipcMain, shell, dialog, safeStorage, screen,
   clipboard, Menu, Notification } = require('electron');
 
@@ -205,9 +206,30 @@ async function start() {
   const cache = createCache({ dir: path.join(userData, 'cache') });
   const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log });
 
+  // Give the shipped source demo a writable project directory in installed builds.
+  let demoDir = path.join(ROOT, 'mod', 'godot', 'demo');
+  if (app.isPackaged) {
+    const shipped = path.join(ROOT + '.unpacked', 'mod', 'godot', 'demo');
+    demoDir = path.join(userData, 'godot-demo');
+    fs.mkdirSync(demoDir, { recursive: true });
+    for (const file of ['project.godot', 'demo.tscn', 'demo.gd', 'dubgame.gd']) {
+      fs.copyFileSync(path.join(shipped, file), path.join(demoDir, file));
+    }
+  }
+
   const games = createGames({
     userData,
     modDir: path.join(ROOT, 'mod'),
+    // Godot is a separate process and cannot read Electron's virtual app.asar paths.
+    demoDir,
+    pickGodot: async () => {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Select the Godot 4 executable (not your game)',
+        properties: ['openFile'],
+        ...(process.platform === 'win32' ? { filters: [{ name: 'Godot executable', extensions: ['exe'] }] } : {}),
+      });
+      return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
+    },
     shell,
     includeBeta: process.env.DUBGAME_BETA === '1',
     // Godot/RPG Maker/Unity games are listed only when Steam tags them as story-driven.

@@ -21,7 +21,7 @@ function findExecutable(dir, platform = process.platform) {
     picks = entries.filter((e) => e.isDirectory() && /\.app$/i.test(e.name));
     if (/\.app$/i.test(dir)) return dir;
   } else {
-    picks = entries.filter((e) => e.isFile() && /\.sh$/i.test(e.name));
+    picks = entries.filter((e) => e.isFile() && /\.(sh|x86_64|x86|arm64)$/i.test(e.name));
   }
   picks.sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
   return picks.length ? path.join(dir, picks[0].name) : null;
@@ -38,13 +38,21 @@ async function launchGame(game, deps = {}) {
     await deps.shell.openExternal('steam://run/' + game.appid);
     return true;
   }
-  const exe = findExecutable(game.installDir, platform);
+  const project = game.engine === 'godot' && fs.existsSync(path.join(game.installDir, 'project.godot'));
+  const exe = project ? deps.godotExecutable : findExecutable(game.installDir, platform);
   if (!exe) throw new Error(`Could not find the game's executable in:\n${game.installDir}`);
   const spawn = deps.spawn || childProcess.spawn;
-  const [cmd, args] = platform === 'darwin' ? ['open', [exe]]
-    : platform === 'win32' ? [exe, []] : ['sh', [exe]];
+  const [cmd, args] = project ? [exe, ['--path', game.installDir]]
+    : platform === 'darwin' ? ['open', [exe]]
+    : platform !== 'win32' && /\.sh$/i.test(exe) ? ['sh', [exe]] : [exe, []];
   const child = spawn(cmd, args, { cwd: game.installDir, detached: true, stdio: 'ignore' });
-  if (child && child.on) child.on('error', () => {});
+  // Real processes must confirm spawn; report missing/invalid executables to the UI.
+  if (child && child.once) {
+    await new Promise((resolve, reject) => {
+      child.once('error', (error) => reject(new Error(`Could not launch ${exe}: ${error.message}`)));
+      child.once('spawn', resolve);
+    });
+  }
   if (child && child.unref) child.unref();
   return true;
 }

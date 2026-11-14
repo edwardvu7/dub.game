@@ -186,7 +186,7 @@ test('games facade: tick installs, recheck reports a removed hook, untick remove
   let games = make();
   const listed = await games.list();
   assert.equal(listed.filter((g) => g.support === 'full').length, 2);
-  const soon = listed.find((g) => g.support === 'soon');
+  const soon = listed.find((g) => g.support === 'soon' && g.engine !== 'godot');
   await assert.rejects(() => games.setEnabled({ appid: soon.appid, enabled: true }), /aren't available yet/);
   assert.equal(listed.find((g) => g.appid === soon.appid).enabled, false);
 

@@ -4,7 +4,34 @@ The supported demo path is a **source-level integration**: a Godot autoload send
 complete dialogue events to the existing dub.game desktop app. No API keys go in
 Godot. The app handles Gemini casting, ElevenLabs speech, caching, and playback.
 
-## Run the demo
+## Launch from dub.game
+
+The Games screen now includes **dub.game Godot Demo** automatically. Click Launch
+and select your downloaded **Godot 4 executable** when prompted (on Windows,
+select the extracted `Godot_v4...exe`, not a ZIP or the game executable).
+The launcher remembers this path. The game opens in its own window while Electron
+continues providing speech. Godot itself is not bundled with dub.game.
+
+Use **Add Folder** for other Godot projects (select the folder with `project.godot`)
+or desktop exports (select the folder containing the executable and `.pck`).
+Source projects use the selected Godot executable. Exported games use their own
+executable; Steam games use Steam. Embedded-pack exports without a separate `.pck`
+are not detected yet. Steam discovery still filters for story-driven games; Add
+Folder bypasses that filter for a game you choose yourself.
+
+Only the bundled demo is labeled as having voice integration. Other Godot games
+can launch without automatic dubbing. Add the source integration below to provide
+voices. The launcher never installs or removes the experimental Godot override
+hook, and it never offers a misleading voice-enable switch for these games.
+If you installed that old experimental hook previously, its files are not modified
+by this update; restore your game's original files before testing an integration.
+
+Installed builds copy the shipped demo into the app's writable user-data folder
+at startup; edit the source demo in the repository when developing your own version.
+UNVERIFIED: Windows installed-build launch and macOS executable selection; launcher
+logic is tested with fixtures, and the real Godot adapter is tested headlessly on Linux.
+
+## Run the demo manually
 
 1. At the repository root, run `npm ci`, then `npm start`.
 2. Configure ElevenLabs and Gemini in the app's Settings. ElevenLabs is required
@@ -16,8 +43,8 @@ Godot. The app handles Gemini casting, ElevenLabs speech, caching, and playback.
    **Stop voice** stops playback. The app receives the cast at game startup.
    Start dub.game before the demo so the cast can be registered.
 
-Do not use Add Folder / Enable Hook for this demo. Its autoload is already built
-in, so it connects directly while the desktop app is open. Leave dub.game running
+The demo appears automatically in Games; you can also run it manually. Its autoload
+is already built in, so it connects directly while the desktop app is open. Leave dub.game running
 in the background for voice playback. Menu and button labels are never voiced.
 The connection indicator confirms HTTP delivery, not completion of AI generation.
 

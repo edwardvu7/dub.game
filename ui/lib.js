@@ -40,6 +40,8 @@
   /** The badge on a game's cover: which engine, and whether voices work there yet. */
   function supportBadge(game) {
     const engine = engineName(game && game.engine);
+    if (game && game.voiceMode) return { text: 'Godot · ' + (game.voiceMode === 'integrated' ? 'Demo voices' : 'Launch available'),
+      tone: 'beta', title: game.voiceMode === 'integrated' ? 'Dialogue integration included.' : 'Launching is supported. Voices require a game integration.' };
     if (game && game.support === 'soon') {
       return { text: engine + ' \u00b7 Coming soon', tone: 'soon', title: "Voices for " + engine + " games aren't available yet." };
     }
@@ -51,6 +53,7 @@
 
   /** off: not voiced. on: hook in place. missing: ticked, but the hook file is gone. */
   function gameStatus(game) {
+    if (game && game.voiceMode) return game.voiceMode === 'integrated' ? 'integrated' : 'launch';
     if (game && game.support === 'soon') return 'soon';
     if (!game || !game.enabled) return 'off';
     return game.hookInstalled ? 'on' : 'missing';
@@ -125,6 +128,7 @@
   /** One sentence under the Games heading. */
   function gamesSummary(games) {
     const all = Array.isArray(games) ? games : [];
+    if (all.some((g) => g.voiceMode)) return all.length + ' games found. Launch a game; Godot voices require an integration.';
     const list = all.filter((g) => g.support !== 'soon');
     const soon = all.length - list.length;
     const later = soon ? ' ' + (soon === 1 ? '1 more game uses' : soon + ' more games use') +
@@ -139,6 +143,8 @@
   /** The line under a game's name: what the player should know or do next. */
   function gameHint(game, justEnabled) {
     const status = gameStatus(game);
+    if (status === 'integrated') return { tone: 'on', text: 'Demo voices included. Select Godot 4 on first launch.' };
+    if (status === 'launch') return { tone: 'off', text: 'Ready to launch. Voices require a dub.game integration in this game.' };
     if (status === 'soon') return { tone: 'off', text: 'Voices for ' + engineName(game.engine) + " games aren't available yet." };
     if (status === 'missing') return { tone: 'warn', text: 'The dub.game script is missing from this game. Reinstall it.' };
     if (status === 'on' && justEnabled) return { tone: 'note', text: 'Voices are on. If the game is open, restart it.' };

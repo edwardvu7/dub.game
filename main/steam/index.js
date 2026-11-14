@@ -1,6 +1,7 @@
 'use strict';
 // Facade used by main/ipc.js for the games:* channels.
 const path = require('node:path');
+const fs = require('node:fs');
 const scan = require('./scan');
 const install = require('./install');
 const { createState } = require('./state');
@@ -42,6 +43,10 @@ function createGames(opts) {
   }
 
   function decorate(game) {
+    if (game.engine === 'godot') {
+      return { ...game, voiceMode: game.builtin ? 'integrated' : 'external',
+        enabled: !!game.builtin, hookInstalled: false };
+    }
     const enabled = state.isEnabled(game.appid);
     let hookInstalled = install.isHookInstalled(game);
     if (game.support === 'soon') return { ...game, enabled: false, hookInstalled: false };
@@ -61,7 +66,13 @@ function createGames(opts) {
       const g = scan.scanFolder(dir);
       if (g) local.push(g);
     }
-    cache = [...steamGames, ...local];
+    const demo = opts.demoDir && scan.scanFolder(opts.demoDir);
+    if (demo) {
+      demo.name = 'dub.game Godot Demo';
+      demo.builtin = true;
+    }
+    cache = [...new Map([...steamGames, ...local, ...(demo ? [demo] : [])]
+      .map((g) => [g.appid, g])).values()];
     generation++;
     checkTagsInBackground();
     return visible();
@@ -97,6 +108,9 @@ function createGames(opts) {
     },
     async setEnabled({ appid, enabled }) {
       const game = await find(appid);
+      if (game.engine === 'godot') {
+        throw new Error('Godot voices are controlled by the game integration. No hook is installed by the launcher.');
+      }
       if (enabled && game.support === 'soon') {
         throw new Error(`Voices for ${game.name} aren't available yet. dub.game supports Ren'Py games for now.`);
       }
@@ -106,7 +120,22 @@ function createGames(opts) {
       return decorate(game);
     },
     async launch({ appid }) {
-      return launchGame(await find(appid), { shell: opts.shell, spawn: opts.spawn });
+      const game = await find(appid);
+      let godotExecutable = state.godotExecutable();
+      if (game.engine === 'godot' && fs.existsSync(path.join(game.installDir, 'project.godot'))) {
+        if (!godotExecutable || !fs.existsSync(godotExecutable)) {
+          godotExecutable = opts.pickGodot ? await opts.pickGodot() : null;
+          if (!godotExecutable) throw new Error('Select the Godot 4 executable to run a source project.');
+          state.setGodotExecutable(godotExecutable);
+        }
+      }
+      try {
+        return await launchGame(game, { shell: opts.shell, spawn: opts.spawn,
+          platform: opts.platform, godotExecutable });
+      } catch (error) {
+        if (godotExecutable) state.setGodotExecutable('');
+        throw error;
+      }
     },
   };
 }
