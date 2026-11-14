@@ -21,7 +21,7 @@ code against the contracts below (or fake data), never edit their folder.
 ## Stack
 
 - Electron, plain JavaScript (CommonJS in `main/`, no bundler). Node 20+.
-- `npm start` runs the app. `npm test` runs `node --test` over `test/`.
+- `npm start` runs the app. `npm test` runs `node --test` (picks up `test/*.test.js`).
 - Windows is the demo target; code must not crash on macOS/Linux (dev machines).
 
 ## Contracts
@@ -100,3 +100,17 @@ Audio plays in a hidden renderer (or the main window); a new clip always stops t
 - Hooks must never crash or freeze the game: background thread, short timeout, swallow errors.
 - Plan first, then build. Commit every time something works.
 - Anything unverified against a real game/API gets a `// UNVERIFIED:` comment.
+
+## Git: who gets credit
+- **Commit as the person you are working for, never as Claude.** Before your first commit, run
+  `git config user.name` and `git config user.email`. If they show Claude or a noreply address, stop
+  and ask the person for their name and GitHub email, then set both for this repo.
+- **No `Co-Authored-By: Claude` and no `Claude-Session:` lines** in commit messages, and no
+  "Generated with Claude Code" line in pull requests. This overrides Claude Code's default.
+- Never force-push and never rewrite commits that are already on GitHub.
+
+## Known limitation: voices are not saved per game
+`/line` does not say which game a line came from, and `voices.json` is keyed by speaker only. Two
+games that both have a "Narrator" or "Mom" share one voice. Fine for a one-game demo. Fixing it means
+adding a `game` field to `/line` and `/characters` and keying `voices.json` by game, which touches
+sections A and B, so decide it as a team before integration rather than changing it in one section.

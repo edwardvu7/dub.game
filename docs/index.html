@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dub.game — Local Voice Hook for Visual Novels</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* Preserved Core Color Scheme */
+      --bg: #0b0d12;
+      --card: #131722;
+      --card-elevated: rgba(24, 29, 43, 0.72);
+      --border: #23293a;
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --specular: rgba(255, 255, 255, 0.09);
+      --text: #eef2ff;
+      --muted: #94a3b8;
+      --subtle: #64748b;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.22);
+      --green: #10b981;
+      --amber: #fbbf24;
+
+      /* Typography */
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+
+      /* Emil Kowalski Motion Curves */
+      --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -15%, rgba(99, 102, 241, 0.14), transparent),
+        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.04), transparent 45%);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1020px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Sticky Translucent Nav */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(11, 13, 18, 0.78);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-inner {
+      height: 64px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.03em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .logo-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    .logo span {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color 180ms var(--ease-out-expo);
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+    }
+
+    /* Tactile Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      padding: 9px 18px;
+      border-radius: 9px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.875rem;
+      letter-spacing: -0.01em;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 4px 20px var(--accent-glow);
+      transition:
+        transform 160ms var(--ease-out-expo),
+        background-color 160ms var(--ease-out-expo),
+        box-shadow 160ms var(--ease-out-expo);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 8px 28px rgba(99, 102, 241, 0.34);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-ghost {
+      background: rgba(19, 23, 34, 0.75);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 var(--specular);
+      color: var(--text);
+    }
+
+    .btn-ghost:hover {
+      background: #1b2130;
+      border-color: #333c54;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    /* Hero Section with Staggered Entrance */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .hero {
+      padding: 76px 0 56px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 44px;
+      align-items: center;
+    }
+
+    .hero-copy {
+      animation: fadeUp 550ms var(--ease-out-expo) both;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: rgba(19, 23, 34, 0.9);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 var(--specular);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow-status {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: clamp(2.85rem, 5.2vw, 4.35rem);
+      line-height: 1.04;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+      color: var(--text);
+    }
+
+    h1 em {
+      font-style: italic;
+      color: #c7d2fe;
+    }
+
+    .hero-sub {
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.65;
+      max-width: 520px;
+      margin-bottom: 28px;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Interactive Shift+F2 Overlay Mockup */
+    .overlay-preview {
+      background: var(--card-elevated);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow:
+        inset 0 1px 0 var(--specular),
+        0 24px 48px -12px rgba(0, 0, 0, 0.65);
+      animation: fadeUp 650ms 90ms var(--ease-out-expo) both;
+    }
+
+    .overlay-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .overlay-title {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    kbd {
+      background: #0b0d12;
+      border: 1px solid var(--border);
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 0.74rem;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    .char-selector {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .char-pill {
+      flex: 1;
+      background: #0b0d12;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 150ms var(--ease-out-expo);
+      text-align: left;
+    }
+
+    .char-pill small {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 400;
+      color: var(--subtle);
+      margin-top: 2px;
+    }
+
+    .char-pill.active {
+      background: rgba(99, 102, 241, 0.14);
+      border-color: rgba(99, 102, 241, 0.55);
+      color: var(--text);
+    }
+
+    .char-pill.active small {
+      color: #a5b4fc;
+    }
+
+    .dialogue-box {
+      background: #0b0d12;
+      border: 1px solid var(--border-subtle);
+      border-radius: 9px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+
+    .dialogue-speaker {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #a5b4fc;
+      margin-bottom: 4px;
+    }
+
+    .dialogue-line {
+      font-family: var(--font-serif);
+      font-size: 1.2rem;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .slider-group {
+      display: grid;
+      gap: 11px;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 76px 1fr 42px;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.78rem;
+    }
+
+    .slider-label {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .slider-val {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      text-align: right;
+      font-size: 0.75rem;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: #0b0d12;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text);
+      border: 2px solid var(--accent);
+      cursor: pointer;
+      transition: transform 120ms var(--ease-spring);
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.18);
+    }
+
+    /* Pipeline Grid */
+    .section {
+      padding: 56px 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 2.1rem;
+      letter-spacing: -0.015em;
+    }
+
+    .section-subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-family: var(--font-mono);
+    }
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 var(--specular);
+      border-radius: 12px;
+      padding: 24px;
+      transition:
+        border-color 200ms var(--ease-out-expo),
+        transform 200ms var(--ease-out-expo);
+    }
+
+    .card:hover {
+      border-color: #333c54;
+      transform: translateY(-2px);
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #a5b4fc;
+    }
+
+    .card h3 {
+      font-size: 1.08rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: #e2e8f0;
+    }
+
+    /* Engine Table */
+    .engine-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
+      gap: 14px;
+    }
+
+    .engine-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 var(--specular);
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .engine-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .engine-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .engine-hook {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: var(--green);
+    }
+
+    .tag.beta {
+      background: rgba(251, 191, 36, 0.12);
+      border-color: rgba(251, 191, 36, 0.35);
+      color: var(--amber);
+    }
+
+    footer {
+      padding: 36px 0 48px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .footer-mono {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--subtle);
+    }
+
+    @media (max-width: 820px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding: 48px 0 40px;
+      }
+      .bento-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav-inner">
+      <a href="#" class="logo">
+        <span class="logo-dot"></span>
+        dub<span>.game</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#pipeline" class="nav-link">Pipeline</a>
+        <a href="#engines" class="nav-link">Adapters</a>
+        <a href="https://github.com/edwardvu7/dub.game" class="btn btn-ghost">GitHub Repository</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">
+          <span class="eyebrow-status"></span>
+          POST localhost:8000/line · Zero Screen OCR
+        </div>
+        <h1>Voice acting for unvoiced visual novels, <em>hooked at the engine.</em></h1>
+        <p class="hero-sub">
+          dub.game scans your local Steam folders, drops a 30-line script into compatible games, profiles each character once with Gemini structured outputs, and streams spoken dialogue through ElevenLabs.
+        </p>
+        <div class="hero-actions">
+          <a href="https://github.com/edwardvu7/dub.game" class="btn">View Source on GitHub</a>
+          <a href="#pipeline" class="btn btn-ghost">Inspect Architecture</a>
+        </div>
+      </div>
+
+      <!-- Interactive Overlay Preview -->
+      <aside class="overlay-preview" aria-label="In-game overlay preview">
+        <div class="overlay-header">
+          <div class="overlay-title">
+            <span>voices.json</span> · Live Tuning
+          </div>
+          <div><kbd>Shift</kbd> + <kbd>F2</kbd></div>
+        </div>
+
+        <div class="char-selector" role="tablist">
+          <button class="char-pill active" type="button" data-char="sylvie">
+            Sylvie
+            <small>female · young_adult</small>
+          </button>
+          <button class="char-pill" type="button" data-char="voss">
+            Inspector Voss
+            <small>male · adult</small>
+          </button>
+          <button class="char-pill" type="button" data-char="narrator">
+            Narrator
+            <small>neutral · calm</small>
+          </button>
+        </div>
+
+        <div class="dialogue-box">
+          <div class="dialogue-speaker" id="preview-speaker">Sylvie — renpy callback</div>
+          <div class="dialogue-line" id="preview-line">"Wait—did you hear that footsteps pattern on the stairs?"</div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-row">
+            <span class="slider-label">Stability</span>
+            <input type="range" id="sl-stability" min="0" max="1" step="0.05" value="0.45" />
+            <span class="slider-val" id="val-stability">0.45</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Style</span>
+            <input type="range" id="sl-style" min="0" max="1" step="0.05" value="0.65" />
+            <span class="slider-val" id="val-style">0.65</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">Speed</span>
+            <input type="range" id="sl-speed" min="0.7" max="1.2" step="0.05" value="1.05" />
+            <span class="slider-val" id="val-speed">1.05×</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section" id="pipeline">
+      <div class="section-header">
+        <h2 class="section-title">How a line gets spoken</h2>
+        <span class="section-subtitle">Game hook → Localhost → Gemini once → ElevenLabs stream</span>
+      </div>
+
+      <div class="bento-grid">
+        <article class="card">
+          <div class="card-meta">
+            <span>01 / STEAM SCAN</span>
+            <span>libraryfolders.vdf</span>
+          </div>
+          <h3>Local Engine Detection</h3>
+          <p>
+            Parses Steam's local <code>appmanifest_*.acf</code> files and inspects game directories for engine signatures rather than relying on store tags. Ticking a game copies <code>dubgame.rpy</code> into <code>game/</code>; unticking removes it.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-meta">
+            <span>02 / ENGINE CALLBACK</span>
+            <span>config.all_character_callbacks</span>
+          </div>
+          <h3>Exact Text Without Screen Reading</h3>
+          <p>
+            Hooks directly into the game's dialogue callback on a background thread. Every spoken line dispatches <code>{ speaker, text }</code> to <code>127.0.0.1:8000/line</code> with Text tags like <code>{w}</code> stripped cleanly.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-meta">
+            <span>03 / CHARACTER PROFILING</span>
+            <span>voices.json</span>
+          </div>
+          <h3>One-Time Gemini Casting</h3>
+          <p>
+            New speakers are profiled once against a 12-voice catalog using schema-enforced JSON output (gender, age range, personality, stability, style, speed). Subsequent lines bypass Gemini and route straight to TTS.
+          </p>
+        </article>
+
+        <article class="card">
+          <div class="card-meta">
+            <span>04 / ELECTRON OVERLAY</span>
+            <span>safeStorage + IPC</span>
+          </div>
+          <h3>Always-On-Top Voice Controls</h3>
+          <p>
+            Press <kbd>Shift</kbd> + <kbd>F2</kbd> over windowed or borderless games to override voice IDs, tweak sliders, or re-roll casting. Player API keys stay encrypted in the main process via Electron <code>safeStorage</code>.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="engines">
+      <div class="section-header">
+        <h2 class="section-title">Engine Adapters</h2>
+        <span class="section-subtitle">Unified POST /line contract across runtimes</span>
+      </div>
+
+      <div class="engine-list">
+        <div class="engine-item">
+          <div class="engine-top">
+            <span class="engine-name">Ren'Py 7 &amp; 8</span>
+            <span class="tag">Full</span>
+          </div>
+          <div class="engine-hook">game/dubgame.rpy callback</div>
+        </div>
+
+        <div class="engine-item">
+          <div class="engine-top">
+            <span class="engine-name">Godot 3 &amp; 4</span>
+            <span class="tag beta">Adapter</span>
+          </div>
+          <div class="engine-hook">override.cfg + scene Label scan</div>
+        </div>
+
+        <div class="engine-item">
+          <div class="engine-top">
+            <span class="engine-name">RPG Maker MV / MZ</span>
+            <span class="tag beta">Adapter</span>
+          </div>
+          <div class="engine-hook">Window_Message.startMessage</div>
+        </div>
+
+        <div class="engine-item">
+          <div class="engine-top">
+            <span class="engine-name">Unity</span>
+            <span class="tag beta">Adapter</span>
+          </div>
+          <div class="engine-hook">BepInEx + XUnity endpoint</div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div>dub.game · Built with Electron, Gemini Structured Outputs, and ElevenLabs</div>
+      <div class="footer-mono">127.0.0.1:8000/line</div>
+    </footer>
+  </main>
+
+  <script>
+    const profiles = {
+      sylvie: {
+        speaker: "Sylvie — renpy callback",
+        line: '"Wait—did you hear that footsteps pattern on the stairs?"',
+        stability: 0.45,
+        style: 0.65,
+        speed: 1.05
+      },
+      voss: {
+        speaker: "Inspector Voss — renpy callback",
+        line: '"The station logs were wiped at midnight. Someone inside helped them."',
+        stability: 0.75,
+        style: 0.35,
+        speed: 0.90
+      },
+      narrator: {
+        speaker: "Narrator — renpy callback",
+        line: '"Rain streaked across the neon glass of the terminal window."',
+        stability: 0.85,
+        style: 0.20,
+        speed: 0.95
+      }
+    };
+
+    const pills = document.querySelectorAll(".char-pill");
+    const speakerEl = document.getElementById("preview-speaker");
+    const lineEl = document.getElementById("preview-line");
+    const slStability = document.getElementById("sl-stability");
+    const slStyle = document.getElementById("sl-style");
+    const slSpeed = document.getElementById("sl-speed");
+    const valStability = document.getElementById("val-stability");
+    const valStyle = document.getElementById("val-style");
+    const valSpeed = document.getElementById("val-speed");
+
+    function updateReadouts() {
+      valStability.textContent = Number(slStability.value).toFixed(2);
+      valStyle.textContent = Number(slStyle.value).toFixed(2);
+      valSpeed.textContent = Number(slSpeed.value).toFixed(2) + "×";
+    }
+
+    pills.forEach((pill) => {
+      pill.addEventListener("click", () => {
+        pills.forEach((p) => p.classList.remove("active"));
+        pill.classList.add("active");
+        const data = profiles[pill.dataset.char];
+        speakerEl.textContent = data.speaker;
+        lineEl.textContent = data.line;
+        slStability.value = data.stability;
+        slStyle.value = data.style;
+        slSpeed.value = data.speed;
+        updateReadouts();
+      });
+    });
+
+    [slStability, slStyle, slSpeed].forEach((input) => {
+      input.addEventListener("input", updateReadouts);
+    });
+  </script>
+</body>
+</html>
