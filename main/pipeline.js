@@ -6,6 +6,7 @@ const profiler = require('./profiler');
 
 const NARRATOR = 'Narrator';
 const UNKNOWN = 'unknown';
+const RESTART_GAP_MS = 3000; // a game restart takes longer than this
 
 /**
  * createPipeline({voices, settings, catalog, cache, emit, speak?, profileCharacter?,
@@ -21,6 +22,8 @@ function createPipeline(deps) {
 
   let generation = 0;        // bumped by every line/stop/preview: only the newest may play
   let lastLineSeq;           // seq of the newest line from the hook, when it sends one
+  let lastLineAt = 0;
+  const now = deps.now || Date.now;
   const inFlight = new Map(); // speaker -> Promise<profile>
   const attempted = new Set(); // speakers Gemini was already asked about this session
   const recent = new Map();  // speaker -> last few lines, used as samples
@@ -109,8 +112,12 @@ function createPipeline(deps) {
     async handleLine(line) {
       const speaker = line.speaker || NARRATOR;
       const text = line.text;
+      // A line older than the newest one (it overtook it on the way here) is dropped. A lower seq
+      // after a pause means the game was restarted and counts from 1 again, so it is accepted.
+      if (line.seq !== undefined && lastLineSeq !== undefined && line.seq <= lastLineSeq &&
+          now() - lastLineAt < RESTART_GAP_MS) return;
       const mine = ++generation;
-      if (line.seq !== undefined) lastLineSeq = line.seq;
+      if (line.seq !== undefined) { lastLineSeq = line.seq; lastLineAt = now(); }
       emit('line:received', { speaker, text, engine: line.engine || 'renpy' });
       if (speaker === NARRATOR && !settings.narration()) {
         emit('audio:stop'); // the previous character must not keep talking over silent narration

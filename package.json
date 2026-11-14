@@ -15,7 +15,9 @@
     "test": "node --test",
     "check:hook": "python3 scripts/check-rpy.py mod/renpy/dubgame.rpy",
     "dist": "electron-builder --win nsis",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --dir",
+    "smoke": "node scripts/smoke-app.js",
+    "smoke:hook": "python scripts/smoke-hook.py"
   },
   "devDependencies": {
     "electron": "^45.3.2",

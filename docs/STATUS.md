@@ -3,10 +3,23 @@
 Sections A, B and C are merged into `main`. They merged with no conflicts.
 
 ## Verified
-- `npm test`: 62 pass, 0 fail, 1 skipped (A's permission test only runs on Windows).
+- `npm run smoke`: boots the real `main/index.js` with a stand-in for Electron, a fake Steam library
+  and fake ElevenLabs/Gemini, then acts as the game and the UI. Checks windows and pages, the
+  Shift+F2 hotkey, IPC wiring, key handling, Steam scan, installing/removing the hook, /characters,
+  /line, audio to the main window only, the cache, voice tuning, preview, narration off, /stop, and
+  that IPC from other pages is refused. All pass.
+- `npm run smoke:hook`: runs `dubgame.rpy` against a stand-in Ren'Py and checks what reaches the app:
+  speaker names (including dynamic names and narration), tag stripping, skipping, /stop, never
+  blocking the game, and staying silent when the app is closed. All pass.
+- `npm test`: 63 pass, 0 fail, 1 skipped (A's permission test only runs on Windows).
 - The Ren'Py hook compiles (`npm run check:hook`).
 - Every IPC channel the UI uses is allowed by `main/preload.js` (guarded by `test/ui.lib.test.js`).
 - The UI pages were clicked through in Chrome against `ui/fake-dub.js`: keys, games, cards, audio, toasts.
+
+## Fixed during integration
+- Lines could reach the app out of order when the player clicked fast (one thread per line), and an
+  old line then played over the current one. The hook now sends from one thread, in order, and skips
+  lines that are already outdated; the app also drops a line older than the newest (hook version 3).
 
 ## Not verified yet (needs a real Windows machine)
 - The app has never been started in Electron. `npm install` and `npm start` are the first real run.

@@ -26,6 +26,7 @@ function rig(over = {}) {
     emit: (channel, payload) => events.push({ channel, payload }),
     speak: over.speak || (async (params, key) => { calls.speak.push({ params, key }); return Buffer.from('mp3:' + params.text); }),
     profileCharacter: over.profileCharacter || (async (c, _cat, key, opts) => { calls.one.push({ c, key, opts }); return profileFor(c.speaker, opts && opts.avoidVoiceId ? 4 : 1); }),
+    now: over.now,
     profileCharacters: over.profileCharacters || (async (list) => { calls.many.push(list); return list.map((c, i) => profileFor(c.speaker, i + 2)); }),
   });
   const of = (channel) => events.filter((e) => e.channel === channel).map((e) => e.payload);
@@ -166,4 +167,19 @@ test('pipeline: preview and re-roll', async () => {
   assert.deepEqual([next.voice_id, next.locked], [catalog[4].voice_id, false]);
   r.keys.gemini = '';
   await assert.rejects(() => r.pipeline.reroll({ speaker: 'Sylvie' }), /Gemini key/);
+});
+
+test('pipeline: a line that arrives after a newer one is dropped; a restarted game is not', async () => {
+  let t = 1000;
+  const r = rig({ now: () => t });
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Line six.', engine: 'renpy', seq: 6 });
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Line five.', engine: 'renpy', seq: 5 });
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Line six.', engine: 'renpy', seq: 6 });
+  assert.deepEqual(r.of('line:received').map((l) => l.text), ['Line six.'], 'stale and duplicate lines are ignored');
+  assert.deepEqual(r.of('audio:play').map((a) => a.text), ['Line six.']);
+  t += 10000; // the player restarted the game: seq starts again at 1
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Hello again.', engine: 'renpy', seq: 1 });
+  assert.equal(r.of('audio:play').pop().text, 'Hello again.');
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'No seq.', engine: 'clipboard' });
+  assert.equal(r.of('audio:play').pop().text, 'No seq.', 'sources without seq are unaffected');
 });

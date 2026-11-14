@@ -1,0 +1,197 @@
+// npm run smoke. Boots the real main/index.js with a stand-in for Electron, a fake Steam library,
+// and fake ElevenLabs/Gemini, then plays the part of a game and of the UI.
+'use strict';
+const Module = require('node:module');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const http = require('node:http');
+const EventEmitter = require('node:events');
+
+const REPO = process.argv[2] || path.join(__dirname, '..');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dubsmoke-'));
+const log = (...a) => console.log('  ', ...a);
+const problems = [];
+const check = (ok, what) => { console.log((ok ? 'PASS ' : 'FAIL ') + what); if (!ok) problems.push(what); };
+
+// ---- fake Steam library with one Ren'Py game ----
+const steam = path.join(tmp, 'Steam');
+const game = path.join(steam, 'steamapps', 'common', 'Demo VN');
+fs.mkdirSync(path.join(game, 'renpy'), { recursive: true });
+fs.mkdirSync(path.join(game, 'game'), { recursive: true });
+fs.writeFileSync(path.join(game, 'game', 'script.rpyc'), 'x');
+fs.writeFileSync(path.join(steam, 'steamapps', 'libraryfolders.vdf'),
+  `"libraryfolders"\n{\n\t"0"\n\t{\n\t\t"path"\t\t"${steam.replace(/\\/g, '\\\\')}"\n\t}\n}\n`);
+fs.writeFileSync(path.join(steam, 'steamapps', 'appmanifest_424242.acf'),
+  `"AppState"\n{\n\t"appid"\t\t"424242"\n\t"name"\t\t"Demo VN"\n\t"installdir"\t\t"Demo VN"\n}\n`);
+process.env.DUBGAME_STEAM_PATH = steam;
+process.env.ELEVENLABS_API_KEY = 'test-eleven';
+process.env.GEMINI_API_KEY = 'test-gemini';
+
+// ---- fake network: ElevenLabs returns bytes, Gemini returns a profile ----
+const calls = [];
+globalThis.fetch = async (url, init = {}) => {
+  calls.push(String(url));
+  const ok = (body, type) => new Response(body, { status: 200, headers: { 'content-type': type } });
+  if (url.includes('api.elevenlabs.io/v1/text-to-speech')) return ok(Buffer.from('ID3fakeaudio'), 'audio/mpeg');
+  if (url.includes('api.elevenlabs.io/v1/user')) return ok('{}', 'application/json');
+  if (url.includes('generativelanguage') && init.method === 'POST') {
+    const req = JSON.parse(init.body);
+    const prompt = req.contents[0].parts[0].text;
+    const cat = require(path.join(REPO, 'voices_catalog.json'));
+    const names = ['Sylvie', 'Marcus'].filter((n) => prompt.includes(n));
+    const one = (n) => ({ speaker: n, gender: 'female', age_range: 'young_adult', personality: n + ' is kind.',
+      voice_id: cat[1].voice_id, stability: 0.4, style: 0.3, speed: 1.05, reason: 'Fits.' });
+    const body = names.length > 1 || /profiles/.test(JSON.stringify(req.generationConfig.responseSchema))
+      ? { profiles: names.map(one) } : one(names[0] || 'Sylvie');
+    return ok(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }] }), 'application/json');
+  }
+  if (url.includes('generativelanguage')) return ok('{}', 'application/json');
+  throw new Error('unexpected fetch ' + url);
+};
+
+// ---- stand-in for electron ----
+const sent = []; // [windowTitle, channel, payload]
+const windows = [];
+class FakeWebContents extends EventEmitter {
+  constructor(win) { super(); this.win = win; this.url = ''; }
+  send(ch, p) { sent.push([this.win.opts.title, ch, p]); }
+  isDestroyed() { return false; }
+  isLoading() { return false; }
+  getURL() { return this.url; }
+  setWindowOpenHandler(fn) { this.openHandler = fn; }
+  toggleDevTools() {}
+}
+class FakeWindow extends EventEmitter {
+  constructor(opts) { super(); this.opts = opts; this.visible = false; this.webContents = new FakeWebContents(this); windows.push(this); }
+  loadFile(f) { this.file = f; this.webContents.url = 'file://' + f; setImmediate(() => { this.emit('ready-to-show'); this.webContents.emit('did-finish-load'); }); return Promise.resolve(); }
+  show() { this.visible = true; } hide() { this.visible = false; } isVisible() { return this.visible; }
+  isDestroyed() { return false; } isMinimized() { return false; } restore() {} focus() {}
+  setAlwaysOnTop() {} setIgnoreMouseEvents() {} setVisibleOnAllWorkspaces() {}
+}
+const handlers = {};
+const shortcuts = {};
+const app = new EventEmitter();
+Object.assign(app, {
+  isPackaged: false,
+  getPath: (n) => path.join(tmp, n),
+  commandLine: { appendSwitch() {} },
+  requestSingleInstanceLock: () => true,
+  whenReady: () => Promise.resolve(),
+  quit: () => log('app.quit() called'),
+});
+const electron = {
+  app, BrowserWindow: FakeWindow,
+  globalShortcut: { register: (k, fn) => { shortcuts[k] = fn; return true; }, unregisterAll() {} },
+  ipcMain: { handle: (ch, fn) => { handlers[ch] = fn; } },
+  shell: { openExternal: (u) => calls.push('openExternal ' + u) },
+  dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }), showErrorBox: (t, m) => problems.push('ERROR BOX ' + m) },
+  safeStorage: { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from('enc:' + s), decryptString: (b) => b.toString().slice(4) },
+  screen: { getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }) },
+  clipboard: { readText: () => '' },
+  Menu: { setApplicationMenu() {} },
+};
+const origResolve = Module._resolveFilename;
+Module._resolveFilename = function (req, ...rest) { return req === 'electron' ? 'electron' : origResolve.call(this, req, ...rest); };
+require.cache.electron = { id: 'electron', filename: 'electron', loaded: true, exports: electron };
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const post = (p, body) => new Promise((resolve, reject) => {
+  const data = JSON.stringify(body);
+  const req = http.request({ host: '127.0.0.1', port: 8000, path: p, method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
+  (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+  req.on('error', reject); req.end(data);
+});
+const trusted = { senderFrame: { url: 'file://' + path.join(REPO, 'ui', 'index.html') } };
+const invoke = (ch, arg) => handlers[ch](trusted, arg);
+const events = (ch) => sent.filter((s) => s[1] === ch);
+
+(async () => {
+  require(path.join(REPO, 'main', 'index.js'));
+  await wait(400);
+
+  // 1. Windows and pages
+  const main = windows.find((w) => w.opts.title === 'dub.game');
+  const overlay = windows.find((w) => w.opts.title === 'dub.game overlay');
+  check(main && fs.existsSync(main.file), 'main window loads an existing page: ' + (main && path.relative(REPO, main.file)));
+  check(overlay && fs.existsSync(overlay.file), 'overlay loads an existing page: ' + (overlay && path.relative(REPO, overlay.file)));
+  check(main && main.visible, 'main window is shown');
+  check(overlay && overlay.opts.transparent && overlay.opts.alwaysOnTop, 'overlay is transparent and always on top');
+  const prefs = main.opts.webPreferences;
+  check(prefs.contextIsolation && !prefs.nodeIntegration && fs.existsSync(prefs.preload), 'secure webPreferences with an existing preload');
+
+  // 2. Every channel the preload allows has a handler, and the UI only uses allowed channels
+  const preload = fs.readFileSync(prefs.preload, 'utf8');
+  const allowedInvoke = (preload.match(/const INVOKE = \[([\s\S]*?)\]/)[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
+  check(allowedInvoke.every((c) => handlers[c]), 'every preload invoke channel has an ipcMain handler (' + allowedInvoke.length + ')');
+
+  // 3. Hotkey toggles the overlay
+  check(typeof shortcuts['Shift+F2'] === 'function', 'Shift+F2 is registered');
+  shortcuts['Shift+F2']();
+  check(overlay.visible && events('overlay:toggle').length === 1, 'Shift+F2 shows the overlay and tells it to refresh');
+  shortcuts['Shift+F2']();
+  check(!overlay.visible, 'Shift+F2 again hides it');
+
+  // 4. Settings: env keys count, no key ever leaves main
+  const s = await invoke('settings:get');
+  check(s.hasElevenLabsKey && s.hasGeminiKey && !JSON.stringify(s).includes('test-'), 'settings:get reports keys without exposing them');
+  check((await invoke('settings:test', { provider: 'elevenlabs' })).ok, 'ElevenLabs key test works');
+  check((await invoke('settings:test', { provider: 'gemini' })).ok, 'Gemini key test works');
+
+  // 5. Steam scan finds the fake Ren'Py game; switching it on installs the hook
+  const games = await invoke('games:list');
+  log('games:list ->', JSON.stringify(games));
+  const demo = games.find((g) => g.appid === '424242');
+  check(demo && demo.engine === 'renpy' && demo.support === 'full', 'scan finds the Ren\'Py game in the fake library');
+  const on = await invoke('games:setEnabled', { appid: '424242', enabled: true });
+  const hook = path.join(game, 'game', 'dubgame.rpy');
+  check(on.enabled && on.hookInstalled && fs.existsSync(hook), 'switching the game on copies dubgame.rpy into game/');
+  check(fs.readFileSync(hook, 'utf8') === fs.readFileSync(path.join(REPO, 'mod', 'renpy', 'dubgame.rpy'), 'utf8'), 'installed hook is identical to mod/renpy/dubgame.rpy');
+
+  // 6. Act as the game: characters at launch, then lines
+  check(await post('/characters', { engine: 'renpy', characters: [{ speaker: 'Sylvie', samples: ['Hi there!'] }, { speaker: 'Marcus', samples: ['Hm.'] }] }) < 300, 'POST /characters accepted');
+  await wait(300);
+  const before = sent.length;
+  check(await post('/line', { speaker: 'Sylvie', text: 'Hey, you made it!', engine: 'renpy' }) < 300, 'POST /line accepted immediately');
+  await wait(400);
+  const line = events('line:received').pop();
+  check(line && line[2].speaker === 'Sylvie', 'line:received sent to the windows');
+  const play = sent.slice(before).filter((x) => x[1] === 'audio:play');
+  check(play.length === 1 && play[0][0] === 'dub.game', 'audio:play goes to the main window only (once)');
+  check(play[0] && Buffer.from(play[0][2].data, 'base64').toString() === 'ID3fakeaudio' && play[0][2].mime, 'audio payload is the ElevenLabs bytes as base64 with a mime type');
+  const voices = await invoke('voices:get');
+  check(voices.Sylvie && voices.Sylvie.source === 'gemini', 'Sylvie was cast by Gemini: ' + (voices.Sylvie && voices.Sylvie.voice_id));
+
+  // 7. Cache: the same line again does not call ElevenLabs
+  const ttsBefore = calls.filter((c) => c.includes('text-to-speech')).length;
+  await post('/line', { speaker: 'Sylvie', text: 'Hey, you made it!', engine: 'renpy' }); await wait(300);
+  check(calls.filter((c) => c.includes('text-to-speech')).length === ttsBefore, 'a repeated line plays from the cache');
+
+  // 8. UI actions: tune a voice, preview, narration off
+  const tuned = await invoke('voices:update', { speaker: 'Sylvie', patch: { speed: 1.15 } });
+  check(tuned.locked && tuned.speed === 1.15 && events('voices:changed').length > 0, 'voices:update locks the profile and broadcasts voices:changed');
+  const pBefore = events('audio:play').length;
+  await invoke('voices:preview', { speaker: 'Sylvie' }); await wait(300);
+  check(events('audio:play').length === pBefore + 1, 'Preview plays a clip');
+  await invoke('settings:setNarration', false);
+  const nBefore = events('audio:play').length;
+  await post('/line', { speaker: 'Narrator', text: 'The rain kept falling.', engine: 'renpy' }); await wait(300);
+  check(events('audio:play').length === nBefore, 'narration off: narrator lines are not spoken');
+  await post('/stop', { engine: 'renpy' }); await wait(100);
+  check(events('audio:stop').length > 0, 'POST /stop sends audio:stop');
+
+  // 9. Untrusted senders are refused
+  let refused = false;
+  try { await handlers['settings:get']({ senderFrame: { url: 'https://evil.example' } }); } catch { refused = true; }
+  check(refused, 'IPC from a non-app page is refused');
+
+  // 10. Switching the game off removes the hook
+  await invoke('games:setEnabled', { appid: '424242', enabled: false });
+  check(!fs.existsSync(hook), 'switching the game off removes dubgame.rpy');
+
+  const statuses = events('app:status').map((x) => x[2].message);
+  if (statuses.length) log('app:status messages:', statuses);
+  console.log(problems.length ? `\n${problems.length} PROBLEM(S)` : '\nALL CHECKS PASSED');
+  process.exit(problems.length ? 1 : 0);
+})().catch((e) => { console.error('CRASH', e); process.exit(2); });

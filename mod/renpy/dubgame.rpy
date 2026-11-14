@@ -11,7 +11,7 @@
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
-# DUBGAME_HOOK_VERSION 2
+# DUBGAME_HOOK_VERSION 3
 
 init -999 python:
     import json as _dubgame_json
@@ -29,21 +29,45 @@ init -999 python:
     _dubgame_text_type = type(u"")
     _dubgame_state = {"seq": 0, "sent_characters": False}
 
-    def _dubgame_post(path, payload):
-        """Fire-and-forget POST on a daemon thread. Never blocks or raises into the game."""
-        def send():
-            try:
-                req = _dubgame_Request(
-                    _dubgame_URL + path,
-                    data=_dubgame_json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"})
-                _dubgame_urlopen(req, timeout=_dubgame_TIMEOUT).read()
-            except Exception:
-                pass  # app not running, port busy, anything: stay silent
+    # One sender thread, in order. Separate threads per line could reach the app out of order
+    # when the player clicks fast, and an old line would then play over the current one.
+    _dubgame_queue = []
+    _dubgame_cv = _dubgame_threading.Condition()
+    _dubgame_worker = {"thread": None}
+
+    def _dubgame_send_now(path, payload):
         try:
-            t = _dubgame_threading.Thread(target=send)
-            t.daemon = True
-            t.start()
+            req = _dubgame_Request(
+                _dubgame_URL + path,
+                data=_dubgame_json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"})
+            _dubgame_urlopen(req, timeout=_dubgame_TIMEOUT).read()
+        except Exception:
+            pass  # app not running, port busy, anything: stay silent
+
+    def _dubgame_run():
+        while True:
+            with _dubgame_cv:
+                while not _dubgame_queue:
+                    _dubgame_cv.wait()
+                path, payload = _dubgame_queue.pop(0)
+            _dubgame_send_now(path, payload)
+
+    def _dubgame_post(path, payload):
+        """Queue a POST for the sender thread. Never blocks or raises into the game."""
+        try:
+            with _dubgame_cv:
+                if path == "/line":
+                    del _dubgame_queue[:]  # a newer line makes anything still unsent obsolete
+                _dubgame_queue.append((path, payload))
+                del _dubgame_queue[:-20]
+                _dubgame_cv.notify()
+                t = _dubgame_worker["thread"]
+                if t is None or not t.is_alive():
+                    t = _dubgame_threading.Thread(target=_dubgame_run)
+                    t.daemon = True
+                    t.start()
+                    _dubgame_worker["thread"] = t
         except Exception:
             pass
 
