@@ -23,8 +23,11 @@ test('slider ranges match what main/voices.js accepts', () => {
 });
 
 test('supportBadge and gameStatus', () => {
-  assert.equal(L.supportBadge({ support: 'full' }).text, 'Full');
-  assert.equal(L.supportBadge({ support: 'beta' }).tone, 'beta');
+  assert.equal(L.supportBadge({ support: 'full', engine: 'renpy' }).text, "Ren'Py");
+  assert.equal(L.supportBadge({ support: 'beta', engine: 'godot' }).tone, 'beta');
+  assert.equal(L.supportBadge({ support: 'soon', engine: 'unity' }).text, 'Unity \u00b7 Coming soon');
+  assert.equal(L.supportBadge({ support: 'soon', engine: 'rpgmaker-mz' }).text, 'RPG Maker MZ \u00b7 Coming soon');
+  assert.equal(L.gameStatus({ support: 'soon', enabled: true, hookInstalled: true }), 'soon');
   assert.equal(L.gameStatus({ enabled: false, hookInstalled: true }), 'off');
   assert.equal(L.gameStatus({ enabled: true, hookInstalled: true }), 'on');
   assert.equal(L.gameStatus({ enabled: true, hookInstalled: false }), 'missing');
@@ -36,6 +39,7 @@ test('gameHint tells the player what to do next', () => {
   assert.match(L.gameHint({ enabled: true, hookInstalled: true }, true).text, /restart/i);
   assert.equal(L.gameHint({ enabled: true, hookInstalled: true }, false).tone, 'on');
   assert.equal(L.gameHint({ enabled: false }).tone, 'off');
+  assert.match(L.gameHint({ support: 'soon', engine: 'godot' }).text, /Godot games aren't available yet/);
 });
 
 test('filterGames and sortGames do not mutate, voiced games come first', () => {
@@ -45,6 +49,8 @@ test('filterGames and sortGames do not mutate, voiced games come first', () => {
     { appid: '3', name: 'Mid', engine: 'renpy', enabled: true },
   ];
   assert.deepEqual(L.sortGames(games).map((g) => g.appid), ['3', '2', '1']);
+  assert.deepEqual(L.sortGames([{ appid: 's', name: 'A', support: 'soon' }, { appid: 'r', name: 'Z', enabled: false }])
+    .map((g) => g.appid), ['r', 's'], 'coming-soon games go last');
   assert.equal(games[0].appid, '1');
   assert.deepEqual(L.filterGames(games, ' GODOT ').map((g) => g.appid), ['2']);
   assert.equal(L.filterGames(games, '').length, 3);
@@ -53,8 +59,12 @@ test('filterGames and sortGames do not mutate, voiced games come first', () => {
 
 test('gamesSummary', () => {
   assert.match(L.gamesSummary([]), /No supported games/);
-  assert.equal(L.gamesSummary([{ enabled: false }]), '1 supported game. Switch one on to give it voices.');
-  assert.equal(L.gamesSummary([{ enabled: true }, { enabled: false }]), '2 supported games, 1 voiced.');
+  assert.equal(L.gamesSummary([{ enabled: false }]), '1 game ready for voices. Switch one on or click Launch.');
+  assert.equal(L.gamesSummary([{ enabled: true }, { enabled: false }]), '2 games ready for voices, 1 voiced.');
+  assert.equal(L.gamesSummary([{ support: 'soon' }, { support: 'soon' }]),
+    "No Ren'Py games yet. 2 more games use an engine that is coming soon.");
+  assert.equal(L.gamesSummary([{ enabled: true }, { support: 'soon' }]),
+    '1 game ready for voices, 1 voiced. 1 more game uses an engine that is coming soon.');
 });
 
 test('sortSpeakers: current speaker first, Narrator last', () => {
@@ -100,6 +110,7 @@ function channelsUsed() {
     // Channels passed indirectly, e.g. loadGames('games:rescan') or bindSwitch(id, 'settings:x').
     for (const m of src.matchAll(/'((?:games|settings):[A-Za-z]+)'/g)) invoke.add(m[1]);
   }
+  for (const ch of events) invoke.delete(ch); // e.g. games:changed is an event, not an invoke
   return { invoke, events };
 }
 

@@ -8,10 +8,15 @@
 #   POST /line        {speaker, text, engine: "renpy", seq}
 #   POST /stop        {engine: "renpy", seq}            (player clicked past the line)
 #   POST /characters  {engine: "renpy", characters: [{speaker, samples}]}   (once, at launch)
+#   GET  /health      (once, at launch) is the app running? If so, keep the game windowed.
+#
+# Windowed mode: the dub.game overlay cannot appear over a fullscreen game. While the app is
+# running, the hook keeps the game's own "fullscreen" preference off. With the app closed the
+# game is left exactly as the player set it.
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
-# DUBGAME_HOOK_VERSION 3
+# DUBGAME_HOOK_VERSION 4
 
 init -999 python:
     import json as _dubgame_json
@@ -27,7 +32,7 @@ init -999 python:
     _dubgame_URL = "http://127.0.0.1:8000"
     _dubgame_TIMEOUT = 2
     _dubgame_text_type = type(u"")
-    _dubgame_state = {"seq": 0, "sent_characters": False}
+    _dubgame_state = {"seq": 0, "sent_characters": False, "app_running": False}
 
     # One sender thread, in order. Separate threads per line could reach the app out of order
     # when the player clicks fast, and an old line would then play over the current one.
@@ -122,11 +127,27 @@ init -999 python:
                 char = None
         return _dubgame_char_name(char) or u"Narrator"
 
+    def _dubgame_keep_windowed():
+        """Main thread only. Turns the fullscreen preference off while the app is running."""
+        # UNVERIFIED: relies on Ren'Py re-reading preferences.fullscreen at the next interaction,
+        # which is how its own Display > Window preference works.
+        try:
+            if not _dubgame_state["app_running"]:
+                return
+            prefs = getattr(_dubgame_sys.modules.get("renpy.game"), "preferences", None)
+            if prefs is None:
+                prefs = getattr(store, "_preferences", None)
+            if prefs is not None and getattr(prefs, "fullscreen", False):
+                prefs.fullscreen = False
+        except Exception:
+            pass
+
     def _dubgame_callback(event, interact=True, **kwargs):
         try:
             if not interact:
                 return
             if event == "begin":
+                _dubgame_keep_windowed()
                 if config.skipping:
                     return  # player is fast-forwarding; do not voice skipped lines
                 what = kwargs.get("what") or getattr(store, "_last_say_what", None)
@@ -188,6 +209,11 @@ init -999 python:
         _dubgame_state["sent_characters"] = True
         def work():
             try:
+                _dubgame_urlopen(_dubgame_URL + "/health", timeout=_dubgame_TIMEOUT).read()
+                _dubgame_state["app_running"] = True  # applied on the main thread, see below
+            except Exception:
+                return  # app closed: nothing to send, and the game's display mode is left alone
+            try:
                 characters = _dubgame_collect_characters()
                 if characters:
                     req = _dubgame_Request(
@@ -207,6 +233,11 @@ init -999 python:
 
     try:
         config.all_character_callbacks.append(_dubgame_callback)
+    except Exception:
+        pass
+    try:
+        # Every interaction (menus included), so the game is windowed before the first line.
+        config.interact_callbacks.append(_dubgame_keep_windowed)
     except Exception:
         pass
     try:

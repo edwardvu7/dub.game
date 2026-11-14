@@ -11,10 +11,10 @@ const { createState } = require('../main/steam/state');
 const { launchGame, findExecutable } = require('../main/steam/launch');
 const { createGames } = require('../main/steam');
 
-test('scan: returns only Ren\'Py games, across every library', async () => {
+test('scan: finds Ren\'Py games across every library', async () => {
   const t = fakeSteam();
   const games = await scan.scanLibrary({ steamPath: t.steam });
-  assert.deepEqual(games.map((g) => g.appid).sort(), ['1001', '2001']);
+  assert.deepEqual(games.filter((g) => g.support === 'full').map((g) => g.appid).sort(), ['1001', '2001']);
   const g = games.find((x) => x.appid === '1001');
   assert.deepEqual(g, {
     appid: '1001', name: 'Sakura Demo VN', installDir: path.join(t.common1, 'SakuraDemo'),
@@ -23,11 +23,17 @@ test('scan: returns only Ren\'Py games, across every library', async () => {
   });
 });
 
-test('scan: beta engines (Godot) appear only when asked for; Unity/RPG Maker never', async () => {
+test('scan: Godot, RPG Maker and Unity games are listed as "soon"; Godot is "beta" only when asked', async () => {
   const t = fakeSteam();
-  const games = await scan.scanLibrary({ steamPath: t.steam, includeBeta: true });
-  assert.deepEqual(games.map((g) => g.appid).sort(), ['1001', '2001', '2002']);
-  assert.equal(games.find((g) => g.appid === '2002').support, 'beta');
+  const games = await scan.scanLibrary({ steamPath: t.steam });
+  const by = Object.fromEntries(games.map((g) => [g.engine, g.support]));
+  assert.equal(by.renpy, 'full');
+  assert.equal(by.godot, 'soon');
+  assert.equal(by.unity, 'soon');
+  assert.equal(by['rpgmaker-mz'], 'soon');
+  const beta = await scan.scanLibrary({ steamPath: t.steam, includeBeta: true });
+  assert.equal(beta.find((g) => g.engine === 'godot').support, 'beta');
+  assert.ok(!games.some((g) => g.engine === 'kirikiri'), 'engines not asked for stay hidden');
 });
 
 test('scan: no Steam found gives an empty list, not a crash', async () => {
@@ -70,7 +76,7 @@ test('parseRegValue: handles spaces in the path', () => {
 test('detect: engine table', () => {
   const t = fakeSteam();
   assert.equal(detectEngine(path.join(t.common1, 'SakuraDemo')).engine, 'renpy');
-  assert.equal(detectEngine(path.join(t.common1, 'UnityThing')).support, 'hidden');
+  assert.equal(detectEngine(path.join(t.common1, 'UnityThing')).support, 'soon');
   assert.equal(detectEngine(path.join(t.common2, 'RPGThing')).engine, 'rpgmaker-mz');
   assert.equal(detectEngine(path.join(t.common2, 'Ghost')), null);
   // renpy/ folder without any script files in game/ is not a Ren'Py game
@@ -147,7 +153,8 @@ test('scanFolder: local id is stable and unsupported folders give null', () => {
   assert.equal(a.appid, scan.scanFolder(dir).appid);
   assert.equal(a.name, 'SakuraDemo');
   assert.equal(a.coverUrl, '');
-  assert.equal(scan.scanFolder(path.join(t.common1, 'UnityThing')), null);
+  assert.equal(scan.scanFolder(path.join(t.common1, 'UnityThing')).support, 'soon');
+  assert.equal(scan.scanFolder(path.join(t.common2, 'Ghost')), null);
   assert.equal(scan.scanFolder(path.join(t.root, 'missing')), null);
 });
 
@@ -177,7 +184,11 @@ test('games facade: tick installs, recheck reports a removed hook, untick remove
   const make = () => createGames({ userData, steamPath: t.steam,
     shell: { openExternal: async (u) => { opened.push(u); } }, pickFolder: async () => pick });
   let games = make();
-  assert.equal((await games.list()).length, 2);
+  const listed = await games.list();
+  assert.equal(listed.filter((g) => g.support === 'full').length, 2);
+  const soon = listed.find((g) => g.support === 'soon');
+  await assert.rejects(() => games.setEnabled({ appid: soon.appid, enabled: true }), /aren't available yet/);
+  assert.equal(listed.find((g) => g.appid === soon.appid).enabled, false);
 
   const on = await games.setEnabled({ appid: '1001', enabled: true });
   assert.deepEqual([on.enabled, on.hookInstalled], [true, true]);
@@ -198,15 +209,16 @@ test('games facade: tick installs, recheck reports a removed hook, untick remove
   const off = await games.setEnabled({ appid: '1001', enabled: false });
   assert.deepEqual([off.enabled, off.hookInstalled], [false, false]);
 
+  const before = listed.length;
   const withLocal = await games.addFolder();
-  assert.equal(withLocal.length, 3);
+  assert.equal(withLocal.length, before + 1);
   assert.ok(withLocal.some((x) => x.appid.startsWith('local:')));
-  assert.equal((await make().list()).length, 3, 'added folder persists');
+  assert.equal((await make().list()).length, before + 1, 'added folder persists');
 
-  pick = path.join(t.common1, 'UnityThing');
+  pick = tmpDir(); // a folder with no recognised engine
   await assert.rejects(() => games.addFolder(), /supported game/);
   pick = null; // cancelled picker
-  assert.equal((await games.addFolder()).length, 3);
+  assert.equal((await games.addFolder()).length, before + 1);
 
   assert.equal(await games.launch({ appid: '1001' }), true);
   assert.deepEqual(opened, ['steam://run/1001']);

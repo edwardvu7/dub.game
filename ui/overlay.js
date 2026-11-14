@@ -1,4 +1,5 @@
-// Overlay window (Shift+F2): the same character cards as the Voices tab, on top of the game.
+// Overlay window (Shift+F2): a compact panel of voice settings on top of the game. It shows the
+// same character cards as the Voices tab and nothing else.
 // Audio is played by the main window only, so nothing here makes sound.
 (function () {
   'use strict';
@@ -20,17 +21,9 @@
     emptyText: 'No characters yet. They appear here as soon as the game sends its first line.',
   });
 
-  const meter = $('heard-meter');
-  let pulseTimer = null;
+  // Whoever is speaking moves to the top, so their settings are the first thing in view.
   dub.on('line:received', (line) => {
-    if (!line) return;
-    $('heard-speaker').textContent = line.speaker || 'Unknown';
-    $('heard-line').textContent = line.text || '';
-    cards.setCurrent(line.speaker || null);
-    // The overlay gets no audio events, so the meter marks the arrival of a line, briefly.
-    meter.classList.add('is-playing');
-    clearTimeout(pulseTimer);
-    pulseTimer = setTimeout(() => meter.classList.remove('is-playing'), 1800);
+    if (line) cards.setCurrent(line.speaker || null);
   });
 
   // Main sends this each time the overlay is shown: voices may have changed while it was hidden.
