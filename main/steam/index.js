@@ -18,6 +18,7 @@ function createGames(opts) {
   function decorate(game) {
     const enabled = state.isEnabled(game.appid);
     let hookInstalled = install.isHookInstalled(game);
+    if (game.support === 'soon') return { ...game, enabled: false, hookInstalled: false };
     // Keep an enabled game's hook current with the one shipped in this build.
     if (enabled && hookInstalled && install.isHookOutdated(game, { modDir: opts.modDir })) {
       try { install.installHook(game, { modDir: opts.modDir }); } catch { /* keep the old one */ }
@@ -68,6 +69,9 @@ function createGames(opts) {
     },
     async setEnabled({ appid, enabled }) {
       const game = await find(appid);
+      if (enabled && game.support === 'soon') {
+        throw new Error(`Voices for ${game.name} aren't available yet. dub.game supports Ren'Py games for now.`);
+      }
       if (enabled) install.installHook(game, { modDir: opts.modDir });
       else install.uninstallHook(game);
       state.setEnabled(game.appid, !!enabled);

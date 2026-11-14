@@ -122,6 +122,7 @@
         // Launch always means "launch with voices": the dub.game script has to be in the game
         // first. It is also what keeps the game windowed so the overlay can show.
         const game = games.find((g) => g.appid === appid);
+        if (game && game.support === 'soon') return;
         if (!game || L.gameStatus(game) !== 'on') {
           const updated = await dub.invoke('games:setEnabled', { appid, enabled: true });
           games = games.map((g) => (g.appid === appid ? updated : g));
@@ -159,6 +160,9 @@
     if (!tile.busy) tile.box.checked = !!game.enabled;
     tile.box.setAttribute('aria-label', 'Voices for ' + game.name);
     tile.repair.hidden = status !== 'missing';
+    // Coming-soon engines are listed so players see them, but nothing can be switched on yet.
+    tile.box.closest('.switch').hidden = status === 'soon';
+    tile.launch.hidden = status === 'soon';
   }
 
   function renderGames() {

@@ -64,8 +64,9 @@ About 12 entries.
    "engine": "renpy", "support": "full", "enabled": true, "hookInstalled": true,
    "coverUrl": "https://cdn.cloudflare.steamstatic.com/steam/apps/1234/header.jpg" }]
 ```
-`support` is `"full"` (Ren'Py) or `"beta"` (engine adapter built, speaker needs calibration).
-Unsupported games are never returned.
+`support` is `"full"` (Ren'Py), `"beta"` (Godot adapter, only with `DUBGAME_BETA=1`) or `"soon"`
+(Godot, RPG Maker MV/MZ, Unity: listed so players see them, but voices can't be switched on and
+`games:setEnabled` refuses them). Other engines are never returned.
 
 ### IPC (renderer ↔ main) — exposed through `main/preload.js` as `window.dub`
 `window.dub.invoke(channel, arg) → Promise` and `window.dub.on(channel, fn) → unsubscribe`.

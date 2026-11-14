@@ -118,14 +118,19 @@ function readManifests(library) {
   return out;
 }
 
-function isSupported(detected, includeBeta) {
-  if (!detected) return false;
-  return detected.support === 'full' || (includeBeta && detected.support === 'beta');
+// Ren'Py works. Godot, RPG Maker and Unity are listed as "soon" so players see them, but voices
+// can't be switched on yet. Godot's untested adapter is offered as "beta" only when asked for.
+function listing(detected, includeBeta) {
+  if (!detected) return null;
+  if (detected.support === 'full') return 'full';
+  if (detected.support === 'beta') return includeBeta ? 'beta' : 'soon';
+  if (detected.support === 'soon') return 'soon';
+  return null;
 }
 
 /**
  * scanLibrary({steamPath?, includeBeta?, platform?, env?, home?, exec?}) -> Promise<Game[]>
- * Returns only supported games (contract shape minus enabled/hookInstalled, which state.js adds).
+ * Returns Ren'Py games plus Godot/RPG Maker/Unity games marked "soon" (contract shape minus enabled/hookInstalled, which state.js adds).
  * includeBeta lists engines whose adapter exists but is untested (Godot). Off by default.
  */
 async function scanLibrary(opts = {}) {
@@ -136,10 +141,11 @@ async function scanLibrary(opts = {}) {
     for (const m of readManifests(lib)) {
       if (games.has(m.appid)) continue;
       const detected = detectEngine(m.installDir);
-      if (!isSupported(detected, opts.includeBeta)) continue;
+      const support = listing(detected, opts.includeBeta);
+      if (!support) continue;
       games.set(m.appid, {
         appid: m.appid, name: m.name, installDir: m.installDir,
-        engine: detected.engine, support: detected.support,
+        engine: detected.engine, support,
         enabled: false, hookInstalled: false, coverUrl: COVER(m.appid),
       });
     }
@@ -156,12 +162,13 @@ function scanFolder(dir, opts = {}) {
   if (!dir) return null;
   const detected = detectEngine(dir);
   // A folder the player picked by hand may show beta engines: they asked for this game.
-  if (!isSupported(detected, opts.includeBeta !== false)) return null;
+  const support = listing(detected, opts.includeBeta !== false);
+  if (!support) return null;
   let name = path.basename(path.resolve(dir));
   if (/\.app$/i.test(name)) name = name.slice(0, -4);
   return {
     appid: localId(dir), name, installDir: path.resolve(dir),
-    engine: detected.engine, support: detected.support,
+    engine: detected.engine, support,
     enabled: false, hookInstalled: false, coverUrl: '',
   };
 }

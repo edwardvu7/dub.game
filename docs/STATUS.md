@@ -35,6 +35,8 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 - Launch turns voices on for the game if needed, then starts it. While the app is running, the Ren'Py
   hook (version 4) keeps the game's fullscreen preference off so the overlay can show. UNVERIFIED on
   a real game.
+- Godot, RPG Maker and Unity games are listed as "Coming soon" (engine name on the badge, no voices
+  switch or Launch). Only Ren'Py games can be voiced.
 - The Games list rescans Steam when the window regains focus (at most every 20 seconds).
 
 ## Not verified yet (needs a real Windows machine)
