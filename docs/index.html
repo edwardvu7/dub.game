@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dub.game — Automatic AI Voice Acting for Visual Novels</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --card: #131722;
+      --border: #23293a;
+      --text: #eef2ff;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --green: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+    header {
+      padding: 28px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { font-weight: 800; font-size: 1.35rem; letter-spacing: -0.03em; }
+    .logo span { color: var(--accent); }
+    .btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      box-shadow: 0 0 24px var(--accent-glow);
+      transition: transform 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .hero {
+      padding: 80px 0 64px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.5rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+    }
+    .hero p {
+      max-width: 640px;
+      margin: 0 auto 32px;
+      color: var(--muted);
+      font-size: 1.15rem;
+    }
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 48px 0;
+    }
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      text-align: left;
+    }
+    .step-num {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .step h3 { font-size: 1.05rem; margin-bottom: 8px; }
+    .step p { color: var(--muted); font-size: 0.9rem; margin: 0; }
+    .section { padding: 48px 0; border-top: 1px solid var(--border); }
+    .section h2 { font-size: 1.6rem; margin-bottom: 24px; letter-spacing: -0.02em; }
+    .engines {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+    }
+    .engine-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 16px 18px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+    }
+    .tag.beta {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+    }
+    kbd {
+      background: #1e2433;
+      border: 1px solid #334155;
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 0.85rem;
+      font-family: monospace;
+    }
+    footer {
+      padding: 36px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">dub<span>.game</span></div>
+      <div>
+        <a href="https://github.com/edwardvu7/dub.game" class="btn btn-outline">GitHub Repo</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="badge">Desktop Overlay &amp; Engine Hook</div>
+      <h1>Every unvoiced visual novel, fully voice acted in real time.</h1>
+      <p>
+        dub.game scans your Steam library, injects a lightweight dialogue hook, profiles every character once with Gemini, and speaks every line live with ElevenLabs.
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/edwardvu7/dub.game" class="btn">View on GitHub</a>
+        <a href="#how-it-works" class="btn btn-outline">How It Works</a>
+      </div>
+
+      <div class="pipeline" id="how-it-works">
+        <div class="step">
+          <div class="step-num">01 · Steam Scan</div>
+          <h3>One-Click Hook</h3>
+          <p>Automatically detects compatible Steam games. Tick a title to inject the hook—untick to remove it cleanly.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">02 · Gemini Profiler</div>
+          <h3>Auto Character Casting</h3>
+          <p>Profiles each speaker once from dialogue context and maps them to a distinct voice ID, speed, and style.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">03 · ElevenLabs TTS</div>
+          <h3>Zero-OCR Dialogue</h3>
+          <p>Reads exact speaker names and lines directly from the engine callback—no fragile screen capture required.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">04 · Live Overlay</div>
+          <h3>ReShade-Style Tuning</h3>
+          <p>Press <kbd>Shift</kbd> + <kbd>F2</kbd> in-game to open a translucent overlay and retune any character's voice mid-scene.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Supported Game Engines</h2>
+      <div class="engines">
+        <div class="engine-card">
+          <strong>Ren'Py (7 &amp; 8)</strong>
+          <span class="tag">Full Support</span>
+        </div>
+        <div class="engine-card">
+          <strong>Godot 3 / 4</strong>
+          <span class="tag beta">Adapter Ready</span>
+        </div>
+        <div class="engine-card">
+          <strong>RPG Maker MV / MZ</strong>
+          <span class="tag beta">Adapter Ready</span>
+        </div>
+        <div class="engine-card">
+          <strong>Unity (BepInEx)</strong>
+          <span class="tag beta">Adapter Ready</span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Built with Electron, Gemini Structured Outputs, and ElevenLabs · Bring your own API keys stored locally via OS encryption.
+    </footer>
+  </div>
+</body>
+</html>
