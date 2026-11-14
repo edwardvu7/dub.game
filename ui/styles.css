@@ -1,5 +1,5 @@
 /* dub.game: main window and overlay.
-   The look is a dubbing booth: dark desk, warm paper text, one amber tally light that means
+   The look is a dubbing booth: dark desk, warm paper text, one sage tally light (the green of the logo's dot) that means
    "this is live". Fonts are system fonts only (the app works offline and the CSP allows no
    remote styles): Bahnschrift, the DIN face that ships with Windows, for headings. */
 
@@ -10,8 +10,8 @@
   --line: #2a313b;
   --paper: #ebe7dd;
   --dim: #99a0ab;
-  --tally: #f2a93b;       /* live, on, primary action */
-  --tally-ink: #1d1404;
+  --tally: #b8cdbd;       /* live, on, primary action: the logo's green */
+  --tally-ink: #0e1511;
   --ok: #62c9a6;
   --bad: #ff7a6b;
 
