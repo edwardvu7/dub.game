@@ -78,7 +78,7 @@ function createTagCheck(opts) {
       if (!reply || (!reply.name && !tagNames(reply).length)) throw new Error('no data');
       const names = tagNames(reply);
       const kind = classify(names);
-      cache[appid] = { kind, at: now(), tags: names.slice(0, 20) };
+      cache[appid] = { kind, at: now() };
       save();
       return kind;
     } catch {

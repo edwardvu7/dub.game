@@ -228,7 +228,7 @@
 
   let refreshingGodot = false;
   setInterval(async () => {
-    if (refreshingGodot || !games.some(g => g.voiceMode === 'generic' && g.enabled)) return;
+    if (refreshingGodot || !document.hasFocus() || !games.some(g => g.voiceMode === 'generic' && g.enabled)) return;
     refreshingGodot = true;
     try {
       if ([...tiles.values()].some(t => t.busy)) return;

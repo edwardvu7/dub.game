@@ -6,6 +6,7 @@ const http = require('node:http');
 const HOST = '127.0.0.1';
 const PORT = 8000;
 const MAX_BODY = 1024 * 1024;
+const MAX_TEXT = 2000; // same cap as clipboard mode; ElevenLabs bills per character
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -30,7 +31,7 @@ function normalizeGame(body) {
 
 function normalizeLine(body) {
   if (!body || typeof body.text !== 'string') return null;
-  const text = body.text.trim();
+  const text = body.text.trim().slice(0, MAX_TEXT);
   if (!text) return null;
   const speaker = typeof body.speaker === 'string' && body.speaker.trim() ? body.speaker.trim() : 'Narrator';
   const line = { speaker, text, engine: typeof body.engine === 'string' && body.engine ? body.engine : 'renpy' };
@@ -82,6 +83,11 @@ function createServer(handlers = {}) {
       res.writeHead(status, body ? { 'Content-Type': 'application/json' } : {});
       res.end(body ? JSON.stringify(body) : undefined);
     };
+    // Browsers send Origin on cross-site requests and game hooks never do: keeps web pages out.
+    // The Host check stops a site that points its own domain at 127.0.0.1 (DNS rebinding).
+    if (req.headers.origin || !/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(req.headers.host || '')) {
+      return end(403, { error: 'local game hooks only' });
+    }
     if (req.method === 'GET' && (url === '/' || url === '/health')) return end(200, { ok: true, app: 'dub.game' });
     if (req.method !== 'POST') return end(405, { error: 'POST only' });
     if (!['/line', '/characters', '/stop', '/godot/hook'].includes(url)) return end(404, { error: 'unknown path' });

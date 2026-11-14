@@ -241,6 +241,7 @@ async function start() {
   const usage = createUsage({ file: path.join(userData, 'usage.json') });
   usage.onChange((snap) => emit('usage:changed', snap));
   const cache = createCache({ dir: path.join(userData, 'cache') });
+  cache.prune(60 * 24 * 3600 * 1000); // clips not played for 60 days
   // Hooks name a game "<engine>:<folder>"; the Steam scan knows the folder's real name.
   let knownGames = [];
   const remember = (list) => { if (Array.isArray(list)) knownGames = list; return list; };
@@ -296,7 +297,6 @@ async function start() {
   });
   if (settings.clipboardMode()) clipboardWatcher.start();
 
-  games.list().then(remember, () => {});
   const trackedGames = {
     ...games,
     list: () => games.list().then(remember),

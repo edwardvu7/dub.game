@@ -100,3 +100,24 @@ test('server: hook diagnostics are bounded and malformed reports rejected', asyn
   assert.equal(reports[0].labels.length, 80);
   assert.equal(reports[0].labels[0].text.length, 120);
 });
+
+test('server: web pages are refused (Origin or foreign Host), and long lines are cut', async () => {
+  const lines = [];
+  await withServer({ onLine: (l) => lines.push(l) }, async (base) => {
+    const evil = await fetch(base + '/line', { method: 'POST', headers: { Origin: 'https://evil.example' },
+      body: JSON.stringify({ text: 'spend credits' }) });
+    assert.equal(evil.status, 403);
+    // fetch cannot set Host, so the rebinding case goes through http.request
+    const status = await new Promise((resolve, reject) => {
+      const u = new URL(base);
+      const req = require('node:http').request({ host: u.hostname, port: u.port, path: '/line', method: 'POST',
+        headers: { Host: 'evil.example' } }, (res) => { res.resume(); resolve(res.statusCode); });
+      req.on('error', reject); req.end('{"text":"x"}');
+    });
+    assert.equal(status, 403);
+    assert.equal((await post(base + '/line', { text: 'a'.repeat(5000) })).status, 204);
+    await tick();
+  });
+  assert.equal(lines.length, 1, 'only the game hook request got through');
+  assert.equal(lines[0].text.length, 2000);
+});

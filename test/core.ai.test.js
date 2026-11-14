@@ -139,3 +139,36 @@ test('tts.subscription: reads the plan quota, and explains a key without permiss
   assert.match(denied.error, /User: read/);
   assert.equal((await subscription('')).ok, false);
 });
+
+test('profiler: a failed later batch keeps the batches that worked; calls carry a timeout', async () => {
+  const { profileCharacters } = require('../main/profiler');
+  const cast = Array.from({ length: 14 }, (_, i) => ({ speaker: 'C' + i, samples: [] }));
+  let n = 0;
+  const fetchStub = async (_url, init) => {
+    assert.ok(init.signal, 'request has an abort signal');
+    if (++n === 2) return { ok: false, status: 429, json: async () => ({ error: { message: 'rate limit' } }) };
+    const names = cast.slice(0, 12).map((c) => c.speaker);
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+      profiles: names.map((speaker) => ({ speaker, voice_id: catalog[0].voice_id })) }) }] } }] }) };
+  };
+  const out = await profileCharacters(cast, catalog, 'k', { fetch: fetchStub });
+  assert.equal(out.length, 12);
+  await assert.rejects(() => profileCharacters(cast.slice(0, 2), catalog, 'k',
+    { fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }) }), /Gemini 500/);
+});
+
+test('cache.prune removes only clips not played recently; a cache hit counts as played', () => {
+  const fs = require('node:fs'); const path = require('node:path');
+  const { createCache } = require('../main/cache');
+  const dir = path.join(require('./helpers').tmpDir(), 'cache');
+  const cache = createCache({ dir });
+  const a = { voice_id: 'v', stability: 0.5, style: 0, speed: 1, text: 'old', model: 'm' };
+  const b = { ...a, text: 'old but replayed' };
+  cache.put(a, Buffer.from('1')); cache.put(b, Buffer.from('2'));
+  const longAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000);
+  for (const f of fs.readdirSync(dir)) fs.utimesSync(path.join(dir, f), longAgo, longAgo);
+  cache.get(b);
+  assert.equal(cache.prune(60 * 24 * 3600 * 1000), 1);
+  assert.equal(cache.get(a), null);
+  assert.equal(cache.get(b).toString(), '2');
+});

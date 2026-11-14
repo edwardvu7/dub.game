@@ -16,9 +16,23 @@ function createCache({ dir }) {
     key: cacheKey,
     get(params) {
       try {
-        const buf = fs.readFileSync(fileFor(params));
-        return buf.length ? buf : null;
+        const file = fileFor(params);
+        const buf = fs.readFileSync(file);
+        if (!buf.length) return null;
+        try { fs.utimesSync(file, new Date(), new Date()); } catch { /* read-only cache still plays */ }
+        return buf;
       } catch { return null; }
+    },
+    /** Delete clips not played for maxAgeMs. Run once at startup so the cache cannot grow forever. */
+    prune(maxAgeMs, now = Date.now()) {
+      let removed = 0;
+      try {
+        for (const name of fs.readdirSync(dir)) {
+          const file = path.join(dir, name);
+          if (now - fs.statSync(file).mtimeMs > maxAgeMs) { fs.unlinkSync(file); removed++; }
+        }
+      } catch { /* no cache yet */ }
+      return removed;
     },
     put(params, buffer) {
       try {

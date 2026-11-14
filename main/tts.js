@@ -47,6 +47,7 @@ async function speak(params, key, deps = {}) {
     method: 'POST',
     headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: MIME },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000), // a stalled call must fail, not hang the line
   });
   if (!res.ok) throw new Error(await errorText(res));
   return Buffer.from(await res.arrayBuffer());

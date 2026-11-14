@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 // gemini-2.5-flash was retired for new API keys (Nov 2026). A GEMINI_MODEL environment variable
 // overrides this without a code change if Google retires this one too.
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const TIMEOUT_MS = 20000; // a stalled call must not silence a character for minutes
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const GENDERS = ['female', 'male', 'neutral'];
 const AGES = ['child', 'teen', 'young_adult', 'adult', 'elder'];
@@ -116,6 +117,7 @@ async function callGemini(request, key, doFetch) {
     method: 'POST',
     headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify(request.body),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) {
     let detail = '';
@@ -147,7 +149,13 @@ async function profileCharacters(characters, catalog, key, deps = {}) {
   const out = [];
   for (let i = 0; i < characters.length; i += BATCH) {
     const chunk = characters.slice(i, i + BATCH);
-    const raw = await callGemini(buildRequest(chunk, catalog, { batch: true }), key, deps.fetch || globalThis.fetch);
+    let raw;
+    try {
+      raw = await callGemini(buildRequest(chunk, catalog, { batch: true }), key, deps.fetch || globalThis.fetch);
+    } catch (e) {
+      if (!out.length) throw e;
+      break; // keep the batches that worked; the rest get placeholders
+    }
     const list = raw && Array.isArray(raw.profiles) ? raw.profiles : [];
     for (const c of chunk) {
       const match = list.find((p) => p && p.speaker === c.speaker) ||

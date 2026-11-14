@@ -268,3 +268,14 @@ test('cost: characters are counted, cache hits are free, and the monthly limit s
   assert.equal(u.totalChars, 12);
   assert.equal(u.limit, 20, 'the limit carries over');
 });
+
+test('usage: a cached line notifies the window but does not rewrite usage.json', () => {
+  const { createUsage } = require('../main/usage');
+  const file = path.join(tmpDir(), 'usage.json');
+  const usage = createUsage({ file });
+  let seen = 0;
+  usage.onChange((u) => { seen = u.session.cached; });
+  usage.recordCached();
+  assert.equal(seen, 1);
+  assert.equal(fs.existsSync(file), false);
+});

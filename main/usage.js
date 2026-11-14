@@ -28,6 +28,9 @@ function createUsage({ file, now = Date.now } = {}) {
         fs.writeFileSync(file, JSON.stringify(data, null, 2));
       } catch { /* counting is best effort */ }
     }
+    notify();
+  }
+  function notify() {
     const snap = get();
     for (const fn of listeners) { try { fn(snap); } catch { /* ignore */ } }
   }
@@ -60,7 +63,7 @@ function createUsage({ file, now = Date.now } = {}) {
       save();
     },
     /** A line was replayed from the cache: free. */
-    recordCached() { session.cached += 1; save(); },
+    recordCached() { session.cached += 1; notify(); }, // session-only: nothing to write
     recordGemini() { rollMonth(); session.gemini += 1; data.monthGemini += 1; save(); },
     /** Monthly character limit; 0 means no limit. */
     setLimit(limit) {
