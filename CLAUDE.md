@@ -14,7 +14,8 @@ lets players retune voices while playing. Full plan: `docs/ROADMAP.md`.
 | C — UI + demo | Person C | `ui/`, `build/`, `docs/pitch.md` | `docs/sections/C-ui-and-demo.md` |
 
 Each section lives on its own branch (`section/a-hook-steam`, `section/b-core-ai`,
-`section/c-ui-demo`) and merges into `main`. If you need something from another section,
+`section/c-ui-demo`). When all three are done, Fable 5 combines them into `main`
+(see `docs/INTEGRATION.md`); it does not build sections. If you need something from another section,
 code against the contracts below (or fake data), never edit their folder.
 
 ## Stack
