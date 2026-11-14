@@ -39,7 +39,7 @@ for name, mod in [("renpy.ast", ast), ("renpy.character", character_mod), ("renp
 def substitute(t): return re.sub(r"\[(\w+)\]", lambda m: str(getattr(store, m.group(1), m.group(0))), t)
 renpy = types.SimpleNamespace(substitute=substitute)
 config = types.SimpleNamespace(all_character_callbacks=[], start_callbacks=[], interact_callbacks=[], skipping=None)
-game_mod.preferences = types.SimpleNamespace(fullscreen=True)
+game_mod.preferences = types.SimpleNamespace(fullscreen=False)
 
 import os
 src = open(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "mod", "renpy", "dubgame.rpy"), encoding="utf-8").read()
@@ -58,9 +58,9 @@ cb = config.all_character_callbacks[0]
 
 # game start: characters
 config.start_callbacks[0](); time.sleep(0.5)
-check(game_mod.preferences.fullscreen is True, "fullscreen is not touched from the background thread")
+check(game_mod.preferences.fullscreen is False, "the display mode is not touched from the background thread")
 config.interact_callbacks[0]()
-check(game_mod.preferences.fullscreen is False, "with the app running, the game is switched to windowed at the first interaction")
+check(game_mod.preferences.fullscreen is True, "with the app running, the game goes borderless fullscreen at the first interaction")
 chars = [b for p, b in got if p == "/characters"]
 check(len(chars) == 1, "sends /characters once at launch")
 names = sorted(c["speaker"] for c in chars[0]["characters"]) if chars else []
@@ -74,7 +74,7 @@ def say(who, what, **kw):
     time.sleep(0.15)  # the player reads, then clicks
 
 got.clear()
-game_mod.preferences.fullscreen = True  # the player presses F11 mid-game
+game_mod.preferences.fullscreen = False  # the player switches to windowed mid-game
 say("s", "Welcome back, [player_name]. {w}I missed you{{really}}.")
 say(None, "The rain kept falling.")
 say("p", "Thanks.")
@@ -82,7 +82,7 @@ say("m", "Ignore me", )  # normal
 config.skipping = "fast"; say("m", "skipped line"); config.skipping = None
 cb("begin", interact=False, what="no interaction")
 time.sleep(0.3)
-check(game_mod.preferences.fullscreen is False, "fullscreen turned back on by the player is switched off at the next line")
+check(game_mod.preferences.fullscreen is False, "the player's own switch to windowed is kept")
 lines = [b for p, b in got if p == "/line"]
 stops = [b for p, b in got if p == "/stop"]
 got.clear()
@@ -109,10 +109,10 @@ start = time.time(); cb("begin", interact=True, what="nobody listening"); time.s
 check(time.time() - start < 0.5, "no crash and no stall when the app is closed")
 # A fresh game start with the app closed: the display mode must be left alone.
 config.all_character_callbacks[:] = []; config.start_callbacks[:] = []; config.interact_callbacks[:] = []
-game_mod.preferences.fullscreen = True
+game_mod.preferences.fullscreen = False
 exec(compile(code, "dubgame.rpy", "exec"), env)
 config.start_callbacks[0](); time.sleep(0.4); config.interact_callbacks[0]()
 config.all_character_callbacks[0]("begin", interact=True, what="hello")
-check(game_mod.preferences.fullscreen is True, "with the app closed, the game keeps its own fullscreen setting")
+check(game_mod.preferences.fullscreen is False, "with the app closed, the game keeps its own display setting")
 print("\nALL HOOK CHECKS PASSED" if ok_all else "\nHOOK PROBLEMS")
 sys.exit(0 if ok_all else 1)

@@ -120,7 +120,7 @@
       launch.disabled = true;
       try {
         // Launch always means "launch with voices": the dub.game script has to be in the game
-        // first. It is also what keeps the game windowed so the overlay can show.
+        // first. It is also what starts the game in borderless fullscreen so the overlay can show.
         const game = games.find((g) => g.appid === appid);
         if (game && game.support === 'soon') return;
         if (!game || L.gameStatus(game) !== 'on') {

@@ -81,7 +81,7 @@ class FakeWindow extends EventEmitter {
   show() { this.visible = true; } hide() { this.visible = false; } isVisible() { return this.visible; }
   isDestroyed() { return false; } isMinimized() { return false; } restore() {}
   setAlwaysOnTop() {} setIgnoreMouseEvents() {} setVisibleOnAllWorkspaces() {}
-  setBounds(b) { this.bounds = b; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() {}
+  setBounds(b) { this.bounds = b; } getBounds() { return this.bounds; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() {}
 }
 const displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }, { workArea: { x: 1920, y: 0, width: 2560, height: 1400 } }];
 let cursor = { x: 100, y: 100 };
@@ -158,7 +158,19 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   cursor = { x: 3000, y: 500 }; // the game is on the second monitor
   shortcuts['Shift+F2']();
   check(overlay.bounds.x === 1920 + 16 && overlay.bounds.y === 400, 'overlay follows the game to a second monitor');
+  check(overlay.opts.movable === true, 'overlay can be dragged');
+  overlay.bounds = { ...overlay.bounds, x: 1920 + 900, y: 150 }; // the player drags it
+  overlay.emit('move');
+  await wait(400);
   shortcuts['Shift+F2']();
+  shortcuts['Shift+F2']();
+  check(overlay.bounds.x === 1920 + 900 && overlay.bounds.y === 150, 'overlay reopens where the player dragged it');
+  shortcuts['Shift+F2']();
+  cursor = { x: 100, y: 100 };
+  shortcuts['Shift+F2']();
+  check(overlay.bounds.x === 16 && overlay.bounds.y === 220, 'on a screen it was never dragged on, it starts at the left edge');
+  shortcuts['Shift+F2']();
+  check(fs.existsSync(path.join(tmp, 'userData', 'overlay-position.json')), 'dragged position is saved to userData');
   overlay.webContents.emit('render-process-gone');
   check(overlay.reloaded === 1, 'a crashed overlay page reloads itself');
 

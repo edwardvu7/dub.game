@@ -8,15 +8,17 @@
 #   POST /line        {speaker, text, engine: "renpy", seq}
 #   POST /stop        {engine: "renpy", seq}            (player clicked past the line)
 #   POST /characters  {engine: "renpy", characters: [{speaker, samples}]}   (once, at launch)
-#   GET  /health      (once, at launch) is the app running? If so, keep the game windowed.
+#   GET  /health      (once, at launch) is the app running? If so, go borderless fullscreen.
 #
-# Windowed mode: the dub.game overlay cannot appear over a fullscreen game. While the app is
-# running, the hook keeps the game's own "fullscreen" preference off. With the app closed the
-# game is left exactly as the player set it.
+# Display mode: the dub.game overlay can sit on top of a windowed or borderless game, but not
+# an exclusive-fullscreen one. Ren'Py 7 and 8 draw "fullscreen" as a borderless window the size
+# of the screen (SDL fullscreen-desktop), so while the app is running the hook switches the game
+# to fullscreen once, at the first interaction. After that the player's own choice wins: if they
+# switch to windowed, it stays windowed. With the app closed the game is left as the player set it.
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
-# DUBGAME_HOOK_VERSION 4
+# DUBGAME_HOOK_VERSION 5
 
 init -999 python:
     import json as _dubgame_json
@@ -127,18 +129,19 @@ init -999 python:
                 char = None
         return _dubgame_char_name(char) or u"Narrator"
 
-    def _dubgame_keep_windowed():
-        """Main thread only. Turns the fullscreen preference off while the app is running."""
+    def _dubgame_borderless():
+        """Main thread only. Once per launch, turns the fullscreen preference on (borderless)."""
         # UNVERIFIED: relies on Ren'Py re-reading preferences.fullscreen at the next interaction,
-        # which is how its own Display > Window preference works.
+        # which is how its own Display > Fullscreen preference works.
         try:
-            if not _dubgame_state["app_running"]:
+            if not _dubgame_state["app_running"] or _dubgame_state.get("display_set"):
                 return
+            _dubgame_state["display_set"] = True
             prefs = getattr(_dubgame_sys.modules.get("renpy.game"), "preferences", None)
             if prefs is None:
                 prefs = getattr(store, "_preferences", None)
-            if prefs is not None and getattr(prefs, "fullscreen", False):
-                prefs.fullscreen = False
+            if prefs is not None and not getattr(prefs, "fullscreen", False):
+                prefs.fullscreen = True
         except Exception:
             pass
 
@@ -147,7 +150,7 @@ init -999 python:
             if not interact:
                 return
             if event == "begin":
-                _dubgame_keep_windowed()
+                _dubgame_borderless()
                 if config.skipping:
                     return  # player is fast-forwarding; do not voice skipped lines
                 what = kwargs.get("what") or getattr(store, "_last_say_what", None)
@@ -236,8 +239,8 @@ init -999 python:
     except Exception:
         pass
     try:
-        # Every interaction (menus included), so the game is windowed before the first line.
-        config.interact_callbacks.append(_dubgame_keep_windowed)
+        # Every interaction (menus included), so the game is borderless before the first line.
+        config.interact_callbacks.append(_dubgame_borderless)
     except Exception:
         pass
     try:

@@ -33,8 +33,13 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 ## Changed on the `ui-changes` branch
 - Overlay is a compact 340 x 600 panel at the left edge, voice settings only (no title, no last line).
 - Launch turns voices on for the game if needed, then starts it. While the app is running, the Ren'Py
-  hook (version 4) keeps the game's fullscreen preference off so the overlay can show. UNVERIFIED on
-  a real game.
+  hook (version 5) switches the game to fullscreen once at launch. Ren'Py's fullscreen is the
+  borderless kind (SDL fullscreen-desktop), so the overlay can still show on top. If the player then
+  picks windowed, that choice is kept. The Godot adapter does the same with Godot 4's borderless
+  WINDOW_MODE_FULLSCREEN. UNVERIFIED on a real game.
+- The overlay can be dragged by the strip along its top. It reopens where it was last dragged on that
+  screen (saved in `userData/overlay-position.json`, pulled back on screen if the resolution shrank);
+  on a screen it was never dragged on, it starts at the left edge.
 - Godot, RPG Maker and Unity games are listed as "Coming soon" (engine name on the badge, no voices
   switch or Launch). Only Ren'Py games can be voiced.
 - Those Godot/RPG Maker/Unity Steam games are listed only when Steam tags them as story-driven

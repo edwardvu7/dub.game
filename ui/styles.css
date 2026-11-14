@@ -265,13 +265,21 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
 .toast-close { margin-left: auto; flex: none; border: 0; background: none; color: var(--dim); font: 600 12px/1.6 var(--text); cursor: pointer; }
 .toast-close:hover { color: var(--paper); }
 
-/* ---------- Overlay window (transparent, compact, left edge of the screen) ---------- */
+/* ---------- Overlay window (transparent, compact, starts at the left edge; draggable) ---------- */
 body.overlay { background: transparent; }
 .panel {
   position: relative; display: flex; flex-direction: column; height: 100vh;
   background: rgba(11, 13, 16, 0.94);
   border: 1px solid var(--line); border-radius: var(--r-m); overflow: hidden;
 }
+/* Drag strip: the whole top edge moves the window (Electron app-region). */
+.panel-grip {
+  flex: none; display: flex; align-items: center; justify-content: center; height: 18px;
+  -webkit-app-region: drag; app-region: drag; cursor: grab;
+  border-bottom: 1px solid var(--line);
+}
+.panel-grip-bar { width: 36px; height: 4px; border-radius: 2px; background: var(--dim); opacity: 0.6; }
+.panel-grip:hover .panel-grip-bar { opacity: 1; }
 .panel-scroll { flex: 1; overflow-y: auto; padding: 10px 10px 40px; scrollbar-width: thin; }
 .panel-hide {
   position: absolute; right: 8px; bottom: 8px;

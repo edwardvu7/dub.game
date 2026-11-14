@@ -9,6 +9,7 @@ const { createServer, PORT, HOST } = require('./server');
 const { createVoiceStore } = require('./voices');
 const { createCache } = require('./cache');
 const { createSettings } = require('./settings');
+const { createOverlayPosition } = require('./overlay-position');
 const { createPipeline } = require('./pipeline');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
@@ -96,27 +97,48 @@ function createMainWindow() {
   mainWindow.on('closed', () => { mainWindow = null; app.quit(); });
 }
 
-// A see-through, always-on-top panel at the left edge of the screen the player is using.
+// A see-through, always-on-top panel on the screen the player is using; the player can drag it.
 // UNVERIFIED: shows over windowed/borderless games; not over exclusive fullscreen (see fullscreen.js).
 const OVERLAY = { width: 340, height: 600, margin: 16 };
 const fullscreenCheck = createFullscreenCheck();
 let lastFullscreenWarning = 0;
 
-// A compact panel at the left edge, vertically centred, on the display under the mouse
-// (the one the game is on: the player just used it).
+let overlayPosition = null; // created in start(), once userData is known
+
+function overlayDisplay() {
+  try { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { return screen.getPrimaryDisplay(); }
+}
+
+// Opens on the display under the mouse (the one the game is on: the player just used it).
+// Where the player last dragged it on that screen, or else a compact panel at the left edge,
+// vertically centred.
 function overlayBounds() {
-  let display;
-  try { display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { /* fall back */ }
-  const area = (display || screen.getPrimaryDisplay()).workArea;
+  const display = overlayDisplay() || screen.getPrimaryDisplay();
+  const area = display.workArea;
   const width = Math.min(OVERLAY.width, area.width - 2 * OVERLAY.margin);
   const height = Math.min(OVERLAY.height, area.height - 2 * OVERLAY.margin);
+  const spot = overlayPosition && overlayPosition.place(display, width, height);
+  if (spot) return { ...spot, width, height };
   return { x: area.x + OVERLAY.margin, y: area.y + Math.round((area.height - height) / 2), width, height };
+}
+
+// The player drags the overlay by its top strip; remember the spot once they let go.
+let movedTimer = null;
+function rememberOverlaySpot() {
+  clearTimeout(movedTimer);
+  movedTimer = setTimeout(() => {
+    if (!overlayPosition || !overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
+    const b = overlayWindow.getBounds();
+    let display;
+    try { display = screen.getDisplayNearestPoint({ x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) }); } catch { return; }
+    if (display) overlayPosition.remember(display, b);
+  }, 300);
 }
 
 function createOverlayWindow() {
   overlayWindow = new BrowserWindow({
     ...overlayBounds(),
-    transparent: true, frame: false, resizable: false, movable: false, minimizable: false,
+    transparent: true, frame: false, resizable: false, movable: true, minimizable: false,
     maximizable: false, fullscreenable: false, skipTaskbar: true, hasShadow: false, show: false,
     alwaysOnTop: true, title: 'dub.game overlay',
     webPreferences: webPreferences(),
@@ -125,6 +147,7 @@ function createOverlayWindow() {
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   lockDown(overlayWindow);
   overlayWindow.loadFile(path.join(ROOT, 'ui', 'overlay.html'));
+  overlayWindow.on('move', rememberOverlaySpot);
   // The overlay's Hide button calls window.close(): hide instead, so it reopens instantly.
   overlayWindow.on('close', (event) => {
     if (!quitting) { event.preventDefault(); overlayWindow.hide(); }
@@ -166,6 +189,7 @@ async function start() {
   if (process.platform === 'win32') app.setAppUserModelId('game.dub.app');
   Menu.setApplicationMenu(null);
   const userData = app.getPath('userData');
+  overlayPosition = createOverlayPosition({ file: path.join(userData, 'overlay-position.json') });
 
   const settings = createSettings({
     file: path.join(userData, 'settings.json'),

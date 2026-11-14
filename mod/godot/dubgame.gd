@@ -5,6 +5,7 @@
 extends Node
 
 const URL := "http://127.0.0.1:8000/line"
+const HEALTH := "http://127.0.0.1:8000/health"
 var seen := {}
 
 func _ready() -> void:
@@ -14,6 +15,22 @@ func _ready() -> void:
     timer.timeout.connect(_scan)
     add_child(timer)
     timer.start()
+    _go_borderless_if_app_running()
+
+# The overlay can't sit over exclusive fullscreen. Godot 4's WINDOW_MODE_FULLSCREEN is the
+# borderless kind, so when the app is running the game switches to it once at launch.
+# With the app closed nothing changes. UNVERIFIED: not yet run against a real Godot game.
+func _go_borderless_if_app_running() -> void:
+    var req := HTTPRequest.new()
+    req.timeout = 1.0
+    add_child(req)
+    req.request_completed.connect(func(result, code, _h, _b):
+        req.queue_free()
+        if result == HTTPRequest.RESULT_SUCCESS and code == 200:
+            DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+    )
+    if req.request(HEALTH) != OK:
+        req.queue_free()
 
 func _scan() -> void:
     var root := get_tree().root
