@@ -8,7 +8,7 @@ const INVOKE_CHANNELS = [
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
   'settings:setClipboardMode',
 ];
-const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed',
+const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'games:changed',
   'overlay:toggle', 'app:status'];
 
 /** createHandlers({games, voices, settings, pipeline, catalog, onClipboardMode?}) */

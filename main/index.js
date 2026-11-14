@@ -13,6 +13,7 @@ const { createPipeline } = require('./pipeline');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
 const { createGames } = require('./steam');
+const { createTagCheck } = require('./steam/tags');
 const tts = require('./tts');
 const profiler = require('./profiler');
 const { createFullscreenCheck, EXCLUSIVE_MESSAGE } = require('./fullscreen');
@@ -95,19 +96,21 @@ function createMainWindow() {
   mainWindow.on('closed', () => { mainWindow = null; app.quit(); });
 }
 
-// A see-through, always-on-top panel docked to the right edge of the screen the player is using.
+// A see-through, always-on-top panel at the left edge of the screen the player is using.
 // UNVERIFIED: shows over windowed/borderless games; not over exclusive fullscreen (see fullscreen.js).
-const OVERLAY_WIDTH = 460;
+const OVERLAY = { width: 340, height: 600, margin: 16 };
 const fullscreenCheck = createFullscreenCheck();
 let lastFullscreenWarning = 0;
 
-// The display under the mouse is the one the game is on (the player just used it).
+// A compact panel at the left edge, vertically centred, on the display under the mouse
+// (the one the game is on: the player just used it).
 function overlayBounds() {
   let display;
   try { display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { /* fall back */ }
   const area = (display || screen.getPrimaryDisplay()).workArea;
-  const width = Math.min(OVERLAY_WIDTH, area.width);
-  return { x: area.x + area.width - width, y: area.y, width, height: area.height };
+  const width = Math.min(OVERLAY.width, area.width - 2 * OVERLAY.margin);
+  const height = Math.min(OVERLAY.height, area.height - 2 * OVERLAY.margin);
+  return { x: area.x + OVERLAY.margin, y: area.y + Math.round((area.height - height) / 2), width, height };
 }
 
 function createOverlayWindow() {
@@ -183,6 +186,9 @@ async function start() {
     modDir: path.join(ROOT, 'mod'),
     shell,
     includeBeta: process.env.DUBGAME_BETA === '1',
+    // Godot/RPG Maker/Unity games are listed only when Steam tags them as story-driven.
+    tagCheck: createTagCheck({ file: path.join(userData, 'steam-tags.json') }),
+    onChange: (list) => emit('games:changed', list),
     pickFolder: async () => {
       const result = await dialog.showOpenDialog(mainWindow, {
         title: 'Pick the game folder', properties: ['openDirectory'] });

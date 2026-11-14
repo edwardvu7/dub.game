@@ -24,6 +24,15 @@ fs.writeFileSync(path.join(steam, 'steamapps', 'libraryfolders.vdf'),
   `"libraryfolders"\n{\n\t"0"\n\t{\n\t\t"path"\t\t"${steam.replace(/\\/g, '\\\\')}"\n\t}\n}\n`);
 fs.writeFileSync(path.join(steam, 'steamapps', 'appmanifest_424242.acf'),
   `"AppState"\n{\n\t"appid"\t\t"424242"\n\t"name"\t\t"Demo VN"\n\t"installdir"\t\t"Demo VN"\n}\n`);
+for (const [id, name, tags] of [['515151', 'Story Unity', { 'Story Rich': 40, Adventure: 30 }], ['616161', 'Shooter Unity', { FPS: 90 }]]) {
+  const dir = path.join(steam, 'steamapps', 'common', name);
+  fs.mkdirSync(path.join(dir, name + '_Data'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'UnityPlayer.dll'), 'x');
+  fs.writeFileSync(path.join(dir, name + '.exe'), 'x');
+  fs.writeFileSync(path.join(steam, 'steamapps', `appmanifest_${id}.acf`),
+    `"AppState"\n{\n\t"appid"\t\t"${id}"\n\t"name"\t\t"${name}"\n\t"installdir"\t\t"${name}"\n}\n`);
+  (globalThis.__spyTags = globalThis.__spyTags || {})[id] = { name, tags };
+}
 process.env.DUBGAME_STEAM_PATH = steam;
 process.env.ELEVENLABS_API_KEY = 'test-eleven';
 process.env.GEMINI_API_KEY = 'test-gemini';
@@ -47,6 +56,10 @@ globalThis.fetch = async (url, init = {}) => {
     return ok(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }] }), 'application/json');
   }
   if (url.includes('generativelanguage')) return ok('{}', 'application/json');
+  if (url.includes('steamspy.com/api.php')) {
+    const id = new URL(url).searchParams.get('appid');
+    return ok(JSON.stringify(globalThis.__spyTags[id] || {}), 'application/json');
+  }
   throw new Error('unexpected fetch ' + url);
 };
 
@@ -139,12 +152,12 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   check(typeof shortcuts['Shift+F2'] === 'function', 'Shift+F2 is registered');
   shortcuts['Shift+F2']();
   check(overlay.visible && events('overlay:toggle').length === 1, 'Shift+F2 shows the overlay and tells it to refresh');
-  check(overlay.bounds && overlay.bounds.x === 1920 - 460 && overlay.bounds.height === 1040, 'overlay docks to the right edge of the screen in use');
+  check(overlay.bounds && overlay.bounds.x === 16 && overlay.bounds.width === 340 && overlay.bounds.height === 600 && overlay.bounds.y === 220, 'overlay is a compact panel at the left edge of the screen in use');
   shortcuts['Shift+F2']();
   check(!overlay.visible, 'Shift+F2 again hides it');
   cursor = { x: 3000, y: 500 }; // the game is on the second monitor
   shortcuts['Shift+F2']();
-  check(overlay.bounds.x === 1920 + 2560 - 460 && overlay.bounds.height === 1400, 'overlay follows the game to a second monitor');
+  check(overlay.bounds.x === 1920 + 16 && overlay.bounds.y === 400, 'overlay follows the game to a second monitor');
   shortcuts['Shift+F2']();
   overlay.webContents.emit('render-process-gone');
   check(overlay.reloaded === 1, 'a crashed overlay page reloads itself');
@@ -158,6 +171,13 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   // 5. Steam scan finds the fake Ren'Py game; switching it on installs the hook
   const games = await invoke('games:list');
   log('games:list ->', JSON.stringify(games));
+  check(!games.some((g) => g.engine === 'unity'), 'Unity games wait for their Steam tags before showing');
+  await wait(2600); // two SteamSpy lookups, spaced about a second apart
+  const changed = events('games:changed').pop();
+  const names = changed ? changed[2].map((g) => g.name) : [];
+  check(names.includes('Story Unity') && !names.includes('Shooter Unity'),
+    'games:changed lists the Unity game tagged Story Rich, not the shooter: ' + JSON.stringify(names));
+  check(changed && changed[2].find((g) => g.name === 'Story Unity').support === 'soon', 'it is marked coming soon');
   const demo = games.find((g) => g.appid === '424242');
   check(demo && demo.engine === 'renpy' && demo.support === 'full', 'scan finds the Ren\'Py game in the fake library');
   const on = await invoke('games:setEnabled', { appid: '424242', enabled: true });

@@ -30,15 +30,28 @@
     return key === 'speed' ? v.toFixed(2) + 'x' : Math.round(v * 100) + '%';
   }
 
-  /** Full = exact speaker names; Beta = text is right but speakers need calibration. */
+  const ENGINES = { renpy: "Ren'Py", godot: 'Godot', 'rpgmaker-mv': 'RPG Maker MV',
+    'rpgmaker-mz': 'RPG Maker MZ', unity: 'Unity', kirikiri: 'Kirikiri' };
+
+  function engineName(engine) {
+    return ENGINES[engine] || String(engine || 'Unknown engine');
+  }
+
+  /** The badge on a game's cover: which engine, and whether voices work there yet. */
   function supportBadge(game) {
-    return game && game.support === 'beta'
-      ? { text: 'Beta', tone: 'beta', title: 'Lines are read correctly, but speaker names may be guessed.' }
-      : { text: 'Full', tone: 'full', title: 'Exact text and speaker names.' };
+    const engine = engineName(game && game.engine);
+    if (game && game.support === 'soon') {
+      return { text: engine + ' \u00b7 Coming soon', tone: 'soon', title: "Voices for " + engine + " games aren't available yet." };
+    }
+    if (game && game.support === 'beta') {
+      return { text: engine + ' \u00b7 Beta', tone: 'beta', title: 'Lines are read correctly, but speaker names may be guessed.' };
+    }
+    return { text: engine, tone: 'full', title: 'Exact text and speaker names.' };
   }
 
   /** off: not voiced. on: hook in place. missing: ticked, but the hook file is gone. */
   function gameStatus(game) {
+    if (game && game.support === 'soon') return 'soon';
     if (!game || !game.enabled) return 'off';
     return game.hookInstalled ? 'on' : 'missing';
   }
@@ -51,10 +64,11 @@
       String(g.engine || '').toLowerCase().includes(q));
   }
 
-  /** Voiced games first, then by name. Does not mutate. */
+  /** Voiced games first, then other playable games, coming-soon engines last; then by name. */
   function sortGames(games) {
+    const rank = (g) => (g.support === 'soon' ? 2 : g.enabled ? 0 : 1);
     return (Array.isArray(games) ? games.slice() : []).sort((a, b) =>
-      (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0) ||
+      rank(a) - rank(b) ||
       String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
   }
 
@@ -110,17 +124,22 @@
 
   /** One sentence under the Games heading. */
   function gamesSummary(games) {
-    const list = Array.isArray(games) ? games : [];
-    if (!list.length) return 'No supported games found yet.';
+    const all = Array.isArray(games) ? games : [];
+    const list = all.filter((g) => g.support !== 'soon');
+    const soon = all.length - list.length;
+    const later = soon ? ' ' + (soon === 1 ? '1 more game uses' : soon + ' more games use') +
+      ' an engine that is coming soon.' : '';
+    if (!list.length) return (soon ? "No Ren'Py games yet." : 'No supported games found yet.') + later;
     const voiced = list.filter((g) => g.enabled).length;
-    const found = list.length === 1 ? '1 supported game' : list.length + ' supported games';
-    if (!voiced) return found + '. Switch one on to give it voices.';
-    return found + ', ' + voiced + ' voiced.';
+    const found = list.length === 1 ? '1 game ready for voices' : list.length + ' games ready for voices';
+    if (!voiced) return found + '. Switch one on or click Launch.' + later;
+    return found + ', ' + voiced + ' voiced.' + later;
   }
 
   /** The line under a game's name: what the player should know or do next. */
   function gameHint(game, justEnabled) {
     const status = gameStatus(game);
+    if (status === 'soon') return { tone: 'off', text: 'Voices for ' + engineName(game.engine) + " games aren't available yet." };
     if (status === 'missing') return { tone: 'warn', text: 'The dub.game script is missing from this game. Reinstall it.' };
     if (status === 'on' && justEnabled) return { tone: 'note', text: 'Voices are on. If the game is open, restart it.' };
     if (status === 'on') return { tone: 'on', text: 'Voices are on.' };
@@ -129,5 +148,5 @@
 
   return { SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
     sortSpeakers, initials, voiceLabel, errorText, base64ToBytes, keyState, needsSetup,
-    gamesSummary, gameHint };
+    gamesSummary, gameHint, engineName };
 });

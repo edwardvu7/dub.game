@@ -35,7 +35,8 @@ function findRenpyRoot(installDir) {
 
 /**
  * detectEngine(installDir) -> { engine, support, hookDir } | null
- * support: "full" (Ren'Py), "beta" (adapter exists, untested), "hidden" (recognised, no adapter).
+ * support: "full" (Ren'Py), "beta" (adapter exists, untested), "soon" (listed, voices not built
+ * yet), "hidden" (recognised, not listed).
  * hookDir: the folder the hook files are copied into.
  */
 function detectEngine(installDir) {
@@ -54,15 +55,15 @@ function detectEngine(installDir) {
   }
   if (isFile(path.join(installDir, 'www', 'js', 'rpg_core.js')) ||
       isFile(path.join(installDir, 'js', 'rpg_core.js'))) {
-    return { engine: 'rpgmaker-mv', support: 'hidden', hookDir: null };
+    return { engine: 'rpgmaker-mv', support: 'soon', hookDir: null };
   }
   if (isFile(path.join(installDir, 'js', 'rmmz_core.js'))) {
-    return { engine: 'rpgmaker-mz', support: 'hidden', hookDir: null };
+    return { engine: 'rpgmaker-mz', support: 'soon', hookDir: null };
   }
   if (names.includes('UnityPlayer.dll') ||
       entries.some((e) => e.isDirectory() && /_Data$/.test(e.name) &&
         names.some((n) => n.toLowerCase() === e.name.slice(0, -5).toLowerCase() + '.exe'))) {
-    return { engine: 'unity', support: 'hidden', hookDir: null };
+    return { engine: 'unity', support: 'soon', hookDir: null };
   }
   if (names.some((n) => /\.xp3$/i.test(n))) {
     return { engine: 'kirikiri', support: 'hidden', hookDir: null };

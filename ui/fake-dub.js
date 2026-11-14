@@ -18,7 +18,11 @@
     { appid: 'folder:the-question', name: 'The Question', installDir: 'C:/Games/the_question',
       engine: 'renpy', support: 'full', enabled: false, hookInstalled: false, coverUrl: '' },
     { appid: '1574820', name: 'Until Then', installDir: 'C:/Steam/common/Until Then',
-      engine: 'godot', support: 'beta', enabled: false, hookInstalled: false, coverUrl: cover('1574820') },
+      engine: 'godot', support: 'soon', enabled: false, hookInstalled: false, coverUrl: cover('1574820') },
+    { appid: '1150690', name: 'OMORI', installDir: 'C:/Steam/common/OMORI',
+      engine: 'rpgmaker-mv', support: 'soon', enabled: false, hookInstalled: false, coverUrl: cover('1150690') },
+    { appid: '1407200', name: 'MECCHA CHAMELEON', installDir: 'C:/Steam/common/MECCHA CHAMELEON',
+      engine: 'unity', support: 'soon', enabled: false, hookInstalled: false, coverUrl: cover('1407200') },
   ];
   const catalog = [
     { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', description: 'calm young woman, American' },
@@ -46,7 +50,12 @@
     'games:list': () => copy(games),
     'games:rescan': async () => { await wait(600); return copy(games); },
     'games:addFolder': () => copy(games),
-    'games:setEnabled': (a) => { const g = game(a); g.enabled = g.hookInstalled = !!a.enabled; return copy(g); },
+    'games:setEnabled': (a) => {
+      const g = game(a);
+      if (a.enabled && g.support === 'soon') throw new Error("Voices for " + g.name + " aren't available yet.");
+      g.enabled = g.hookInstalled = !!a.enabled;
+      return copy(g);
+    },
     'games:launch': (a) => { game(a); return true; },
     'voices:get': () => copy(voices),
     'voices:catalog': () => copy(catalog),

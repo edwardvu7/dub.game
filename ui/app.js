@@ -90,6 +90,7 @@
     repair.type = 'button';
     const launch = el('button', 'btn btn-primary', 'Launch');
     launch.type = 'button';
+    launch.title = 'Turns voices on for this game and starts it in a window, so the overlay can show.';
     row.append(toggle, repair, launch);
     body.append(name, hint, row);
     root.append(art, body);
@@ -115,10 +116,20 @@
     box.addEventListener('change', () => setEnabled(box.checked));
     repair.addEventListener('click', () => setEnabled(true));
     launch.addEventListener('click', async () => {
+      if (tile.busy) return;
       launch.disabled = true;
       try {
+        // Launch always means "launch with voices": the dub.game script has to be in the game
+        // first. It is also what keeps the game windowed so the overlay can show.
+        const game = games.find((g) => g.appid === appid);
+        if (game && game.support === 'soon') return;
+        if (!game || L.gameStatus(game) !== 'on') {
+          const updated = await dub.invoke('games:setEnabled', { appid, enabled: true });
+          games = games.map((g) => (g.appid === appid ? updated : g));
+          renderGames();
+        }
         await dub.invoke('games:launch', { appid });
-        toast('Starting ' + name.textContent + '. Press Shift + F2 in the game to tune voices.', 'note');
+        toast('Starting ' + name.textContent + ' in a window, so the overlay can show. Press Shift + F2 in the game to change voices.', 'note');
       } catch (e) {
         fail(e);
       } finally {
@@ -149,6 +160,9 @@
     if (!tile.busy) tile.box.checked = !!game.enabled;
     tile.box.setAttribute('aria-label', 'Voices for ' + game.name);
     tile.repair.hidden = status !== 'missing';
+    // Coming-soon engines are listed so players see them, but nothing can be switched on yet.
+    tile.box.closest('.switch').hidden = status === 'soon';
+    tile.launch.hidden = status === 'soon';
   }
 
   function renderGames() {
@@ -189,6 +203,22 @@
   $('games-add').addEventListener('click', (e) => loadGames('games:addFolder', e.currentTarget));
   $('games-add-empty').addEventListener('click', (e) => loadGames('games:addFolder', e.currentTarget));
   search.addEventListener('input', renderGames);
+
+  // Steam is scanned when the app opens, and again whenever the player comes back to this window
+  // (they may have just installed a game), at most once every 20 seconds.
+  let lastScan = Date.now();
+  let scanning = false;
+  window.addEventListener('focus', async () => {
+    if (scanning || Date.now() - lastScan < 20000) return;
+    if (Array.from(tiles.values()).some((t) => t.busy)) return;
+    scanning = true;
+    try {
+      const list = await dub.invoke('games:rescan');
+      if (Array.isArray(list)) { games = list; renderGames(); }
+    } catch { /* a background rescan fails quietly; the Rescan button reports errors */ }
+    lastScan = Date.now();
+    scanning = false;
+  });
 
   // ---------- Voices ----------
   let cards = null;
@@ -352,6 +382,12 @@
     });
   });
   dub.on('audio:stop', stopAudio);
+  // A background Steam tag lookup found more story games to list.
+  dub.on('games:changed', (list) => {
+    if (!Array.isArray(list)) return;
+    games = list;
+    renderGames();
+  });
   dub.on('line:received', showLine);
   dub.on('app:status', (s) => {
     if (s && s.message) toast(s.message, s.level === 'error' ? 'error' : 'note');

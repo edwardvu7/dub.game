@@ -16,7 +16,7 @@
       <button class="tab" role="tab" id="tab-voices" aria-controls="view-voices" aria-selected="false" data-view="voices" tabindex="-1">Voices</button>
       <button class="tab" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" data-view="settings" tabindex="-1">Settings<span class="tab-flag" id="settings-flag" hidden>Needs keys</span></button>
     </div>
-    <p class="rail-note">Press <kbd>Shift</kbd> + <kbd>F2</kbd> in a game to tune voices without leaving it.</p>
+    <p class="rail-note">Launch a game from here and it opens in a window. Press <kbd>Shift</kbd> + <kbd>F2</kbd> in the game to change voices.</p>
   </nav>
 
   <main class="stage">
@@ -35,7 +35,7 @@
       <div class="games" id="games" aria-live="polite"></div>
       <div class="blank" id="games-empty" hidden>
         <h2>No supported games found</h2>
-        <p>dub.game lists Steam games built with Ren'Py. If yours is installed outside Steam, or from itch.io, point to its folder.</p>
+        <p>dub.game checks your Steam library by itself and lists Ren'Py games, plus Godot, RPG Maker and Unity games that Steam tags as visual novels or story-rich. Voices work in Ren'Py games today. If a game is installed outside Steam, or from itch.io, point to its folder.</p>
         <button class="btn btn-primary" id="games-add-empty" type="button">Add game folder</button>
       </div>
     </section>
