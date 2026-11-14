@@ -1,4 +1,7 @@
-# dubgame.gd (beside the game's .exe). Godot 4 syntax. Untested starting point.
+# dub.game hook for Godot 4 (beside the game's .exe, loaded by override.cfg as an autoload).
+# UNVERIFIED: beta. Never run against a real Godot game. Godot 3 needs a ported copy
+# (different signal/typing syntax). Speaker names are not known here ("unknown"); every line is
+# tagged with its node path in `source` so the app can calibrate per game later.
 extends Node
 
 const URL := "http://127.0.0.1:8000/line"
@@ -27,8 +30,10 @@ func _check(n: Node, text: String) -> void:
         return
     seen[id] = text
     var req := HTTPRequest.new()
+    req.timeout = 2.0
     add_child(req)
     req.request_completed.connect(func(_a, _b, _c, _d): req.queue_free())
     var body := JSON.stringify({"speaker": "unknown", "text": text,
         "engine": "godot", "source": str(n.get_path())})
-    req.request(URL, ["Content-Type: application/json"], HTTPClient.METHOD_POST, body)
+    if req.request(URL, ["Content-Type: application/json"], HTTPClient.METHOD_POST, body) != OK:
+        req.queue_free()
