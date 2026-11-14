@@ -47,10 +47,16 @@ Full plan: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 When all three sections are done, Fable 5 merges them into `main`. It only combines; it doesn't build the sections. See [docs/INTEGRATION.md](docs/INTEGRATION.md).
 
-## Godot demo
+## Godot launcher and game overlay
 
-A runnable Godot 4 demo and source integration are in
-[`mod/godot/demo`](mod/godot/demo). It sends named dialogue and character samples
-to the existing desktop app, with stop/skip support and nonblocking offline behavior.
-See [setup, integration, and verification](mod/godot/README.md).
-This does not establish compatibility with arbitrary exported Godot games.
+Use **Add Folder** for a Godot source project (`project.godot`) or exported desktop
+game (executable plus `.pck`). Select the Godot 4 executable on first source-project
+launch. There is no bundled demo game. Voice dubbing requires integration with the
+game's dialogue system; launching alone does not add voices.
+
+On Windows, games launched here are tracked when their window takes focus. The
+launcher requests borderless positioning on that window's actual monitor. Shift+F2
+opens an overlay constrained to the game client area, following movement and size
+changes. The overlay hides while the game is minimized or another app has focus.
+Windows behavior, mixed-DPI monitors and individual engines require local rehearsal.
+See [Godot integration](mod/godot/README.md) and [window tracking](docs/GAME-WINDOW.md).

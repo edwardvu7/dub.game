@@ -36,6 +36,7 @@ async function launchGame(game, deps = {}) {
   if (!String(game.appid).startsWith('local:')) {
     if (!/^\d+$/.test(String(game.appid))) throw new Error('Bad appid: ' + game.appid);
     await deps.shell.openExternal('steam://run/' + game.appid);
+    if (deps.onLaunch) deps.onLaunch(game, 0);
     return true;
   }
   const project = game.engine === 'godot' && fs.existsSync(path.join(game.installDir, 'project.godot'));
@@ -53,6 +54,7 @@ async function launchGame(game, deps = {}) {
       child.once('spawn', resolve);
     });
   }
+  if (deps.onLaunch) deps.onLaunch(game, project && child && child.pid || 0);
   if (child && child.unref) child.unref();
   return true;
 }

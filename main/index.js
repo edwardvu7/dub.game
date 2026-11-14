@@ -1,7 +1,6 @@
 'use strict';
 // Electron entry point: windows, hotkey, localhost server, and wiring of the testable modules.
 const path = require('node:path');
-const fs = require('node:fs');
 const { app, BrowserWindow, globalShortcut, ipcMain, shell, dialog, safeStorage, screen,
   clipboard, Menu, Notification } = require('electron');
 
@@ -10,11 +9,12 @@ const { createServer, PORT, HOST } = require('./server');
 const { createVoiceStore } = require('./voices');
 const { createCache } = require('./cache');
 const { createSettings } = require('./settings');
-const { createOverlayPosition } = require('./overlay-position');
+const { createOverlayPosition, constrainToGame } = require('./overlay-position');
 const { createPipeline } = require('./pipeline');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
 const { createGames } = require('./steam');
+const { createGameWindowTracker } = require('./game-window');
 const { createTagCheck } = require('./steam/tags');
 const tts = require('./tts');
 const profiler = require('./profiler');
@@ -106,34 +106,50 @@ let lastFullscreenWarning = 0;
 
 let overlayPosition = null; // created in start(), once userData is known
 
-function overlayDisplay() {
-  try { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { return screen.getPrimaryDisplay(); }
-}
+let gameFrame = null;
+let overlayWanted = false;
+let gameTracker = null;
+let applyingOverlayBounds = false;
+let overlayOffset = null;
 
-// Opens on the display under the mouse (the one the game is on: the player just used it).
-// Where the player last dragged it on that screen, or else a compact panel at the left edge,
-// vertically centred.
+function gameArea() {
+  if (!gameFrame || gameFrame.minimized) return null;
+  const rect = { x: gameFrame.x, y: gameFrame.y, width: gameFrame.width, height: gameFrame.height };
+  return process.platform === 'win32' ? screen.screenToDipRect(null, rect) : rect;
+}
 function overlayBounds() {
-  const display = overlayDisplay() || screen.getPrimaryDisplay();
-  const area = display.workArea;
-  const width = Math.min(OVERLAY.width, area.width - 2 * OVERLAY.margin);
-  const height = Math.min(OVERLAY.height, area.height - 2 * OVERLAY.margin);
-  const spot = overlayPosition && overlayPosition.place(display, width, height);
-  if (spot) return { ...spot, width, height };
-  return { x: area.x + OVERLAY.margin, y: area.y + Math.round((area.height - height) / 2), width, height };
+  const area = gameArea();
+  if (!area) return { x: 0, y: 0, width: OVERLAY.width, height: OVERLAY.height };
+  const display = { id: 'game:' + gameFrame.gameId, workArea: area };
+  const spot = overlayOffset ? { x: area.x + overlayOffset.dx, y: area.y + overlayOffset.dy }
+    : overlayPosition && overlayPosition.place(display, OVERLAY.width, OVERLAY.height);
+  return constrainToGame(area, { ...spot, width: OVERLAY.width, height: OVERLAY.height });
 }
-
-// The player drags the overlay by its top strip; remember the spot once they let go.
-let movedTimer = null;
+function placeOverlay(bounds) {
+  const current = overlayWindow.getBounds();
+  if (['x', 'y', 'width', 'height'].every(k => current[k] === bounds[k])) return;
+  applyingOverlayBounds = true;
+  try { overlayWindow.setBounds(bounds); } finally { applyingOverlayBounds = false; }
+}
+function syncOverlay() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const area = gameArea();
+  const overlayFocused = overlayWindow.isFocused && overlayWindow.isFocused();
+  if (!overlayWanted || !area || (!gameFrame.focused && !overlayFocused)) {
+    overlayWindow.hide();
+    return;
+  }
+  placeOverlay(overlayBounds());
+  if (!overlayWindow.isVisible()) overlayWindow.showInactive();
+}
 function rememberOverlaySpot() {
-  clearTimeout(movedTimer);
-  movedTimer = setTimeout(() => {
-    if (!overlayPosition || !overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
-    const b = overlayWindow.getBounds();
-    let display;
-    try { display = screen.getDisplayNearestPoint({ x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) }); } catch { return; }
-    if (display) overlayPosition.remember(display, b);
-  }, 300);
+  if (applyingOverlayBounds || !overlayWindow || overlayWindow.isDestroyed()) return;
+  const area = gameArea();
+  if (!area) return;
+  const bounds = constrainToGame(area, overlayWindow.getBounds());
+  overlayOffset = { dx: bounds.x - area.x, dy: bounds.y - area.y };
+  placeOverlay(bounds);
+  if (overlayPosition) overlayPosition.remember({ id: 'game:' + gameFrame.gameId, workArea: area }, bounds);
 }
 
 function createOverlayWindow() {
@@ -149,9 +165,20 @@ function createOverlayWindow() {
   lockDown(overlayWindow);
   overlayWindow.loadFile(path.join(ROOT, 'ui', 'overlay.html'));
   overlayWindow.on('move', rememberOverlaySpot);
+  overlayWindow.on('will-move', (event, proposed) => {
+    const area = gameArea();
+    if (!area) { event.preventDefault(); return; }
+    const clamped = constrainToGame(area, proposed);
+    if (clamped.x !== proposed.x || clamped.y !== proposed.y) {
+      event.preventDefault();
+      overlayOffset = { dx: clamped.x - area.x, dy: clamped.y - area.y };
+      placeOverlay(clamped);
+      rememberOverlaySpot();
+    }
+  });
   // The overlay's Hide button calls window.close(): hide instead, so it reopens instantly.
   overlayWindow.on('close', (event) => {
-    if (!quitting) { event.preventDefault(); overlayWindow.hide(); }
+    if (!quitting) { event.preventDefault(); overlayWanted = false; overlayWindow.hide(); }
   });
   // If the overlay page ever crashes, reload it so Shift+F2 keeps working.
   overlayWindow.webContents.on('render-process-gone', () => {
@@ -173,13 +200,14 @@ function warnIfExclusiveFullscreen() {
 
 function toggleOverlay() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (overlayWindow.isVisible()) {
-    overlayWindow.hide();
+  if (overlayWanted) { overlayWanted = false; overlayWindow.hide(); return; }
+  if (!gameArea() || !gameFrame.focused) {
+    emit('app:status', { level: 'warn', message: 'Launch a game from dub.game, focus its window, then press Shift+F2. Game-window tracking requires Windows.' });
     return;
   }
-  // Re-placed on every open: the game may be on another monitor, or the resolution changed.
-  overlayWindow.setBounds(overlayBounds());
-  overlayWindow.setAlwaysOnTop(true, 'screen-saver'); // Windows can drop topmost after a hide
+  overlayWanted = true;
+  placeOverlay(overlayBounds());
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
   overlayWindow.show();
   overlayWindow.focus();
   send(overlayWindow, 'overlay:toggle');
@@ -206,22 +234,22 @@ async function start() {
   const cache = createCache({ dir: path.join(userData, 'cache') });
   const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log });
 
-  // Give the shipped source demo a writable project directory in installed builds.
-  let demoDir = path.join(ROOT, 'mod', 'godot', 'demo');
-  if (app.isPackaged) {
-    const shipped = path.join(ROOT + '.unpacked', 'mod', 'godot', 'demo');
-    demoDir = path.join(userData, 'godot-demo');
-    fs.mkdirSync(demoDir, { recursive: true });
-    for (const file of ['project.godot', 'demo.tscn', 'demo.gd', 'dubgame.gd']) {
-      fs.copyFileSync(path.join(shipped, file), path.join(demoDir, file));
-    }
-  }
+  gameTracker = createGameWindowTracker({
+    onFrame: (frame) => {
+      if (!frame || !gameFrame || frame.gameId !== gameFrame.gameId) overlayOffset = null;
+      gameFrame = frame;
+      syncOverlay();
+    },
+    onError: (message) => emit('app:status', { level: 'warn', message }),
+  });
 
   const games = createGames({
     userData,
     modDir: path.join(ROOT, 'mod'),
-    // Godot is a separate process and cannot read Electron's virtual app.asar paths.
-    demoDir,
+    onLaunch: (game, pid) => {
+      overlayWanted = false;
+      gameTracker.start(game, pid);
+    },
     pickGodot: async () => {
       const result = await dialog.showOpenDialog(mainWindow, {
         title: 'Select the Godot 4 executable (not your game)',
@@ -303,6 +331,9 @@ if (!app.requestSingleInstanceLock()) {
     dialog.showErrorBox('dub.game could not start', String(e && e.stack ? e.stack : e));
     app.quit();
   });
-  app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on('will-quit', () => {
+    if (gameTracker) gameTracker.stop();
+    globalShortcut.unregisterAll();
+  });
   app.on('window-all-closed', () => app.quit());
 }

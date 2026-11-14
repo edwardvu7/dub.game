@@ -44,8 +44,8 @@ function createGames(opts) {
 
   function decorate(game) {
     if (game.engine === 'godot') {
-      return { ...game, voiceMode: game.builtin ? 'integrated' : 'external',
-        enabled: !!game.builtin, hookInstalled: false };
+      return { ...game, voiceMode: 'external',
+        enabled: false, hookInstalled: false };
     }
     const enabled = state.isEnabled(game.appid);
     let hookInstalled = install.isHookInstalled(game);
@@ -66,13 +66,7 @@ function createGames(opts) {
       const g = scan.scanFolder(dir);
       if (g) local.push(g);
     }
-    const demo = opts.demoDir && scan.scanFolder(opts.demoDir);
-    if (demo) {
-      demo.name = 'dub.game Godot Demo';
-      demo.builtin = true;
-    }
-    cache = [...new Map([...steamGames, ...local, ...(demo ? [demo] : [])]
-      .map((g) => [g.appid, g])).values()];
+    cache = [...new Map([...steamGames, ...local].map((g) => [g.appid, g])).values()];
     generation++;
     checkTagsInBackground();
     return visible();
@@ -131,7 +125,7 @@ function createGames(opts) {
       }
       try {
         return await launchGame(game, { shell: opts.shell, spawn: opts.spawn,
-          platform: opts.platform, godotExecutable });
+          platform: opts.platform, godotExecutable, onLaunch: opts.onLaunch });
       } catch (error) {
         if (godotExecutable) state.setGodotExecutable('');
         throw error;

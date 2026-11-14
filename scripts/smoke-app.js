@@ -76,12 +76,12 @@ class FakeWebContents extends EventEmitter {
   toggleDevTools() {}
 }
 class FakeWindow extends EventEmitter {
-  constructor(opts) { super(); this.opts = opts; this.visible = false; this.webContents = new FakeWebContents(this); windows.push(this); }
+  constructor(opts) { super(); this.opts = opts; this.bounds = { x: opts.x, y: opts.y, width: opts.width, height: opts.height }; this.visible = false; this.focused = false; this.webContents = new FakeWebContents(this); windows.push(this); }
   loadFile(f) { this.file = f; this.webContents.url = 'file://' + f; setImmediate(() => { this.emit('ready-to-show'); this.webContents.emit('did-finish-load'); }); return Promise.resolve(); }
-  show() { this.visible = true; } hide() { this.visible = false; } isVisible() { return this.visible; }
+  show() { this.visible = true; } showInactive() { this.visible = true; } isFocused() { return this.focused; } hide() { this.visible = false; this.focused = false; } isVisible() { return this.visible; }
   isDestroyed() { return false; } isMinimized() { return false; } restore() {}
   setAlwaysOnTop() {} setIgnoreMouseEvents() {} setVisibleOnAllWorkspaces() {}
-  setBounds(b) { this.bounds = b; } getBounds() { return this.bounds; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() {}
+  setBounds(b) { this.bounds = b; } getBounds() { return this.bounds; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() { this.focused = true; }
 }
 const displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }, { workArea: { x: 1920, y: 0, width: 2560, height: 1400 } }];
 let cursor = { x: 100, y: 100 };
@@ -117,6 +117,14 @@ const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (req, ...rest) { return req === 'electron' ? 'electron' : origResolve.call(this, req, ...rest); };
 require.cache.electron = { id: 'electron', filename: 'electron', loaded: true, exports: electron };
 
+let trackerCallbacks;
+const trackerFile = path.join(REPO, 'main', 'game-window.js');
+require.cache[trackerFile] = { id: trackerFile, filename: trackerFile, loaded: true, exports: {
+  createGameWindowTracker: (opts) => { trackerCallbacks = opts; return {
+    start: () => opts.onFrame(null), stop: () => opts.onFrame(null),
+  }; },
+} };
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const post = (p, body) => new Promise((resolve, reject) => {
   const data = JSON.stringify(body);
@@ -148,29 +156,41 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   const allowedInvoke = (preload.match(/const INVOKE = \[([\s\S]*?)\]/)[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
   check(allowedInvoke.every((c) => handlers[c]), 'every preload invoke channel has an ipcMain handler (' + allowedInvoke.length + ')');
 
-  // 3. Hotkey toggles the overlay
+  // 3. Hotkey is tied to the tracked game, never the cursor's monitor.
   check(typeof shortcuts['Shift+F2'] === 'function', 'Shift+F2 is registered');
   shortcuts['Shift+F2']();
-  check(overlay.visible && events('overlay:toggle').length === 1, 'Shift+F2 shows the overlay and tells it to refresh');
-  check(overlay.bounds && overlay.bounds.x === 16 && overlay.bounds.width === 340 && overlay.bounds.height === 600 && overlay.bounds.y === 220, 'overlay is a compact panel at the left edge of the screen in use');
+  check(!overlay.visible, 'overlay stays hidden without a tracked game');
+  let frame = { x: -1920, y: -100, width: 1920, height: 1080,
+    focused: true, minimized: false, gameId: '424242' };
+  trackerCallbacks.onFrame(frame);
   shortcuts['Shift+F2']();
-  check(!overlay.visible, 'Shift+F2 again hides it');
-  cursor = { x: 3000, y: 500 }; // the game is on the second monitor
+  check(overlay.visible && events('overlay:toggle').length === 1, 'hotkey shows overlay over tracked game');
+  check(overlay.bounds.x === -1904 && overlay.bounds.y === 140, 'negative monitor origin is respected');
+  cursor = { x: 3000, y: 500 };
+  trackerCallbacks.onFrame(frame);
+  check(overlay.bounds.x === -1904, 'moving cursor to another monitor does not move overlay');
+  let prevented = false;
+  overlay.emit('will-move', { preventDefault: () => { prevented = true; } },
+    { x: 5000, y: 5000, width: 340, height: 600 });
+  check(prevented && overlay.bounds.x === -340 && overlay.bounds.y === 380, 'drag stays inside game bounds');
+  frame = { ...frame, x: 100, y: 50, width: 250, height: 200 };
+  trackerCallbacks.onFrame(frame);
+  check(overlay.bounds.x === 100 && overlay.bounds.y === 50 && overlay.bounds.width === 250 && overlay.bounds.height === 200,
+    'overlay follows and shrinks to a smaller game window');
+  overlay.focused = false;
+  trackerCallbacks.onFrame({ ...frame, focused: false });
+  check(!overlay.visible, 'Alt+Tab hides overlay');
+  trackerCallbacks.onFrame(frame);
+  check(overlay.visible && !overlay.focused, 'returning to game restores overlay without stealing focus');
+  trackerCallbacks.onFrame({ ...frame, minimized: true });
+  check(!overlay.visible, 'minimized game hides overlay');
+  trackerCallbacks.onFrame(frame);
   shortcuts['Shift+F2']();
-  check(overlay.bounds.x === 1920 + 16 && overlay.bounds.y === 400, 'overlay follows the game to a second monitor');
-  check(overlay.opts.movable === true, 'overlay can be dragged');
-  overlay.bounds = { ...overlay.bounds, x: 1920 + 900, y: 150 }; // the player drags it
-  overlay.emit('move');
-  await wait(400);
-  shortcuts['Shift+F2']();
-  shortcuts['Shift+F2']();
-  check(overlay.bounds.x === 1920 + 900 && overlay.bounds.y === 150, 'overlay reopens where the player dragged it');
-  shortcuts['Shift+F2']();
-  cursor = { x: 100, y: 100 };
-  shortcuts['Shift+F2']();
-  check(overlay.bounds.x === 16 && overlay.bounds.y === 220, 'on a screen it was never dragged on, it starts at the left edge');
-  shortcuts['Shift+F2']();
-  check(fs.existsSync(path.join(tmp, 'userData', 'overlay-position.json')), 'dragged position is saved to userData');
+  trackerCallbacks.onFrame(frame);
+  check(!overlay.visible, 'explicit toggle off stays off');
+  trackerCallbacks.onFrame(null);
+  check(!overlay.visible, 'game exit hides overlay');
+  check(fs.existsSync(path.join(tmp, 'userData', 'overlay-position.json')), 'game-relative drag position is saved');
   overlay.webContents.emit('render-process-gone');
   check(overlay.reloaded === 1, 'a crashed overlay page reloads itself');
 

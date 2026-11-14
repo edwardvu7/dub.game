@@ -29,20 +29,20 @@ test('Godot source project is detected without a pck', () => {
   assert.equal(game.support, 'launch');
 });
 
-test('bundled demo appears once, picks Godot once and never writes an injection hook', async () => {
+test('no demo is injected; added project picks Godot once and never writes a hook', async () => {
   const dir = project();
   const userData = tmpDir();
   const exe = path.join(tmpDir(), 'Godot 4.exe');
   write(exe);
   const calls = [];
   let picks = 0;
-  const opts = { userData, steamPath: tmpDir(), demoDir: dir, platform: 'win32',
+  const opts = { userData, steamPath: tmpDir(), platform: 'win32',
     pickFolder: async () => dir, pickGodot: async () => { picks++; return exe; }, spawn: fakeSpawn(calls) };
   const games = createGames(opts);
-  const [game] = await games.list();
-  assert.equal(game.name, 'dub.game Godot Demo');
-  assert.equal(game.voiceMode, 'integrated');
-  assert.equal(L.gameStatus(game), 'integrated');
+  assert.deepEqual(await games.list(), []);
+  const [game] = await games.addFolder();
+  assert.equal(game.voiceMode, 'external');
+  assert.equal(L.gameStatus(game), 'launch');
   assert.equal((await games.addFolder()).length, 1);
   await games.launch({ appid: game.appid });
   await createGames(opts).launch({ appid: game.appid });
@@ -84,4 +84,22 @@ test('Linux Godot binary is executed directly, not passed to sh', async () => {
   const calls = [];
   await launchGame(scanFolder(dir), { platform: 'linux', spawn: fakeSpawn(calls) });
   assert.deepEqual(calls, [{ cmd: path.join(dir, 'Story.x86_64'), args: [] }]);
+});
+
+test('source launch passes the spawned PID to game-window tracking', async () => {
+  const game = scanFolder(project());
+  const calls = [];
+  let tracked;
+  await launchGame(game, { godotExecutable: '/godot', spawn: (cmd, args) => {
+    const child = fakeSpawn(calls)(cmd, args); child.pid = 321; return child;
+  }, onLaunch: (g, pid) => { tracked = { game: g, pid }; } });
+  assert.equal(tracked.game.appid, game.appid);
+  assert.equal(tracked.pid, 321);
+});
+
+test('Steam launch tracks the install directory without guessing a process id', async () => {
+  const game = { appid: '123', installDir: '/games/story' };
+  let tracked;
+  await launchGame(game, { shell: { openExternal: async () => {} }, onLaunch: (g, pid) => { tracked = [g, pid]; } });
+  assert.deepEqual(tracked, [game, 0]);
 });
