@@ -88,3 +88,15 @@ test('server: game id is passed on for per-game voices, and optional', () => {
   assert.equal(normalizeLine({ text: 'Hi', game: 42 }).game, undefined);
   assert.equal(normalizeCharacters({ game: 'godot:X', characters: [] }).game, 'godot:X');
 });
+
+test('server: hook diagnostics are bounded and malformed reports rejected', async () => {
+  const reports = [];
+  await withServer({ onGodotHook: x => reports.push(x) }, async base => {
+    assert.equal((await post(base + '/godot/hook', { labels: [] })).status, 400);
+    assert.equal((await post(base + '/godot/hook', { appid: 'x', token: 't', labels:
+      Array.from({ length: 90 }, () => ({ path: '/root/X', text: 'a'.repeat(500), candidate: true })) })).status, 204);
+    await tick();
+  });
+  assert.equal(reports[0].labels.length, 80);
+  assert.equal(reports[0].labels[0].text.length, 120);
+});

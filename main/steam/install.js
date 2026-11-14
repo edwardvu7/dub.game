@@ -2,19 +2,17 @@
 // Copies the hook into a game (the "injection") and removes it again. Nothing else is touched.
 const fs = require('node:fs');
 const path = require('node:path');
+const godot = require('./godot-hook');
 const { detectEngine } = require('./detect');
 
 const DEFAULT_MOD_DIR = path.join(__dirname, '..', '..', 'mod');
-const GODOT_MARKER = 'DUBGAME_MARKER';
 
 // Files per engine: [source inside mod/, file name in the game].
 const HOOK_FILES = {
   renpy: [['renpy/dubgame.rpy', 'dubgame.rpy']],
-  // UNVERIFIED: Godot adapter is beta and has not been run against a real game.
-  godot: [['godot/override.cfg', 'override.cfg'], ['godot/dubgame.gd', 'dubgame.gd']],
 };
 // Compiled leftovers Ren'Py writes next to the hook.
-const EXTRA_REMOVE = { renpy: ['dubgame.rpyc', 'dubgame.rpyb'], godot: [] };
+const EXTRA_REMOVE = { renpy: ['dubgame.rpyc', 'dubgame.rpyb'] };
 
 function hookDirFor(game) {
   const detected = detectEngine(game.installDir);
@@ -41,6 +39,7 @@ function friendly(err, dir, action) {
 }
 
 function isHookInstalled(game) {
+  if (game.engine === 'godot') return godot.isInstalled(game);
   const files = HOOK_FILES[game.engine];
   if (!files) return false;
   const dir = hookDirFor(game);
@@ -49,6 +48,7 @@ function isHookInstalled(game) {
 
 /** True when the installed hook differs from the one shipped with this build. */
 function isHookOutdated(game, opts = {}) {
+  if (game.engine === 'godot') return godot.isOutdated(game, opts);
   const files = HOOK_FILES[game.engine];
   if (!files) return false;
   const modDir = opts.modDir || DEFAULT_MOD_DIR;
@@ -60,18 +60,12 @@ function isHookOutdated(game, opts = {}) {
 }
 
 function installHook(game, opts = {}) {
+  if (game.engine === 'godot') return godot.install(game, opts);
   const files = HOOK_FILES[game.engine];
   if (!files) throw new Error(`No dub.game hook for engine "${game.engine}".`);
   const modDir = opts.modDir || DEFAULT_MOD_DIR;
   const dir = hookDirFor(game);
   try {
-    if (game.engine === 'godot') {
-      const existing = path.join(dir, 'override.cfg');
-      if (fs.existsSync(existing) && !fs.readFileSync(existing, 'utf8').includes(GODOT_MARKER)) {
-        throw new Error(`This game already has its own override.cfg in:\n${dir}\n` +
-          'dub.game will not overwrite it.');
-      }
-    }
     for (const [src, name] of files) {
       // read + write (not copyFile) so it also works from inside a packaged app.asar
       fs.writeFileSync(path.join(dir, name), fs.readFileSync(path.join(modDir, src)));
@@ -83,6 +77,7 @@ function installHook(game, opts = {}) {
 }
 
 function uninstallHook(game) {
+  if (game.engine === 'godot') return godot.uninstall(game);
   const files = HOOK_FILES[game.engine];
   if (!files) return true;
   const dir = hookDirFor(game);
@@ -90,9 +85,6 @@ function uninstallHook(game) {
     for (const [, name] of files) {
       const target = path.join(dir, name);
       if (!fs.existsSync(target)) continue;
-      if (name === 'override.cfg' && !fs.readFileSync(target, 'utf8').includes(GODOT_MARKER)) {
-        continue; // not ours
-      }
       fs.unlinkSync(target);
     }
     for (const name of EXTRA_REMOVE[game.engine] || []) {

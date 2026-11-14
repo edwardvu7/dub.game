@@ -18,7 +18,8 @@
     "pack": "electron-builder --dir",
     "smoke": "node scripts/smoke-app.js",
     "smoke:hook": "python scripts/smoke-hook.py",
-    "smoke:godot": "node scripts/smoke-godot.js"
+    "smoke:godot": "node scripts/smoke-godot.js",
+    "smoke:godot-generic": "node scripts/smoke-godot-generic.js"
   },
   "devDependencies": {
     "electron": "^45.3.2",

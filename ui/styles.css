@@ -330,3 +330,7 @@ body.overlay { background: transparent; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
   .is-playing .meter i, .meter.is-playing i { height: 14px; }
 }
+
+.godot-diagnostics { margin-top: 12px; font-size: 12px; }
+.godot-diagnostics select { display: block; width: 100%; margin: 6px 0 10px; }
+.godot-diagnostics p { overflow-wrap: anywhere; }

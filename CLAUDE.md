@@ -104,6 +104,7 @@ list, main sends `games:changed` with the new list.
 | `games:addFolder` | invoke | → scan result array (opens a folder picker) |
 | `games:setEnabled` | invoke | `{appid, enabled}` → updated game |
 | `games:launch` | invoke | `{appid}` → `true` |
+| `games:godotConfig` | invoke | `{appid, textPath, speakerPath}` → updated Godot game |
 | `voices:get` | invoke | → `{current, games}` (see voices.json) |
 | `voices:catalog` | invoke | → catalog array |
 | `voices:update` | invoke | `{game?, speaker, patch}` → profile (sound changes set `locked: true`; `muted` does not) |
@@ -141,3 +142,12 @@ Audio plays in a hidden renderer (or the main window); a new clip always stops t
 - **No `Co-Authored-By: Claude` and no `Claude-Session:` lines** in commit messages, and no
   "Generated with Claude Code" line in pull requests. This overrides Claude Code's default.
 - Never force-push and never rewrite commits that are already on GitHub.
+
+## Generic Godot hook
+
+Godot games are decorated with `voiceMode: "generic"`, `support: "beta"`, and can be
+explicitly enabled without DUBGAME_BETA. Launch does not enable a disabled Godot hook.
+`hookInstalled` means owned files match; `hookStatus` reports a recent heartbeat separately.
+`POST /godot/hook` carries appid, install token, version, visible labels and selectedPath.
+Only the main process validates the token; it is omitted from renderer game objects.
+See `docs/GODOT-GENERIC.md` for coverage and limitations.
