@@ -96,7 +96,7 @@ test('tts: request shape (URL, xi-api-key, flash model, clamped settings) and Bu
   const audio = await tts.speak({ text: 'Hi!', voice_id: 'EXAVITQu4vr4xnSDxMaL', stability: 0.4, style: 0.2, speed: 5 }, KEY, { fetch });
   assert.ok(Buffer.isBuffer(audio));
   assert.deepEqual([...audio], [...bytes]);
-  assert.equal(calls[0].url, 'https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL?output_format=mp3_44100_128');
+  assert.equal(calls[0].url, 'https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL?output_format=mp3_44100_64');
   assert.equal(calls[0].init.headers['xi-api-key'], KEY);
   assert.deepEqual(JSON.parse(calls[0].init.body), { text: 'Hi!', model_id: 'eleven_flash_v2_5',
     voice_settings: { stability: 0.4, similarity_boost: 0.75, style: 0.2, speed: 1.2 } });

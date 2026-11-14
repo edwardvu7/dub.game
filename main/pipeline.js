@@ -7,6 +7,7 @@ const profiler = require('./profiler');
 const NARRATOR = 'Narrator';
 const UNKNOWN = 'unknown';
 const RESTART_GAP_MS = 3000; // a game restart takes longer than this
+const SETTLE_MS = 150; // a line the player skips faster than this is never paid for
 
 /**
  * createPipeline({voices, settings, catalog, cache, emit, usage?, gameName?, speak?,
@@ -19,6 +20,8 @@ const RESTART_GAP_MS = 3000; // a game restart takes longer than this
 function createPipeline(deps) {
   const { voices: store, settings, catalog, cache, emit } = deps;
   const usage = deps.usage || null;
+  const settleMs = deps.settleMs === undefined ? SETTLE_MS : deps.settleMs;
+  const speaking = new Map(); // cache key -> Promise<audio>: the same line is never bought twice at once
   const gameName = deps.gameName || (() => null);
   const speak = deps.speak || ttsModule.speak;
   const profileOne = deps.profileCharacter || profiler.profileCharacter;
@@ -115,15 +118,20 @@ function createPipeline(deps) {
     const params = ttsParams(profile, text);
     const cached = cache.get(params);
     if (cached) { if (usage) usage.recordCached(); return cached; }
+    const id = cache.key(params);
+    if (speaking.has(id)) return speaking.get(id);
     const key = settings.getKey('elevenlabs');
     if (!key) throw new Error('No ElevenLabs key: lines are received but not spoken. Add one in Settings.');
     if (usage && usage.wouldExceed(text.length)) {
       throw new Error('Monthly character limit reached: new lines are not spoken. Raise it in Settings.');
     }
-    const audio = await speak(params, key);
-    cache.put(params, audio);
-    if (usage) usage.recordSpeech(text.length, game);
-    return audio;
+    const work = speak(params, key).then((audio) => {
+      cache.put(params, audio);
+      if (usage) usage.recordSpeech(text.length, game);
+      return audio;
+    });
+    speaking.set(id, work);
+    try { return await work; } finally { speaking.delete(id); }
   }
 
   const play = (speaker, text, audio) =>
@@ -151,6 +159,12 @@ function createPipeline(deps) {
       try {
         const profile = await ensureProfile(voices, speaker, samplesOf(game, speaker));
         if (profile && profile.muted) { emit('audio:stop'); return; } // muted in the overlay: free
+        // Lines already on disk play at once. A new line waits a moment: if the player has
+        // clicked past it by then, it is never sent to ElevenLabs.
+        if (settleMs && !cache.get(ttsParams(profile, text))) {
+          await new Promise((r) => setTimeout(r, settleMs));
+          if (mine !== generation) return;
+        }
         const audio = await synthesize(profile, text, game);
         if (mine === generation) play(speaker, text, audio); // newest line wins
       } catch (e) {

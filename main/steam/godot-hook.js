@@ -21,6 +21,28 @@ function record(game) {
 function config(game) {
   try { return JSON.parse(fs.readFileSync(target(game, CONFIG), 'utf8')); } catch { return null; }
 }
+/**
+ * Godot major version of a resource pack: a .pck file, or an executable with the pack embedded
+ * (Godot ends such a file with the pack's size and the letters GDPC). null when it is neither.
+ * UNVERIFIED: the embedded layout comes from Godot's source, not from a real embedded game.
+ */
+function packMajor(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const at = (pos) => { const b = Buffer.alloc(16); return fs.readSync(fd, b, 0, 16, pos) === 16 ? b : null; };
+    let head = at(0);
+    if (!head || head.toString('ascii', 0, 4) !== 'GDPC') {
+      const size = fs.fstatSync(fd).size;
+      const tail = size >= 28 ? at(size - 16) : null;
+      if (!tail || tail.toString('ascii', 12, 16) !== 'GDPC') return null;
+      const start = size - 12 - Number(tail.readBigUInt64LE(4));
+      head = start >= 0 ? at(start) : null;
+      if (!head || head.toString('ascii', 0, 4) !== 'GDPC') return null;
+    }
+    return head.readUInt32LE(8);
+  } catch { return null; } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
 function verifyVersion(game) {
   const project = read(target(game, 'project.godot'));
   if (project) {
@@ -28,14 +50,10 @@ function verifyVersion(game) {
     if (/^DubGame\s*=/m.test(project.toString())) throw new Error('This project already has a DubGame autoload. Use its source integration instead of installing a second hook.');
     return;
   }
-  const packs = fs.readdirSync(game.installDir).filter(n => /\.pck$/i.test(n));
-  const versions = packs.map(n => {
-    const fd = fs.openSync(target(game, n), 'r');
-    try { const b = Buffer.alloc(16); return fs.readSync(fd, b, 0, 16, 0) === 16 && b.toString('ascii', 0, 4) === 'GDPC' ? b.readUInt32LE(8) : null; }
-    finally { fs.closeSync(fd); }
-  });
+  const versions = fs.readdirSync(game.installDir).filter(n => /\.(pck|exe|x86_64)$/i.test(n))
+    .map(n => packMajor(target(game, n)));
   if (!versions.includes(4) || versions.some(v => v !== null && v !== 4)) {
-    throw new Error('Could not verify a Godot 4 resource pack. Godot 3 and embedded-only packs are not supported by this hook.');
+    throw new Error('Could not verify a Godot 4 resource pack. Godot 3 games are not supported by this hook.');
   }
 }
 function isInstalled(game) {
@@ -112,5 +130,5 @@ function configure(game, patch) {
   } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
   return { textPath: c.textPath, speakerPath: c.speakerPath };
 }
-module.exports = { install, uninstall, isInstalled, isOutdated, config, configure, verifyVersion,
+module.exports = { install, uninstall, isInstalled, isOutdated, config, configure, verifyVersion, packMajor,
   SCRIPT, CONFIG, RECORD, MARKER };

@@ -2,7 +2,7 @@
 // ElevenLabs text-to-speech. Runs in the main process only; the key never leaves it.
 const API = 'https://api.elevenlabs.io';
 const MODEL = 'eleven_flash_v2_5'; // fastest model
-const OUTPUT_FORMAT = 'mp3_44100_128';
+const OUTPUT_FORMAT = 'mp3_44100_64'; // speech: half the download and cache of 128 kbps
 const MIME = 'audio/mpeg';
 
 const clamp = (n, lo, hi, dflt) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : dflt);

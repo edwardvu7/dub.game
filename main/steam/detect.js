@@ -2,6 +2,7 @@
 // Engine detection from files on disk. Compatibility is decided by engine, never by store tags.
 const fs = require('node:fs');
 const path = require('node:path');
+const { packMajor } = require('./godot-hook');
 
 function ls(dir) {
   try { return fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
@@ -53,8 +54,9 @@ function detectEngine(installDir) {
   const names = entries.map((e) => e.name);
 
   // UNVERIFIED: the signatures below come from general knowledge, not a real Steam install.
-  if (names.some((n) => /\.pck$/i.test(n))) {
-    // Games that embed the pack inside the exe are not detected.
+  // A .pck beside the exe, or a pack embedded inside it.
+  if (names.some((n) => /\.pck$/i.test(n)) || names.some((n) => /\.(exe|x86_64)$/i.test(n) &&
+      packMajor(path.join(installDir, n)) !== null)) {
     return { engine: 'godot', support: 'beta', hookDir: installDir };
   }
   if (isFile(path.join(installDir, 'www', 'js', 'rpg_core.js')) ||

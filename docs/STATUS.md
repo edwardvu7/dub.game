@@ -81,5 +81,10 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 - Fixed: text boxes named Bubble/Balloon/TextBox are found automatically, and a node the player picks
   once keeps matching when the game re-creates it under an engine-numbered name (`@VBoxContainer@5`).
   `npm run smoke:godot-generic` (needs `GODOT_BIN`) covers both.
-- UNVERIFIED on Until Then itself: its node names are unknown, text drawn without Label/RichTextLabel
-  nodes cannot be read, and a game with the pack embedded in the .exe is not detected.
+- UNVERIFIED on Until Then itself: its node names are unknown, and text drawn without Label/RichTextLabel
+  nodes cannot be read. Games with the pack embedded in the .exe are now detected (UNVERIFIED on a real one).
+
+## Cost and first run (0.1.2)
+- Audio is 64 kbps. A new line waits 150 ms before ElevenLabs is called, so lines the player skips are
+  not paid for; cached lines play at once. The same line requested twice at once is bought once.
+- First launch: Settings opens with a welcome title; when the second key tests OK the app moves to Games.

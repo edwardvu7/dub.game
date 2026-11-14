@@ -22,7 +22,7 @@ function rig(over = {}) {
   const voices = store.forGame('unknown'); // lines without a game land here
   const cache = createCache({ dir: path.join(dir, 'cache') });
   const pipeline = createPipeline({
-    voices: store, cache, catalog, usage: over.usage,
+    voices: store, cache, catalog, usage: over.usage, settleMs: over.settleMs || 0,
     settings: { getKey: (p) => keys[p], narration: () => state.narration },
     emit: (channel, payload) => events.push({ channel, payload }),
     speak: over.speak || (async (params, key) => { calls.speak.push({ params, key }); return Buffer.from('mp3:' + params.text); }),
@@ -278,4 +278,33 @@ test('usage: a cached line notifies the window but does not rewrite usage.json',
   usage.recordCached();
   assert.equal(seen, 1);
   assert.equal(fs.existsSync(file), false);
+});
+
+test('cost: a line skipped before it settles is never sent to ElevenLabs; cached lines play at once', async () => {
+  const r = rig({ settleMs: 40 });
+  const skipped = r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Skipped.', seq: 1 });
+  await new Promise((res) => setTimeout(res, 5));
+  r.pipeline.handleStop({ seq: 1 }); // the player clicked past it
+  await skipped;
+  assert.equal(r.calls.speak.length, 0);
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Read.', seq: 2 });
+  assert.equal(r.calls.speak.length, 1);
+  const t = Date.now();
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Read.', seq: 3 });
+  assert.ok(Date.now() - t < 30, 'a cached line does not wait');
+  assert.equal(r.of('audio:play').length, 2);
+});
+
+test('cost: the same line arriving twice at once is bought once', async () => {
+  let release;
+  const gate = new Promise((res) => { release = res; });
+  const calls = [];
+  const r = rig({ speak: async (params) => { calls.push(params.text); await gate; return Buffer.from('mp3'); } });
+  r.voices.setAuto(profileFor('Sylvie'));
+  const a = r.pipeline.preview({ game: 'unknown', speaker: 'Sylvie', text: 'Same line.' });
+  const b = r.pipeline.preview({ game: 'unknown', speaker: 'Sylvie', text: 'Same line.' });
+  await new Promise((res) => setTimeout(res, 5));
+  release();
+  await Promise.all([a, b]);
+  assert.deepEqual(calls, ['Same line.']);
 });

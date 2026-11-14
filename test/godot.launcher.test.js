@@ -104,3 +104,20 @@ test('Steam launch tracks the install directory without guessing a process id', 
   await launchGame(game, { shell: { openExternal: async () => {} }, onLaunch: (g, pid) => { tracked = [g, pid]; } });
   assert.deepEqual(tracked, [game, 0]);
 });
+
+test('godot: a pack embedded in the exe is detected and its version read', () => {
+  const fs = require('node:fs'); const path = require('node:path');
+  const { packMajor } = require('../main/steam/godot-hook');
+  const { detectEngine } = require('../main/steam/detect');
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'dub-embedded-'));
+  const pack = Buffer.alloc(64); pack.write('GDPC', 0, 'ascii'); pack.writeUInt32LE(2, 4); pack.writeUInt32LE(4, 8);
+  const tail = Buffer.alloc(12); tail.writeBigUInt64LE(BigInt(pack.length), 0); tail.write('GDPC', 8, 'ascii');
+  fs.writeFileSync(path.join(dir, 'Game.exe'), Buffer.concat([Buffer.alloc(300, 1), pack, tail]));
+  fs.writeFileSync(path.join(dir, 'crash.exe'), Buffer.alloc(300, 1));
+  assert.equal(packMajor(path.join(dir, 'Game.exe')), 4);
+  assert.equal(packMajor(path.join(dir, 'crash.exe')), null);
+  assert.equal(packMajor(path.join(dir, 'missing.exe')), null);
+  assert.equal(detectEngine(dir).engine, 'godot');
+  fs.rmSync(path.join(dir, 'Game.exe'));
+  assert.equal(detectEngine(dir), null, 'an ordinary exe is not a Godot game');
+});

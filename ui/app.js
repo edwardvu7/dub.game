@@ -408,6 +408,8 @@
     $('opt-narration').checked = !!settings.narration;
     $('opt-clipboard').checked = !!settings.clipboardMode;
     $('settings-flag').hidden = !L.needsSetup(settings);
+    // First launch opens here, so say why: nothing can speak until both keys are in.
+    $('settings-title').textContent = L.needsSetup(settings) ? 'Welcome. Add two keys to start' : 'Settings';
   }
 
   function showResult(form, tone, text) {
@@ -424,8 +426,10 @@
       const r = await dub.invoke('settings:test', { provider: form.dataset.provider });
       if (r && r.ok) showResult(form, 'ok', 'Works. This service is ready.');
       else showResult(form, 'bad', (r && r.error) || 'The test failed.');
+      return !!(r && r.ok);
     } catch (e) {
       showResult(form, 'bad', L.errorText(e));
+      return false;
     } finally {
       button.disabled = !settings || !settings[HAS[form.dataset.provider]];
     }
@@ -438,9 +442,14 @@
       const key = form.elements.key.value.trim();
       if (!key) { showResult(form, 'bad', 'Paste a key first.'); form.elements.key.focus(); return; }
       try {
+        const firstRun = L.needsSetup(settings);
         paintSettings(await dub.invoke('settings:setKeys', { [provider]: key }));
         form.elements.key.value = ''; // the key never stays in the page
-        await testKey(form);           // saving without knowing it works helps nobody
+        const works = await testKey(form); // saving without knowing it works helps nobody
+        if (firstRun && works && !L.needsSetup(settings)) {
+          toast('Both keys work. Pick a game and click Launch.', 'note');
+          showView('games');
+        }
       } catch (err) {
         showResult(form, 'bad', L.errorText(err));
       }
