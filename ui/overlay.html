@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>dub.game overlay</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="overlay">
+  <aside class="panel" aria-label="Voice tuning">
+    <header class="panel-head">
+      <div class="wordmark" aria-label="dub.game">dub<span class="wordmark-dot">.</span>game</div>
+      <button class="btn btn-quiet" id="overlay-close" type="button" title="Shift + F2 or Esc">Hide</button>
+    </header>
+
+    <section class="heard" aria-live="polite">
+      <div class="meter" id="heard-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="heard-text">
+        <span class="now-speaker" id="heard-speaker">Waiting for a line</span>
+        <span class="now-line" id="heard-line">Advance the dialogue and the speaker shows up here.</span>
+      </div>
+    </section>
+
+    <div class="panel-scroll">
+      <div id="cards-host"></div>
+    </div>
+
+    <p class="panel-error" id="overlay-error" role="alert" hidden></p>
+    <footer class="panel-foot">Changes apply to the next line. Your picks are never overwritten.</footer>
+  </aside>
+
+  <script src="fake-dub.js"></script>
+  <script src="lib.js"></script>
+  <script src="cards.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.cloudflare.steamstatic.com https://cdn.akamai.steamstatic.com https://shared.cloudflare.steamstatic.com; media-src blob:; base-uri 'none'; form-action 'none'">
+  <title>dub.game</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="app">
+  <nav class="rail" aria-label="Sections">
+    <div class="wordmark" aria-label="dub.game">dub<span class="wordmark-dot">.</span>game</div>
+    <div class="tabs" role="tablist" aria-orientation="vertical">
+      <button class="tab" role="tab" id="tab-games" aria-controls="view-games" aria-selected="true" data-view="games">Games</button>
+      <button class="tab" role="tab" id="tab-voices" aria-controls="view-voices" aria-selected="false" data-view="voices" tabindex="-1">Voices</button>
+      <button class="tab" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" data-view="settings" tabindex="-1">Settings<span class="tab-flag" id="settings-flag" hidden>Needs keys</span></button>
+    </div>
+    <p class="rail-note">Press <kbd>Shift</kbd> + <kbd>F2</kbd> in a game to tune voices without leaving it.</p>
+  </nav>
+
+  <main class="stage">
+    <section class="view" id="view-games" role="tabpanel" aria-labelledby="tab-games">
+      <header class="view-head">
+        <div>
+          <h1>Games</h1>
+          <p class="lede" id="games-summary">Looking through your Steam library.</p>
+        </div>
+        <div class="view-tools">
+          <input class="search" id="games-search" type="search" placeholder="Filter games" aria-label="Filter games" hidden>
+          <button class="btn btn-quiet" id="games-add" type="button">Add game folder</button>
+          <button class="btn" id="games-rescan" type="button">Rescan</button>
+        </div>
+      </header>
+      <div class="games" id="games" aria-live="polite"></div>
+      <div class="blank" id="games-empty" hidden>
+        <h2>No supported games found</h2>
+        <p>dub.game lists Steam games built with Ren'Py. If yours is installed outside Steam, or from itch.io, point to its folder.</p>
+        <button class="btn btn-primary" id="games-add-empty" type="button">Add game folder</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-voices" role="tabpanel" aria-labelledby="tab-voices" hidden>
+      <header class="view-head">
+        <div>
+          <h1>Voices</h1>
+          <p class="lede">Every character dub.game has heard. Change a voice and the next line uses it.</p>
+        </div>
+      </header>
+      <div id="cards-host"></div>
+    </section>
+
+    <section class="view" id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <header class="view-head">
+        <div>
+          <h1>Settings</h1>
+          <p class="lede">dub.game speaks with your own ElevenLabs and Gemini accounts. Keys are encrypted on this computer and never leave it.</p>
+        </div>
+      </header>
+
+      <ol class="guide">
+        <li>Click <b>Get a key</b> and create a key on each site. Both have a free plan.</li>
+        <li>Paste each key here and click <b>Save</b>.</li>
+        <li>Click <b>Test</b>. A green check means that service is ready.</li>
+      </ol>
+
+      <form class="keyrow" data-provider="elevenlabs" autocomplete="off">
+        <div class="keyrow-head">
+          <h2>ElevenLabs</h2>
+          <span class="tag" data-role="state"></span>
+        </div>
+        <p class="keyrow-what">Speaks every line. On the site: Developers, then API Keys.</p>
+        <div class="keyrow-controls">
+          <input class="input" type="password" name="key" aria-label="ElevenLabs API key" spellcheck="false" autocomplete="off">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <button class="btn" type="button" data-role="test">Test</button>
+          <a class="btn btn-quiet" href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">Get a key</a>
+          <button class="btn btn-quiet" type="button" data-role="remove" hidden>Remove</button>
+        </div>
+        <p class="keyrow-result" data-role="result" role="status"></p>
+      </form>
+
+      <form class="keyrow" data-provider="gemini" autocomplete="off">
+        <div class="keyrow-head">
+          <h2>Gemini</h2>
+          <span class="tag" data-role="state"></span>
+        </div>
+        <p class="keyrow-what">Picks a voice for each new character, once. Keys come from Google AI Studio.</p>
+        <div class="keyrow-controls">
+          <input class="input" type="password" name="key" aria-label="Gemini API key" spellcheck="false" autocomplete="off">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <button class="btn" type="button" data-role="test">Test</button>
+          <a class="btn btn-quiet" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key</a>
+          <button class="btn btn-quiet" type="button" data-role="remove" hidden>Remove</button>
+        </div>
+        <p class="keyrow-result" data-role="result" role="status"></p>
+      </form>
+
+      <div class="switches">
+        <label class="switch">
+          <input type="checkbox" id="opt-narration">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-text"><b>Read narration aloud</b><small>Lines with no speaker use a narrator voice. Turn this off to save ElevenLabs credits.</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="opt-clipboard">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-text"><b>Read lines from the clipboard</b><small>For games without a dub.game hook. Use Textractor with its copy-to-clipboard extension. Speakers are guessed.</small></span>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <footer class="now" id="now" aria-live="off">
+    <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="now-text">
+      <span class="now-speaker" id="now-speaker">Nothing playing</span>
+      <span class="now-line" id="now-line">Launch a voiced game and lines show up here as they are spoken.</span>
+    </div>
+    <button class="btn btn-quiet" id="now-stop" type="button" hidden>Stop</button>
+    <label class="volume" title="Volume">
+      <span class="field-label">Volume</span>
+      <input type="range" id="volume" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+    </label>
+  </footer>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+  <script src="fake-dub.js"></script>
+  <script src="lib.js"></script>
+  <script src="cards.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
