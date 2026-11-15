@@ -308,3 +308,15 @@ test('voice design: an avoided name is removed as a word, never from inside anot
   const { sanitizeDescription } = require('../main/voice-design');
   assert.equal(sanitizeDescription('A calm voice, a Samurai spirit, Sam sounds warm and clear.', ['Sam']).includes('Samurai'), true);
 });
+
+test('designPreviews uses the description the player typed, and falls back to Grok/profile text when blank', async () => {
+  const seen = [];
+  const designer = () => ({ design: async () => ({ voice_id: 'X', name: 'n' }), remove: async () => true,
+    previews: async ({ description }) => { seen.push(description); return { description, previews: [{ id: 'p1', mime: 'audio/mpeg', data: 'AA' }] }; } });
+  const r = rig({ designer });
+  await r.line('Nicole');
+  await r.pipeline.designPreviews({ game: 'g', speaker: 'Nicole', description: '  a   gruff old fisherman ' });
+  assert.equal(seen[0], 'a gruff old fisherman');
+  await r.pipeline.designPreviews({ game: 'g', speaker: 'Nicole', description: '' });
+  assert.ok(seen[1] && seen[1] !== 'a gruff old fisherman', 'blank falls back to a generated description');
+});

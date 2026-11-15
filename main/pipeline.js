@@ -643,12 +643,14 @@ function createPipeline(deps) {
      * Manual design, step 1: ElevenLabs makes up to 3 versions of the character's voice for the player
      * to audition. Nothing is saved and no voice slot is used until pickPreview.
      */
-    async designPreviews({ game, speaker } = {}) {
+    async designPreviews({ game, speaker, description: own } = {}) {
       const g = gameOf({ game });
       const voices = store.forGame(g);
       const existing = voices.get(speaker);
       checkCanDesign(voices, speaker, existing);
-      const description = await voicePrompt(g, speaker, existing);
+      // The player's own words win; blank means Grok writes it. (sanitizeDescription pads/cleans it later.)
+      const typed = String(own || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+      const description = typed || await voicePrompt(g, speaker, existing);
       const made = await designer.previews({ description, avoid: [speaker, titleOf(g)] });
       auditions.set(keyOf(g, speaker), { description: made.description, ids: made.previews.map((p) => p.id), at: now() });
       return made.previews;

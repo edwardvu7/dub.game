@@ -451,3 +451,7 @@ body.overlay { background: transparent; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
 .pick-list li { padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .pick-list li:hover, .pick-list li[aria-selected="true"] { background: color-mix(in srgb, var(--tally) 22%, transparent); }
+
+/* Custom voice: the optional description box shown before the 3 versions are made */
+.card-brief-text { display: block; width: 100%; margin-top: var(--s-2); resize: vertical; min-height: 64px; font: inherit; line-height: 1.4; }
+.card-brief-hint { flex-basis: 100%; margin: 0; color: var(--dim); font-size: 12px; }

@@ -145,8 +145,29 @@
       cancel.type = 'button';
       cancel.addEventListener('click', close);
       box.replaceChildren(title, ...rows, cancel);
+      box.hidden = false; // nothing auto-plays: the player presses Play on the version they want to hear
+    }
+
+    // Step 0: the player may describe the voice before the 3 versions are made. Blank = Grok writes it.
+    function showBrief(card, speaker, generate) {
+      const box = card.audition;
+      const close = () => { box.hidden = true; box.replaceChildren(); };
+      const label = el('label', 'card-audition-title', 'Describe how this character should sound');
+      const text = el('textarea', 'input card-brief-text');
+      text.rows = 3;
+      text.maxLength = 400;
+      text.placeholder = 'e.g. a warm, slightly husky young woman who speaks softly and hesitates when nervous';
+      label.append(text);
+      const hint = el('p', 'card-brief-hint', 'Optional. Leave it blank and Grok writes it from the game and the character.');
+      const go = el('button', 'btn', 'Make 3 versions');
+      go.type = 'button';
+      go.addEventListener('click', () => generate(text.value.trim(), close));
+      const cancel = el('button', 'btn btn-quiet', 'Cancel');
+      cancel.type = 'button';
+      cancel.addEventListener('click', close);
+      box.replaceChildren(label, hint, go, cancel);
       box.hidden = false;
-      if (versions && versions[0]) { try { playVersion(versions[0]); } catch { /* the Play buttons report it */ } }
+      text.focus();
     }
 
     function paintOpen(card, open) {
@@ -247,20 +268,21 @@
       // ElevenLabs makes up to 3 versions; the player listens and keeps one (only that one uses a slot).
       const audition = el('div', 'card-audition');
       audition.hidden = true;
-      custom.addEventListener('click', async () => {
+      async function makeVersions(description) {
         if (card.busy) return;
         custom.textContent = 'Designing\u2026';
         custom.setAttribute('aria-busy', 'true');
         try {
           await run(card, custom, async () => {
-            const versions = await dub.invoke('voices:designPreviews', target(speaker));
+            const versions = await dub.invoke('voices:designPreviews', { ...target(speaker), ...(description ? { description } : {}) });
             showAudition(card, speaker, versions);
           });
         } finally {
           custom.removeAttribute('aria-busy');
           if (!destroyed && voices[speaker]) patch(speaker, voices[speaker]);
         }
-      });
+      }
+      custom.addEventListener('click', () => { if (!card.busy) showBrief(card, speaker, (description) => makeVersions(description)); });
       card.custom = custom;
       card.audition = audition;
       actions.append(preview, reset, mute, custom);

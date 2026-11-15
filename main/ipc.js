@@ -49,7 +49,7 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     // Manual design: audition up to 3 versions ({id, mime, data}), then keep one.
     'voices:designPreviews': async (arg) => {
       canCustomize('designPreviews');
-      return pipeline.designPreviews({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });
+      return pipeline.designPreviews({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), description: typeof arg.description === 'string' ? arg.description : '' });
     },
     'voices:pickPreview': async (arg) => {
       canCustomize('pickPreview');
