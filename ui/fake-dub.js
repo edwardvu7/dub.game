@@ -47,7 +47,7 @@
   const voicesOf = (a) => store.games[(a && a.game) || store.current].voices;
   const usage = { session: { chars: 1840, gemini: 2, lines: 31, cached: 6 }, month: '2026-11', monthChars: 12650,
     monthGemini: 9, totalChars: 40210, limit: 0, byGame: {}, overLimit: false };
-  let settings = { hasElevenLabsKey: false, hasGeminiKey: false, narration: true, clipboardMode: false, acting: true };
+  let settings = { hasElevenLabsKey: false, hasGeminiKey: false, hasGrokKey: false, narration: true, clipboardMode: false, acting: true };
   const game = (a) => {
     const g = games.find((x) => x.appid === String(a.appid));
     if (!g) throw new Error('Unknown game: ' + a.appid);
@@ -98,6 +98,7 @@
     'settings:setKeys': (a) => {
       if (typeof a.elevenlabs === 'string') settings.hasElevenLabsKey = !!a.elevenlabs.trim();
       if (typeof a.gemini === 'string') settings.hasGeminiKey = !!a.gemini.trim();
+      if (typeof a.grok === 'string') settings.hasGrokKey = !!a.grok.trim();
       return copy(settings);
     },
     'settings:test': async (a) => {

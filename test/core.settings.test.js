@@ -26,10 +26,10 @@ test('settings: public shape never contains a key, and the file on disk is encry
   const seen = [];
   const s = createSettings({ file, safeStorage: fakeSafeStorage(), env: {},
     testers: { elevenlabs: async (k) => { seen.push(k); return { ok: true }; }, gemini: async () => ({ ok: false, error: 'bad' }) } });
-  assert.deepEqual(s.getPublic(), { hasElevenLabsKey: false, hasGeminiKey: false, narration: true, clipboardMode: false, acting: true });
+  assert.deepEqual(s.getPublic(), { hasElevenLabsKey: false, hasGeminiKey: false, hasGrokKey: false, narration: true, clipboardMode: false, acting: true });
 
   const out = s.setKeys({ elevenlabs: `  ${SECRET_EL} `, gemini: SECRET_GM });
-  assert.deepEqual(out, { hasElevenLabsKey: true, hasGeminiKey: true, narration: true, clipboardMode: false, acting: true });
+  assert.deepEqual(out, { hasElevenLabsKey: true, hasGeminiKey: true, hasGrokKey: false, narration: true, clipboardMode: false, acting: true });
   for (const value of [out, s.getPublic(), s.setNarration(false), await s.test({ provider: 'elevenlabs' }), await s.test({ provider: 'gemini' })]) {
     const text = JSON.stringify(value);
     assert.ok(!text.includes(SECRET_EL) && !text.includes(SECRET_GM));
@@ -142,7 +142,7 @@ test('ipc: every contract channel has a handler and settings handlers never retu
   await assert.rejects(() => registered['settings:get']({ ok: false }), /Untrusted/);
 
   const out = await registered['settings:setKeys']({ ok: true }, { elevenlabs: SECRET_EL });
-  assert.deepEqual(Object.keys(out).sort(), ['acting', 'clipboardMode', 'hasElevenLabsKey', 'hasGeminiKey', 'narration']);
+  assert.deepEqual(Object.keys(out).sort(), ['acting', 'clipboardMode', 'hasElevenLabsKey', 'hasGeminiKey', 'hasGrokKey', 'narration']);
   for (const c of ['settings:get', 'settings:setNarration', 'settings:test']) {
     const value = await registered[c]({ ok: true }, c === 'settings:test' ? { provider: 'elevenlabs' } : true);
     assert.ok(!JSON.stringify(value).includes(SECRET_EL), c);

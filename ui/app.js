@@ -388,7 +388,7 @@
   dub.on('usage:changed', paintUsage);
 
   // ---------- Settings ----------
-  const HAS = { elevenlabs: 'hasElevenLabsKey', gemini: 'hasGeminiKey' };
+  const HAS = { elevenlabs: 'hasElevenLabsKey', gemini: 'hasGeminiKey', grok: 'hasGrokKey' };
   const keyrows = Array.from(document.querySelectorAll('.keyrow'));
   let settings = null;
 

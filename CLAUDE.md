@@ -78,6 +78,14 @@ locked profile. `muted: true` skips the character (nothing is sent to ElevenLabs
 lock. A version 1 file (speaker to profile) is moved to the first game voiced after the upgrade.
 `voices:get` and `voices:changed` return `{current, games}` (the file without `version`).
 
+### `cast.json` (in `userData`, main/cast.js)
+Optional, needs an xAI key. The first time a game is voiced, Grok searches the web (xAI Responses API,
+`web_search` tool) for its main characters: `{ [game]: {name, at, characters: [{name, aliases, gender,
+age_range, personality, voice}]} }`. Used to resolve speaker names (case, full names, aliases, a
+Godot node like "MarkSprite") to one character, and as notes for Gemini's casting. When it arrives,
+unlocked voices picked without it are recast once (profiles get `cast: true`). Gemini is always told
+the game's name. Grok never picks voices or touches ElevenLabs.
+
 ### `usage.json` (in `userData`, main/usage.js)
 Characters sent to ElevenLabs this session, this month (per game too) and in total; Gemini calls;
 and an optional monthly character limit. Cache hits are free and not counted. Over the limit, new
@@ -118,8 +126,8 @@ list, main sends `games:changed` with the new list.
 | `usage:get` | invoke | → `{session, month, monthChars, monthGemini, totalChars, limit, byGame, overLimit}` |
 | `usage:setLimit` | invoke | `number` (0 = none) → same as get |
 | `usage:plan` | invoke | → `{ok, used, limit, resetAt?}` from ElevenLabs, or `{ok:false, error}` |
-| `settings:get` | invoke | → `{hasElevenLabsKey, hasGeminiKey, narration, clipboardMode, acting}` (never the keys) |
-| `settings:setKeys` | invoke | `{elevenlabs?, gemini?}` → same shape as get |
+| `settings:get` | invoke | → `{hasElevenLabsKey, hasGeminiKey, hasGrokKey, narration, clipboardMode, acting}` (never the keys) |
+| `settings:setKeys` | invoke | `{elevenlabs?, gemini?, grok?}` → same shape as get |
 | `settings:test` | invoke | `{provider}` → `{ok, error?}` |
 | `settings:setNarration` | invoke | `boolean` |
 | `settings:setActing` | invoke | `boolean`: Gemini directs each line ahead of time (default on) |
@@ -134,7 +142,7 @@ Audio plays in a hidden renderer (or the main window); a new clip always stops t
 
 ## Rules
 - **API keys stay in the main process.** Never in renderer code, never in git. Dev keys come from
-  `.env` (`ELEVENLABS_API_KEY`, `GEMINI_API_KEY`); player keys are stored with `safeStorage`.
+  `.env` (`ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, optional `XAI_API_KEY`); player keys are stored with `safeStorage`.
 - Renderer windows use `contextIsolation: true`, `nodeIntegration: false`, and talk only via `window.dub`.
 - Hooks must never crash or freeze the game: background thread, short timeout, swallow errors.
 - Plan first, then build. Commit every time something works.

@@ -104,6 +104,22 @@
         <p class="keyrow-result" data-role="result" role="status"></p>
       </form>
 
+      <form class="keyrow" data-provider="grok" autocomplete="off">
+        <div class="keyrow-head">
+          <h2>Grok <span class="keyrow-optional">optional</span></h2>
+          <span class="tag" data-role="state"></span>
+        </div>
+        <p class="keyrow-what">Looks up each game's characters online, once per game, so dub.game knows who is who and Gemini casts them true to the story. Keys come from the xAI console.</p>
+        <div class="keyrow-controls">
+          <input class="input" type="password" name="key" aria-label="Grok (xAI) API key" spellcheck="false" autocomplete="off">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <button class="btn" type="button" data-role="test">Test</button>
+          <a class="btn btn-quiet" href="https://console.x.ai/" target="_blank" rel="noopener">Get a key</a>
+          <button class="btn btn-quiet" type="button" data-role="remove" hidden>Remove</button>
+        </div>
+        <p class="keyrow-result" data-role="result" role="status"></p>
+      </form>
+
       <section class="usage" aria-labelledby="usage-title">
         <div class="keyrow-head">
           <h2 id="usage-title">Usage</h2>

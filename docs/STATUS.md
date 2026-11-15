@@ -97,3 +97,11 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
   stability/style/speed for that line only. Settings > "Act out scenes" (on by default) turns it off.
   The first line after a choice has no mood yet and uses the base voice. Godot games get only the
   surrounding-lines context. UNVERIFIED: Ren'Py's context().current and script.lookup() on a real game.
+
+## Cast lookup with Grok (0.1.6)
+- Optional xAI key in Settings. Once per game, Grok searches the web for the main characters (names,
+  aliases, gender, age, personality, how they sound); saved in `userData/cast.json`.
+- Speaker names resolve to the cast ("MARK", "Mark Borja", Godot's "MarkSprite" -> Mark), so one
+  character never gets several voices. Gemini gets the notes and the game's name when casting;
+  unlocked voices are recast once when the lookup arrives. Without a Grok key, Gemini still gets the
+  game's name. UNVERIFIED: xAI's API (model `grok-4.7`, override with GROK_MODEL) not called live.

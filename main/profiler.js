@@ -38,12 +38,17 @@ function prompt(characters, catalog, opts) {
   const voices = catalog.map((v) => `- ${v.voice_id}: ${v.name} - ${v.description}`).join('\n');
   const cast = characters.map((c) => {
     const lines = (c.samples || []).slice(0, 6).map((s) => `    "${s}"`).join('\n');
-    return `- ${c.speaker}\n${lines || '    (no sample lines; judge from the name)'}`;
+    // notes: what is known about the character (from the Grok cast lookup), trusted over guesses.
+    const known = c.notes ? `    Known about them: ${c.notes}\n` : '';
+    return `- ${c.speaker}\n${known}${lines || '    (no sample lines; judge from the name)'}`;
   }).join('\n');
+  const game = characters.find((c) => c.game);
   const avoid = opts.avoidVoiceId ? `\nThe player disliked voice ${opts.avoidVoiceId}; pick a different one.\n` : '';
   const many = characters.length > 1;
   return [
     'You are casting voice actors for a visual novel.',
+    // Gemini often knows popular games already: naming the game helps even without a lookup.
+    game ? `The characters are from the game "${game.game}". Use what you know about it and them.` : '',
     many
       ? 'For each character below, infer a profile from the name and sample lines and pick the best voice. Return one profile per character, with "speaker" copied exactly. Give different characters different voices where the catalog allows.'
       : 'Infer a profile for the character below from the name and sample lines and pick the best voice. Copy "speaker" exactly.',
@@ -183,4 +188,4 @@ async function testKey(key, deps = {}) {
 }
 
 module.exports = { profileCharacter, profileCharacters, buildRequest, sanitizeProfile, fallbackProfile,
-  profileSchema, testKey, callGemini, MODEL, ENDPOINT, GENDERS, AGES };
+  profileSchema, testKey, callGemini, prompt, MODEL, ENDPOINT, GENDERS, AGES };

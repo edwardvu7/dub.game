@@ -13,6 +13,7 @@ const { createUsage } = require('./usage');
 const { createOverlayPosition, constrainToGame } = require('./overlay-position');
 const { createPipeline } = require('./pipeline');
 const { createMoods } = require('./moods');
+const castLookup = require('./cast');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
 const { createGames } = require('./steam');
@@ -25,7 +26,7 @@ const catalog = require('../voices_catalog.json');
 
 const ROOT = path.join(__dirname, '..');
 const HOTKEY = 'Shift+F2';
-const EXTERNAL_HOSTS = ['elevenlabs.io', 'aistudio.google.com', 'store.steampowered.com'];
+const EXTERNAL_HOSTS = ['elevenlabs.io', 'aistudio.google.com', 'store.steampowered.com', 'console.x.ai'];
 
 let mainWindow = null;
 const APP_ICON = path.join(ROOT, 'ui', 'logo.png');
@@ -241,7 +242,8 @@ async function start() {
     file: path.join(userData, 'settings.json'),
     safeStorage,
     env: process.env,
-    testers: { elevenlabs: (key) => tts.testKey(key), gemini: (key) => profiler.testKey(key) },
+    testers: { elevenlabs: (key) => tts.testKey(key), gemini: (key) => profiler.testKey(key),
+      grok: (key) => castLookup.testKey(key) },
   });
   const voices = createVoiceStore({
     file: path.join(userData, 'voices.json'),
@@ -264,7 +266,10 @@ async function start() {
     return hit ? hit.name : null;
   };
   const moods = createMoods({ settings, usage, emitStatus: (message) => emit('app:status', { level: 'warn', message }) });
-  const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName, moods });
+  let pipeline = null;
+  const cast = castLookup.createCastBook({ file: path.join(userData, 'cast.json'), settings, log,
+    onReady: (game) => { if (pipeline) pipeline.recast(game).catch(() => {}); } });
+  pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName, moods, cast });
 
   gameTracker = createGameWindowTracker({
     onFrame: (frame) => {

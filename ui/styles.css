@@ -231,6 +231,7 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m);
 }
 .keyrow-head { display: flex; align-items: center; gap: 10px; }
+.keyrow-optional { font: 500 12.5px/1 var(--text); color: var(--dim); margin-left: 4px; }
 .keyrow-what { color: var(--dim); font-size: 13px; margin: 4px 0 12px; }
 .keyrow-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 .keyrow-controls .input { flex: 1 1 240px; font-family: ui-monospace, Consolas, monospace; }

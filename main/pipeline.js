@@ -25,6 +25,7 @@ function createPipeline(deps) {
   const speaking = new Map(); // cache key -> Promise<audio>: the same line is never bought twice at once
   const gameName = deps.gameName || (() => null);
   const moods = deps.moods || null; // Gemini's per-line direction, prepared ahead (main/moods.js)
+  const cast = deps.cast || null;   // Grok's cast lookup per game (main/cast.js): names and notes
   const scenes = new Map(); // game -> last few lines, any speaker: context for ElevenLabs and Gemini
   const speak = deps.speak || ttsModule.speak;
   const profileOne = deps.profileCharacter || profiler.profileCharacter;
@@ -43,9 +44,24 @@ function createPipeline(deps) {
   const keyOf = (game, speaker) => game + '\u0000' + speaker;
   const gameOf = (x) => String((x && x.game) || store.current() || 'unknown');
 
+  // Display name, or the folder part of "renpy:<folder>" when the Steam scan does not know it.
+  const titleOf = (game) => gameName(game) || String(game).split(':').slice(1).join(':') || '';
+  const nameIn = (game, speaker) => (cast ? cast.resolve(game, speaker) : speaker);
+  // What Gemini gets about a character: the game it is from and, when looked up, what it is like.
+  const describe = (game, c) => {
+    const out = { ...c };
+    const title = titleOf(game);
+    const notes = cast ? cast.notes(game, c.speaker) : '';
+    if (title) out.game = title;
+    if (notes) out.notes = notes;
+    return out;
+  };
+
   function activate(game) {
     store.setCurrent(game, gameName(game));
-    return store.forGame(game);
+    const voices = store.forGame(game);
+    if (cast) cast.ensure(game, titleOf(game), Object.keys(voices.all()));
+    return voices;
   }
 
   function status(level, message) {
@@ -100,9 +116,10 @@ function createPipeline(deps) {
       attempted.add(k);
       try {
         if (usage) usage.recordGemini();
-        const profile = await profileOne({ speaker, samples }, catalog, key);
+        const asked = describe(voices.game, { speaker, samples });
+        const profile = await profileOne(asked, catalog, key);
         log(`profiled ${speaker} -> ${profile.voice_id}`);
-        return voices.setAuto(profile);
+        return voices.setAuto({ ...profile, cast: !!asked.notes }); // cast: picked with looked-up notes
       } catch (e) {
         status('error', e.message);
         return voices.get(speaker) || voices.setAuto(profiler.fallbackProfile(speaker, catalog, 'Gemini error'));
@@ -145,9 +162,10 @@ function createPipeline(deps) {
   return {
     /** POST /line */
     async handleLine(line) {
-      const speaker = line.speaker || NARRATOR;
       const text = line.text;
       const game = gameOf(line);
+      const speaker = nameIn(game, line.speaker || NARRATOR);
+      if (line.upcoming && cast) line = { ...line, upcoming: line.upcoming.map((u) => ({ ...u, speaker: nameIn(game, u.speaker) })) };
       // A line older than the newest one (it overtook it on the way here) is dropped. A lower seq
       // after a pause means the game was restarted and counts from 1 again, so it is accepted.
       if (line.seq !== undefined && lastLineSeq !== undefined && line.seq <= lastLineSeq &&
@@ -190,9 +208,16 @@ function createPipeline(deps) {
 
     /** POST /characters: profile the whole cast before the first line. */
     async handleCharacters(payload = {}) {
-      const { characters } = payload;
       const game = gameOf(payload);
       const voices = activate(game);
+      // The same person under two names ("MARK", "Mark Borja") is one character.
+      const merged = new Map();
+      for (const c of payload.characters || []) {
+        const speaker = nameIn(game, c.speaker);
+        const prev = merged.get(speaker);
+        merged.set(speaker, { speaker, samples: [...(prev ? prev.samples : []), ...(c.samples || [])] });
+      }
+      const characters = [...merged.values()];
       for (const c of characters || []) for (const s of c.samples || []) remember(game, c.speaker, s);
       const todo = (characters || []).filter((c) =>
         c.speaker !== NARRATOR && c.speaker !== UNKNOWN && needsProfile(voices, c.speaker) &&
@@ -207,17 +232,19 @@ function createPipeline(deps) {
         return;
       }
       for (const c of todo) attempted.add(keyOf(game, c.speaker));
+      const asked = todo.map((c) => describe(game, c));
+      const withNotes = new Set(asked.filter((c) => c.notes).map((c) => c.speaker));
       const batch = (async () => {
         try {
           if (usage) usage.recordGemini();
-          return await profileMany(todo, catalog, key);
+          return await profileMany(asked, catalog, key);
         } catch (e) { status('error', e.message); return []; }
       })();
       // Lines that arrive while the batch is running wait for it instead of asking Gemini again.
       const each = todo.map((c) => {
         const p = batch.then((profiles) => {
           const found = profiles.find((x) => x.speaker === c.speaker);
-          if (found) return voices.setAuto(found);
+          if (found) return voices.setAuto({ ...found, cast: withNotes.has(c.speaker) });
           return voices.get(c.speaker) || voices.setAuto(profiler.fallbackProfile(c.speaker, catalog, 'not profiled'));
         });
         inFlight.set(keyOf(game, c.speaker), p);
@@ -257,11 +284,34 @@ function createPipeline(deps) {
       const key = settings.getKey('gemini');
       if (!key) throw new Error('Re-roll needs a Gemini key. Add one in Settings.');
       if (usage) usage.recordGemini();
-      const profile = await profileOne({ speaker, samples: samplesOf(g, speaker) }, catalog, key,
+      const profile = await profileOne(describe(g, { speaker, samples: samplesOf(g, speaker) }), catalog, key,
         { avoidVoiceId: existing.voice_id });
       attempted.add(keyOf(g, speaker));
       voices.unlock(speaker);
       return voices.setAuto(profile);
+    },
+
+    /**
+     * The cast lookup for `game` just finished: recast the voices Gemini picked without it, in one
+     * batch. Voices the player set (locked) and built-in narrator voices are left alone.
+     */
+    async recast(game) {
+      const voices = store.forGame(game);
+      // Casting that started before the lookup finished must land first, or it would be skipped.
+      const prefix = game + '\u0000';
+      await Promise.all([...inFlight].filter(([k]) => k.startsWith(prefix)).map(([, w]) => w.catch(() => {})));
+      const key = settings.getKey('gemini');
+      const all = voices.all();
+      const todo = Object.values(all).filter((p) => !p.locked && !p.cast && p.source !== 'builtin' &&
+        p.speaker !== NARRATOR && p.speaker !== UNKNOWN)
+        .map((p) => describe(game, { speaker: p.speaker, samples: samplesOf(game, p.speaker) }));
+      if (!key || !todo.length) return 0;
+      if (usage) usage.recordGemini();
+      let profiles = [];
+      try { profiles = await profileMany(todo, catalog, key); } catch (e) { status('error', e.message); return 0; }
+      for (const p of profiles) voices.setAuto({ ...p, cast: true });
+      log(`recast ${profiles.length} character(s) of ${game} with the looked-up cast`);
+      return profiles.length;
     },
 
     /** Kept for callers of the old API: handleCharacters now seeds samples itself. */

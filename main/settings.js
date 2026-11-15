@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ENV_NAMES = { elevenlabs: 'ELEVENLABS_API_KEY', gemini: 'GEMINI_API_KEY' };
+const ENV_NAMES = { elevenlabs: 'ELEVENLABS_API_KEY', gemini: 'GEMINI_API_KEY', grok: 'XAI_API_KEY' };
 
 /**
  * createSettings({file, safeStorage, env?, testers?})
@@ -50,6 +50,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     return {
       hasElevenLabsKey: !!getKey('elevenlabs'),
       hasGeminiKey: !!getKey('gemini'),
+      hasGrokKey: !!getKey('grok'),
       narration: data.narration,
       clipboardMode: data.clipboardMode,
       acting: data.acting,
@@ -63,7 +64,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     clipboardMode: () => data.clipboardMode,
     acting: () => data.acting,
 
-    /** setKeys({elevenlabs?, gemini?}): a non-empty string saves, an empty string removes. */
+    /** setKeys({elevenlabs?, gemini?, grok?}): a non-empty string saves, an empty string removes. */
     setKeys(keys) {
       for (const provider of Object.keys(ENV_NAMES)) {
         const value = keys && keys[provider];

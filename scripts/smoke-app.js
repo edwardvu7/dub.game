@@ -36,6 +36,7 @@ for (const [id, name, tags] of [['515151', 'Story Unity', { 'Story Rich': 40, Ad
 process.env.DUBGAME_STEAM_PATH = steam;
 process.env.ELEVENLABS_API_KEY = 'test-eleven';
 process.env.GEMINI_API_KEY = 'test-gemini';
+process.env.XAI_API_KEY = 'test-xai';
 
 // ---- fake network: ElevenLabs returns bytes, Gemini returns a profile ----
 const calls = [];
@@ -46,6 +47,11 @@ globalThis.fetch = async (url, init = {}) => {
   const ok = (body, type) => new Response(body, { status: 200, headers: { 'content-type': type } });
   if (url.includes('api.elevenlabs.io/v1/text-to-speech')) return ok(Buffer.from('ID3fakeaudio'), 'audio/mpeg');
   if (url.includes('api.elevenlabs.io/v1/user')) return ok('{}', 'application/json');
+  if (url === 'https://api.x.ai/v1/responses') { // Grok's cast lookup for the demo game
+    const cast = { characters: [{ name: 'Sylvie', aliases: ['Sylvie Ray'], gender: 'female', age_range: 'young_adult',
+      personality: 'Shy artist.', voice: 'Soft.' }] };
+    return ok(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(cast) }] }] }), 'application/json');
+  }
   if (url.includes('generativelanguage') && init.method === 'POST') {
     const req = JSON.parse(init.body);
     const prompt = req.contents[0].parts[0].text;
@@ -264,6 +270,18 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   usage = await invoke('usage:get');
   check(usage.session.cached === 1 && usage.session.chars === 'Hey, you made it!'.length, 'a cached line costs nothing');
 
+  // 7. Cast lookup: one Grok search for the game; a full name the game shows maps to the same Sylvie
+  await wait(200);
+  check(calls.filter((u) => u === 'https://api.x.ai/v1/responses').length === 1, 'Grok looks up the game\'s cast once');
+  const castFile = path.join(tmp, 'userData', 'cast.json');
+  check(fs.existsSync(castFile) && JSON.parse(fs.readFileSync(castFile, 'utf8'))[GAME].characters[0].name === 'Sylvie', 'the cast is saved to userData/cast.json');
+  const geminiPrompts = bodies.filter(([u]) => u.includes('generativelanguage')).map(([, b]) => b.contents[0].parts[0].text);
+  check(geminiPrompts.some((t) => /Known about them: female; young adult; Shy artist/.test(t) && /from the game "Demo Visual Novel"/.test(t)),
+    'Gemini recasts with the game name and the looked-up notes');
+  await post('/line', { speaker: 'Sylvie Ray', text: 'It is me, Sylvie.', engine: 'renpy', game: GAME }); await wait(300);
+  const castStore = await invoke('voices:get');
+  check(!castStore.games[GAME].voices['Sylvie Ray'], 'a full name from the game resolves to the same Sylvie');
+
   // 7a. Acting: the hook sends the next lines; Gemini directs them ahead; the line is then acted
   const geminiBefore = bodies.filter(([u]) => u.includes('generativelanguage')).length;
   await post('/line', { speaker: 'Sylvie', text: 'Did you hear that?', engine: 'renpy', game: GAME,
@@ -271,7 +289,7 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   await wait(400);
   check(bodies.filter(([u]) => u.includes('generativelanguage')).length === geminiBefore + 1, 'one Gemini call directs the coming lines ahead of time');
   const asked = bodies.filter(([u]) => u.includes('text-to-speech')).pop()[1];
-  check(asked.previous_text === 'Hey, you made it!' && asked.next_text === 'Get behind me.', 'ElevenLabs gets the lines around this one');
+  check(asked.previous_text === 'It is me, Sylvie.' && asked.next_text === 'Get behind me.', 'ElevenLabs gets the lines around this one');
   await post('/line', { speaker: 'Marcus', text: 'Get behind me.', engine: 'renpy', game: GAME, upcoming: [] });
   await wait(400);
   const acted = bodies.filter(([u]) => u.includes('text-to-speech')).pop()[1];
