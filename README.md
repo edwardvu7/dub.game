@@ -1,45 +1,105 @@
 # dub.game
-AI voice-over for visual novels. Casts a unique voice for every character with Gemini and speaks their lines live with ElevenLabs.
 
-## Install (players)
+Real-time voice acting for unvoiced visual novels, hooked directly at the game engine.
 
-1. Download the installer: https://github.com/edwardvu7/dub.game/releases/latest/download/dub.game-Setup.exe
-   (this link always gives the newest release).
-2. Run it. Windows may say "Windows protected your PC" because the app isn't code-signed yet:
-   click **More info**, then **Run anyway**.
-3. dub.game opens on Settings. Paste your ElevenLabs and Gemini keys (each has a **Get a key** button).
-4. Your Ren'Py games appear under Games. Click **Launch**, then press **Shift + F2** in the game.
+**[Website](https://edwardvu7.github.io/dub.game/)** · **[Download Latest Release](https://github.com/edwardvu7/dub.game/releases/latest)**
 
-## Run from the code (team)
+---
 
-Install [Node.js](https://nodejs.org/en/download) (LTS) once, then double-click **`start.bat`** in this
-folder. The first run installs everything (a few minutes); after that it just starts the app.
-Your dev API keys can go in a `.env` file (copy `.env.example`).
+## How It Works
 
-Terminal equivalent: `npm install`, then `npm start`. Tests: `npm test`, `npm run smoke`.
+Instead of relying on screen capture or OCR, **dub.game** reads exact dialogue straight from the engine runtime and streams spoken audio locally:
 
-## Make a new installer
+1. **Steam Library Scan:** Parses local Steam manifests (`libraryfolders.vdf` and `appmanifest_*.acf`) to detect compatible visual novels and toggle engine hooks on or off cleanly.
+2. **Engine Callback Hook:** Injects a lightweight callback script (such as `game/dubgame.rpy` via `config.all_character_callbacks`) that strips text tags and dispatches `{ speaker, text }` payloads to `POST http://127.0.0.1:8000/line`.
+3. **One-Time Character Profiling:** New speakers are profiled once using Gemini structured outputs (via Mastra) against `voices_catalog.json` to assign gender, age range, personality, and voice parameters, then cached locally in `voices.json`.
+4. **ElevenLabs Streaming & Live Overlay:** Streams dialogue audio in real time and provides an always-on-top Electron overlay (`Shift + F2`) to swap voices, adjust stability/style/speed sliders mid-scene, or re-roll casting.
 
-Installers are built by GitHub on a Windows machine, so nobody needs to build locally.
+---
 
-1. Bump `"version"` in `package.json` (for example `0.1.0` to `0.2.0`) and commit it to `main`.
-2. Tag that commit and push the tag:
+## Supported Engines
+
+| Engine | Status | Hook Mechanism |
+| :--- | :--- | :--- |
+| **Ren'Py 7 & 8** | Full | `game/dubgame.rpy` character callback |
+| **Godot 3 & 4** | Beta | `override.cfg` + scene `Label` hook |
+| **RPG Maker MV / MZ** | Beta | `Window_Message.startMessage` hook |
+| **Unity** | Beta | BepInEx + XUnity endpoint |
+
+---
+
+## Getting Started
+
+### Prerequisites
+- **Node.js `>= 22.12.0`** (required by Electron `v45+`)
+- An **ElevenLabs API key** and a **Gemini API key** (stored encrypted in the Electron main process via `safeStorage`, or configured via `.env` for local development)
+
+### Local Development
+
+1. **Clone the repository:**
    ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
+   git clone [https://github.com/edwardvu7/dub.game.git](https://github.com/edwardvu7/dub.game.git)
+   cd dub.game
    ```
-3. Wait about 10 minutes. The installer appears on the Releases page under `v0.2.0`, and the
-   download link above (also used by the website) switches to it automatically.
 
-For a test build without a release: Actions tab, **Build Windows installer**, **Run workflow**. The
-installer is attached to that run.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-## How the work is split
-Three sections, one owner each, all building against the contracts in [`CLAUDE.md`](CLAUDE.md):
+3. **Configure environment variables (optional):**
+   ```bash
+   cp .env.example .env
+   ```
 
-| Section | Branch | Task list |
-|---|---|---|
-| A — game hook + Steam scan | `section/a-hook-steam` | [docs/sections/A-game-hook-and-steam.md](docs/sections/A-game-hook-and-steam.md) |
+4. **Launch the application:**
+   ```bash
+   npm start
+   ```
+
+> **Windows Note:** If PowerShell blocks `npm` scripts, run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force` once, or launch via `npm.cmd start`.
+
+---
+
+## In-Game Controls & Local API
+
+- **`Shift + F2`**: Toggle the always-on-top voice tuning overlay over windowed or borderless games.
+- **`POST http://127.0.0.1:8000/line`**: Local HTTP endpoint receiving dialogue events from hooked games:
+  ```json
+  {
+    "speaker": "Sylvie",
+    "text": "Did you hear footsteps on the stairs?"
+  }
+  ```
+
+---
+
+## Project Structure
+
+```text
+dub.game/
+├── main/                 # Electron main process, HTTP server (:8000), Mastra profiler, TTS pipeline
+├── mod/                  # Engine hook scripts and adapters (Ren'Py, Godot, RPG Maker, Unity)
+├── ui/                   # Electron renderer UI & Shift+F2 in-game overlay
+├── docs/                 # GitHub Pages landing page (edwardvu7.github.io/dub.game)
+├── scripts/              # Build and packaging utilities
+├── test/                 # Pipeline and hook tests
+└── voices_catalog.json   # Curated ElevenLabs voice definitions for character casting
+```
+
+---
+
+## Team
+
+- **Edward Vu** ([@edwardvu7](https://github.com/edwardvu7))
+- **Alexander Miller** ([@chadscheeks](https://github.com/chadscheeks))
+- **Matthew** ([@Craz33matt](https://github.com/Craz33matt))
+
+---
+
+## License
+
+See [LICENSE](LICENSE) for details.steam.md) |
 | B — app core + AI | `section/b-core-ai` | [docs/sections/B-app-core-and-ai.md](docs/sections/B-app-core-and-ai.md) |
 | C — UI + demo | `section/c-ui-demo` | [docs/sections/C-ui-and-demo.md](docs/sections/C-ui-and-demo.md) |
 
