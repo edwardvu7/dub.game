@@ -443,3 +443,11 @@ body.overlay { background: transparent; }
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
 
+
+/* Overlay only: the native <select> list is an OS window that opens beneath the always-on-top overlay,
+   so the overlay draws its own list inside the page. */
+.pick-list { position: fixed; z-index: 1000; margin: 0; padding: 4px; list-style: none; overflow-y: auto;
+  background: var(--panel, #1b1b1f); color: inherit; border: 1px solid var(--tally); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+.pick-list li { padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.pick-list li:hover, .pick-list li[aria-selected="true"] { background: color-mix(in srgb, var(--tally) 22%, transparent); }
