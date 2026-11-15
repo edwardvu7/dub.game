@@ -25,7 +25,8 @@
 # UNVERIFIED (DDLC, Ren'Py 6.99 / Python 2): DynamicCharacter names (s_name), [player] substitution via
 # renpy.substitute (if missing on 6.99 the text keeps "[player]"), garbled glitch text sent as is, and
 # `extend` lines (Ren'Py passes the whole accumulated text). The hook binds no keys, so Shift+F2 is never eaten.
-# DUBGAME_HOOK_VERSION 9
+# DynamicCharacter('m_name'): the name is a store variable, read at call time on every line (it changes, Girl 3 -> Monika).
+# DUBGAME_HOOK_VERSION 10
 
 init -999 python:
     import json as _dubgame_json
@@ -133,14 +134,28 @@ init -999 python:
         name = getattr(char, "name", None)
         if name is None:
             return None
+        var = None
         try:
+            if isinstance(name, (_dubgame_text_type, str)) and _dubgame_ID.match(name):
+                var = name
             if getattr(char, "dynamic", False):
                 name = eval(name, vars(store))        # dynamic=True: the name is an expression
+            elif var is not None and isinstance(getattr(store, var, None), (_dubgame_text_type, str)):
+                name = getattr(store, var)            # DDLC's 'm_name': Character(dynamic) flag not visible, name is a variable
             if callable(name):
                 name = name()
         except Exception:
-            pass
-        return _dubgame_clean(name) or None
+            if var is not None:                       # shortcut: substitute is the last resort for a variable name
+                try:
+                    name = renpy.substitute(u"[" + var + u"]")
+                    if u"[" in name:
+                        name = None                   # substitute left it unresolved
+                except Exception:
+                    name = None
+        clean = _dubgame_clean(name)
+        if var is not None and clean == var and var.endswith("name"):
+            return None                               # never send an unresolved variable name like m_name
+        return clean or None
 
     def _dubgame_speaker():
         return _dubgame_name_of(getattr(store, "_last_say_who", None))

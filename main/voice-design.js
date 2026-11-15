@@ -34,7 +34,7 @@ function sanitizeDescription(raw, avoid = []) {
     if (n.length < 2) continue;
     const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // "named Sayori", "from the game "Title"", or the bare name: dropped with its lead-in word.
-    d = d.replace(new RegExp(`\\s*\\b(?:named|called|from|in|of)?\\s*(?:the game\\s*)?["'“]?${esc}["'”]?`, 'gi'), '');
+    d = d.replace(new RegExp(`\\s*\\b(?:named|called|from|in|of)?\\s*(?:the game\\s*)?["'“]?${esc}["'”]?${/\w$/.test(n) ? '\\b' : ''}`, 'gi'), '');
   }
   d = d.replace(/\byoung adult (young (?:woman|man))\b/gi, '$1')
     .replace(/\b(young adult|youthful)( (?:young adult|youthful))+\b/gi, '$1')

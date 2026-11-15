@@ -74,7 +74,7 @@ test('design: "Girl 1" is an alias of a researched main character and gets a des
   assert.equal(r.voices.has('Girl 1'), false);
 });
 
-test('design: unresolved placeholders qualify only among the first few ids met; Student 1 never', async () => {
+test('design: a placeholder with a speaker_id qualifies after one line; Student 1 (no id) never', async () => {
   const r = rig([{ name: 'Sayori', aliases: [], protagonist: false }]);
   await r.line('Girl 2', 'n');
   await r.line('Student 1', undefined);
@@ -82,7 +82,7 @@ test('design: unresolved placeholders qualify only among the first few ids met; 
   await r.pipeline.designIdle();
   assert.ok(r.voices.get('Girl 2').custom_voice);
   assert.equal(r.voices.get('Student 1').custom_voice, undefined);
-  assert.equal(r.voices.get('Extra 3').custom_voice, undefined, 'the 6th id met is past the early window');
+  assert.ok(r.voices.get('Extra 3').custom_voice, 'any id-bearing character qualifies at once');
 });
 
 test('protagonist: speaker_id mc is cast as a teenage boy even if Grok said otherwise', async () => {

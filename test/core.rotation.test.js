@@ -21,7 +21,7 @@ const PRESET = catalog[0].voice_id;
 const prof = (speaker, extra = {}) => ({ speaker, gender: 'female', age_range: 'adult', personality: 'p', voice_id: PRESET,
   stability: 0.5, style: 0.3, speed: 1, reason: 'r', source: 'grok', ...extra });
 
-function rig({ ranks = {}, researched = false, settleMs = 0, quality } = {}) {
+function rig({ ranks = {}, researched = false, settleMs = 0, quality, designer } = {}) {
   const dir = tmpDir();
   const store = createVoiceStore({ file: path.join(dir, 'voices.json'), catalogIds: catalog.map((v) => v.voice_id), catalog });
   const removed = [];
@@ -29,17 +29,17 @@ function rig({ ranks = {}, researched = false, settleMs = 0, quality } = {}) {
   const models = [];
   let n = 0;
   const pipeline = createPipeline({
-    voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog, settleMs, castWaitMs: 50, designBackoffMs: 1,
+    voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog, settleMs, castWaitMs: 50, designBackoffMs: 1, designRetryMs: 5,
     settings: { getKey: () => 'k', narration: () => true, customVoices: () => true, quality: () => quality || 'fast' },
     emit: (ch, p) => events.push([ch, p]), fetch: async () => { throw new Error('offline'); },
-    cast: { ensure() {}, resolve: (_g, s) => s, notes: () => '', setting: () => '', detail: () => ({}), rank: (_g, s) => (s in ranks ? ranks[s] : -1), ...(researched ? { has: () => true } : {}) },
+    cast: { ensure() {}, resolve: (_g, s) => s, notes: () => '', setting: () => '', detail: () => ({}), rank: (_g, s) => (s in ranks ? ranks[s] : -1), has: () => researched },
     speak: async (params) => { models.push(params.model); return Buffer.from('mp3'); },
     profileCharacter: async (c) => prof(c.speaker),
-    designer: { design: async () => ({ voice_id: 'Cust' + (++n), name: 'n' }), remove: async (id) => { removed.push(id); return true; } },
+    designer: designer ? designer(() => 'Cust' + (++n), removed) : { design: async () => ({ voice_id: 'Cust' + (++n), name: 'n' }), remove: async (id) => { removed.push(id); return true; } },
   });
   const voices = store.forGame('g');
   let i = 0;
-  const line = (speaker, game = 'g') => pipeline.handleLine({ speaker, text: 'Hello there ' + (++i), game });
+  const line = (speaker, game = 'g', speaker_id) => pipeline.handleLine({ speaker, text: 'Hello there ' + (++i), game, speaker_id });
   return { pipeline, store, voices, removed, events, models, line, dir };
 }
 
@@ -257,4 +257,54 @@ test('custom voices follow the research: Nicole gets one at once, "Student 1" ne
   assert.ok(!r.voices.get('Student 1').custom_voice, 'placeholder never earns one');
   for (let k = 0; k < 14; k++) { await r.line('Mr Reyes'); await r.pipeline.designIdle(); }
   assert.ok(r.voices.get('Mr Reyes').custom_voice, 'recurring unlisted character is adapted in');
+});
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('DDLC: every character met gets a designed voice after one line, through renames and a transient failure', async () => {
+  for (const researched of [false, true]) {
+    const asked = [], notices = [];
+    let failed = false;
+    const r = rig({ researched, ranks: researched ? { Sayori: 0, Monika: 1, Natsuki: 2, Yuri: 3 } : {},
+      designer: (id) => ({ design: async (a) => { asked.push(a.name);
+        if (!failed && /Girl 2/.test(a.name)) { failed = true; throw new Error('ElevenLabs 500 during Voice Design'); }
+        return { voice_id: id(), name: 'n' }; }, remove: async () => true }) });
+    const settle = async () => { await sleep(30); await r.pipeline.designIdle(); };
+    const met = [['Girl 1', 's'], ['Girl 2', 'm'], ['Girl 3', 'n'], ['m_name', 'mc'], ['Narrator', undefined]];
+    for (const [who, id] of met) { await r.line(who, 'g', id); await settle(); }
+    for (const [who, id] of [['Sayori', 's'], ['Monika', 'm'], ['Natsuki', 'n'], ['Yuri', 'y'], ['Sayori', 's']]) { await r.line(who, 'g', id); await settle(); }
+    for (const name of ['Sayori', 'Monika', 'Natsuki', 'Yuri', 'm_name']) assert.ok(r.voices.get(name) && r.voices.get(name).custom_voice, `${name} designed (researched=${researched})`);
+    assert.ok(!r.voices.get('Narrator').custom_voice);
+    assert.ok(asked.findIndex((n) => /Girl 1/.test(n)) < asked.findIndex((n) => /Girl 3/.test(n)), 'first met first');
+  }
+});
+
+test('pool: never above 8 across 12 characters; a 9th main character evicts the least valuable non-main; the evicted can return', async () => {
+  const r = rig({ ranks: { Main: 0 }, researched: true });
+  for (let k = 0; k < 12; k++) { await r.line('C' + k); await r.pipeline.designIdle(); assert.ok(r.voices.customCount() <= MAX_CUSTOM_PER_GAME); }
+  await r.line('Main'); await r.pipeline.designIdle();
+  assert.ok(r.voices.get('Main').custom_voice);
+  assert.equal(r.voices.customCount(), MAX_CUSTOM_PER_GAME);
+  const gone = Array.from({ length: 12 }, (_, k) => 'C' + k).filter((s) => !r.voices.get(s).custom_voice);
+  assert.ok(gone.length >= 4);
+  const back = gone[0];
+  for (let k = 0; k < 3; k++) { await r.line(back); await r.pipeline.designIdle(); }
+  assert.ok(r.voices.get(back).custom_voice, 'an evicted character that keeps talking gets a voice again');
+  assert.equal(r.voices.customCount(), MAX_CUSTOM_PER_GAME);
+});
+
+test('design failures stop blocking forever and are announced once', async () => {
+  let calls = 0;
+  const r = rig({ designer: (id) => ({ design: async () => { if (++calls <= 3) throw new Error('boom'); return { voice_id: id(), name: 'n' }; }, remove: async () => true }) });
+  await r.line('Ann'); await sleep(40); await r.pipeline.designIdle();
+  assert.ok(!r.voices.get('Ann').custom_voice);
+  assert.ok(r.events.some(([c, p]) => c === 'app:status' && /Ann/.test(p.message)), 'visible notice');
+  await sleep(10);
+  await r.line('Ann'); await sleep(10); await r.pipeline.designIdle();
+  assert.ok(r.voices.get('Ann').custom_voice, 'retried later');
+});
+
+test('voice design: an avoided name is removed as a word, never from inside another word', () => {
+  const { sanitizeDescription } = require('../main/voice-design');
+  assert.equal(sanitizeDescription('A calm voice, a Samurai spirit, Sam sounds warm and clear.', ['Sam']).includes('Samurai'), true);
 });

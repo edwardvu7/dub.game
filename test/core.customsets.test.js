@@ -184,8 +184,8 @@ test('queue: transient errors retry with backoff, bounded', async () => {
   await r.pipeline.designIdle();
   await new Promise((res) => setTimeout(res, 40));
   await r.pipeline.designIdle();
-  assert.equal(n, 3); // DESIGN_ATTEMPTS, then it stays on the preset
-  assert.equal(r.statuses().filter((s) => s.level === 'error').length, 0);
+  assert.equal(n, 3); // DESIGN_ATTEMPTS, then it waits (retried on a later line) and says so once
+  assert.equal(r.statuses().filter((s) => s.level === 'error').length, 1);
   const r2 = rig({ custom: true, designFn: async (name, k) => { if (k === 1) throw new Error('Could not reach ElevenLabs: x'); return { voice_id: 'Cust' + k, name }; } });
   await r2.line('A'); await r2.pipeline.designIdle();
   await new Promise((res) => setTimeout(res, 20)); await r2.pipeline.designIdle();

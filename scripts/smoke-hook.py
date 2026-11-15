@@ -29,6 +29,10 @@ store.s = ADVCharacter("Sylvie")
 store.m = ADVCharacter("Marcus")
 store.p = ADVCharacter("player_name", dynamic=True)
 store.extra = ADVCharacter("Never Speaks")
+store.m_name = "Girl 3"                          # DDLC: the name is a variable, its value changes
+store.mo = ADVCharacter("m_name", dynamic=True)
+store.mo2 = ADVCharacter("m_name")               # dynamic flag not visible: still resolved
+store.gone = ADVCharacter("zz_name", dynamic=True)  # unresolvable: must never send the variable name
 ast = types.ModuleType("renpy.ast"); ast.Say = Say; ast.Menu = Menu
 def eval_who(who):
     return getattr(store, who) if isinstance(who, str) and hasattr(store, who) else who
@@ -101,7 +105,7 @@ burst = [b for p, b in got if p == "/line"]
 seqs = [b["seq"] for b in burst]
 check(burst and burst[-1]["text"] == "burst 49", "a burst of 50 clicks always ends on the newest line (%d of 50 sent)" % len(burst))
 check(seqs == sorted(seqs), "lines reach the app in order")
-check({k: v for k, v in lines[0].items() if k != "upcoming"} == {"speaker": "Sylvie", "text": "Welcome back, Ana. I missed you{really}}.", "engine": "renpy", "game": "renpy:The Question", "seq": 1}, "line 1: " + json.dumps(lines[0]))
+check({k: v for k, v in lines[0].items() if k not in ("upcoming", "speaker_id")} == {"speaker": "Sylvie", "text": "Welcome back, Ana. I missed you{really}}.", "engine": "renpy", "game": "renpy:The Question", "seq": 1}, "line 1: " + json.dumps(lines[0]))
 check(chars and chars[0].get("game") == "renpy:The Question", "the cast is tagged with the game too")
 check(stops and all(b.get("game") == "renpy:The Question" for b in stops), "so is /stop")
 check(lines[1]["speaker"] == "Narrator", "narration is sent as Narrator")
@@ -114,6 +118,15 @@ check(lines[2]["speaker"] == "Ana", "dynamic player name resolved for a line")
 check(not any(b["text"] in ("skipped line", "no interaction") for b in lines), "skipped and non-interactive lines are not sent")
 check(len(stops) >= 4, "player advancing sends /stop (%d)" % len(stops))
 check(elapsed < 0.2, "callback never blocks the game (50 calls in %.0f ms)" % (elapsed * 1000))
+
+nm = env["_dubgame_char_name"]
+check(nm(store.mo) == "Girl 3" and nm(store.mo2) == "Girl 3", "DynamicCharacter 'm_name' resolves to the variable's value, flag or not")
+store.m_name = "Monika"
+check(nm(store.mo) == "Monika", "the name is read again on every line (Girl 3 -> Monika)")
+check(nm(store.gone) is None and env["_dubgame_name_of"]("gone") == "Narrator", "an unresolvable variable name is never sent")
+store._last_say_who = "mo"; got.clear(); cb("begin", interact=True, what="Just Monika."); time.sleep(0.3)
+dl = [b for p, b in got if p == "/line"]
+check(dl and dl[0]["speaker"] == "Monika" and dl[0].get("speaker_id") == "mo", "/line speaker is Monika, speaker_id the variable")
 
 srv.shutdown(); srv.server_close()
 # app not running: must stay silent and fast

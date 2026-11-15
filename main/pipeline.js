@@ -15,8 +15,7 @@ const { isProtagonistName } = require('./cast');
 const MAX_CUSTOM_PER_GAME = 8;
 const DESIGN_ATTEMPTS = 3;     // automatic design: transient failures retry this many times per character
 const DESIGN_BACKOFF_MS = 30000; // ... waiting attempt * this long
-
-const EARLY_CHARACTERS = 4; // the first this many characters (by stable speaker_id) met in a game are likely main ones
+const DESIGN_RETRY_LATER_MS = 5 * 60 * 1000; // after DESIGN_ATTEMPTS failures a character is tried again on its next line after this
 const NARRATOR = 'Narrator';
 const UNKNOWN = 'unknown';
 const RESTART_GAP_MS = 3000; // a game restart takes longer than this
@@ -49,7 +48,10 @@ function createPipeline(deps) {
   const designing = new Map(); // key -> Promise<profile>: one custom-voice design per character at a time
   // Automatic design (Custom voices on): one background queue, one design at a time, never awaited by a line.
   const pending = new Map();   // key -> {game, speaker, notBefore}
-  const attempts = new Map();  // key -> failed tries; at DESIGN_ATTEMPTS the character keeps its preset this session
+  const attempts = new Map();  // key -> failed tries in a row
+  const blockedUntil = new Map(); // key -> time: after DESIGN_ATTEMPTS failures the character waits (not forever) before its next try
+  const renamedTo = new Map(); // key of an old name -> new name (a design finishing after a rename lands on the new name)
+  const retryLaterMs = deps.designRetryMs === undefined ? DESIGN_RETRY_LATER_MS : deps.designRetryMs;
   const backoffMs = deps.designBackoffMs === undefined ? DESIGN_BACKOFF_MS : deps.designBackoffMs;
   let hardStop = null;         // message of the failure that stopped automatic design for the session
   let pump = null;             // Promise of the running queue loop
@@ -123,14 +125,19 @@ function createPipeline(deps) {
     const voices = store.forGame(game);
     if (voices.has(prev)) {
       voices.rename(prev, name);
+      const a = keyOf(game, prev), b = keyOf(game, name);
+      renamedTo.set(a, name);
+      for (const m of [attempts, blockedUntil]) if (m.has(a)) { m.set(b, m.get(a)); m.delete(a); }
+      if (pending.has(a)) { pending.set(b, { ...pending.get(a), speaker: name }); pending.delete(a); }
+      if (lastSpeaker === a) lastSpeaker = b;
       if (rankOf(game, name) >= 0) { voices.requeue(name); attempted.delete(keyOf(game, name)); } // cast again with the research
     }
     return name;
   }
-  function earlyId(game, speaker) {
+  // A speaker the hook gave a stable id ("s", "mc"): a defined character, even when its name looks like a placeholder.
+  function hasId(game, speaker) {
     const t = idTable.get(game);
-    const id = t && [...t.names].find(([, n]) => n === speaker);
-    return !!id && t.met.indexOf(id[0]) >= 0 && t.met.indexOf(id[0]) < EARLY_CHARACTERS;
+    return !!t && [...t.names.values()].includes(speaker);
   }
 
   function activate(game) {
@@ -254,10 +261,11 @@ function createPipeline(deps) {
     const grokKey = settings.getKey('grok');
     const asked = describe(g, { ...existing, samples: samplesOf(g, speaker) });
     if (grokKey && usage) usage.recordAI();
-    const { description } = grokKey
-      ? await profiler.voiceDescription(asked, asked.notes, asked.setting, grokKey, { fetch: deps.fetch })
-      : { description: profiler.fallbackVoiceDescription(asked) };
-    return description;
+    if (grokKey) { // a slow or failing Grok must not cost the character its voice
+      try { return (await profiler.voiceDescription(asked, asked.notes, asked.setting, grokKey, { fetch: deps.fetch })).description; }
+      catch (e) { log(`voice description for ${speaker} failed, using the profile: ${e && e.message}`); }
+    }
+    return profiler.fallbackVoiceDescription(asked);
   }
   // The one rule for "can this character get a designed voice": it exists and a designer is available.
   function checkCanDesign(voices, speaker, existing) {
@@ -281,7 +289,7 @@ function createPipeline(deps) {
   // Standing of a character in the pool: main characters (researched, ranked first) beat the rest; then lines
   // voiced (persisted \`lines\` in voices.json), then who spoke last.
   const standing = (game, name, p) => {
-    const rank = rankOf(game, name);
+    const rank = rankOf(game, name) >= 0 ? rankOf(game, name) : isHero(game, name) ? 0 : -1; // the protagonist is protected like a main
     return { name, locked: !!p.locked, main: rank >= 0, rank, lines: Number.isFinite(p.lines) ? p.lines : 0,
       at: Number.isFinite(p.last_spoken) ? p.last_spoken : 0 };
   };
@@ -358,7 +366,10 @@ function createPipeline(deps) {
       // Names stay out of the prompt: the voice is described, never identified.
       const made = await designer.design({ description, name: voiceName(titleOf(g), speaker), avoid: [speaker, titleOf(g)] });
       // The slot is given up only now that the new voice exists: a failed design costs nobody their voice.
-      return keepCustom(g, speaker, { voice_id: made.voice_id, name: made.name, description: made.description || description }, victimFor(g, speaker));
+      let who = speaker; // renamed while the design ran (Girl 1 -> Sayori): it belongs to the new name
+      while (!voices.has(who) && renamedTo.has(keyOf(g, who))) who = renamedTo.get(keyOf(g, who));
+      if (!voices.has(who)) { removeRemote(made.voice_id); throw new Error('The character is gone.'); }
+      return keepCustom(g, who, { voice_id: made.voice_id, name: made.name, description: made.description || description }, victimFor(g, who));
     })();
     designing.set(k, work);
     try { return await work; } finally { designing.delete(k); }
@@ -366,32 +377,26 @@ function createPipeline(deps) {
 
   // Placeholder speakers ("Student 1", "Guard", "Voice 2") never earn a designed voice by themselves.
   const GENERIC_SPEAKER = /^(?:the\s+)?(?:student|classmate|guy|girl|man|woman|boy|person|kid|child|npc|extra|voice|customer|villager|stranger|waiter|waitress|guard|crowd|everyone|all|both|someone|somebody|teacher|worker|clerk|passerby|male|female)s?(?:[\s_-]*[a-z]?\d+[a-z]?)?$|[\s_-]\d+$/i;
-  const ADAPT_LINES_RESEARCHED = 12; // a character the research missed must keep talking before it gets one
-  const ADAPT_LINES_UNRESEARCHED = 6; // no research for this game (no Grok key, or it failed)
   /**
-   * Who gets a designed voice: the main characters Grok found for this game (a quick web search), first.
-   * Others are adapted in only once they clearly recur, and never when the name is a placeholder.
+   * Who gets a designed voice, after ONE spoken line: any real character. Placeholders ("Student 1", "???") only
+   * with a research match or a speaker_id (DDLC's "Girl 1" is Sayori). The pool and eviction decide who keeps one.
    */
-  function qualifiesForDesign(game, speaker, p) {
-    if (!cast || typeof cast.has !== 'function') return true; // no research to go by
-    // Researched (placeholder names are aliases there), the player character, or among the first few met by id.
-    if (rankOf(game, speaker) >= 0 || isHero(game, speaker) || earlyId(game, speaker)) return true;
-    if (GENERIC_SPEAKER.test(String(speaker).trim())) return false;
-    const researched = cast.has(game);
-    return (Number.isFinite(p.lines) ? p.lines : 0) >= (researched ? ADAPT_LINES_RESEARCHED : ADAPT_LINES_UNRESEARCHED);
+  function qualifiesForDesign(game, speaker) {
+    if (rankOf(game, speaker) >= 0 || isHero(game, speaker) || hasId(game, speaker)) return true;
+    return !isPlaceholder(speaker);
   }
 
   function wantsDesign(game, speaker) {
     const p = store.forGame(game).get(speaker);
     return !!p && !p.custom_voice && !p.muted && speaker !== NARRATOR && speaker !== UNKNOWN &&
-      qualifiesForDesign(game, speaker, p) && !!roomFor(game, speaker, false);
+      qualifiesForDesign(game, speaker) && !!roomFor(game, speaker, false);
   }
 
   /** Queue a character for automatic design (no-op unless the setting is on and it needs one). */
   function enqueueDesign(game, speaker) {
     const k = keyOf(game, speaker);
     if (!designer || !customOn() || hardStop || pending.has(k) || designing.has(k) ||
-        (attempts.get(k) || 0) >= DESIGN_ATTEMPTS || !settings.getKey('elevenlabs') || !wantsDesign(game, speaker)) return;
+        (blockedUntil.get(k) || 0) > now() || !settings.getKey('elevenlabs') || !wantsDesign(game, speaker)) return;
     pending.set(k, { game, speaker, notBefore: 0 });
     startPump();
   }
@@ -439,6 +444,11 @@ function createPipeline(deps) {
             attempts.set(k, n);
             log(`custom voice for ${j.speaker} failed (${n}/${DESIGN_ATTEMPTS}): ${e && e.message}`);
             if (n < DESIGN_ATTEMPTS) pending.set(k, { ...j, notBefore: now() + backoffMs * n });
+            else {
+              attempts.delete(k);
+              blockedUntil.set(k, now() + retryLaterMs); // tried again on a later line, not given up for the session
+              status('error', `Could not make a custom voice for ${j.speaker}: ${e && e.message} It speaks with its preset voice for now and will be tried again.`);
+            }
           }
         }
       } finally { pump = null; }
@@ -453,6 +463,7 @@ function createPipeline(deps) {
       if (on === true) {
         hardStop = null;
         attempts.clear();
+        blockedUntil.clear();
         const g = store.current();
         if (g) for (const [name, p] of Object.entries(store.forGame(g).all())) if (p.spoken) enqueueDesign(g, name);
       }
