@@ -36,7 +36,7 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'voices:update': (arg) => voices.forGame(gameArg(arg)).update(String(need(arg, 'speaker').speaker), arg.patch || {}),
     'voices:reroll': (arg) => pipeline.reroll({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) }),
     'voices:customize': async (arg) => {
-      if (!settings.customVoices()) throw new Error('Custom voices are off. Turn them on in Settings, under Experimental.');
+      if (!settings.customVoices()) throw new Error('Custom voices are off. Turn them on in Settings.');
       if (!settings.getKey('elevenlabs') || !settings.getKey('grok')) throw new Error('Custom voices need both an ElevenLabs key and a Grok key. Add them in Settings.');
       if (!pipeline || typeof pipeline.customizeVoice !== 'function') throw new Error('Custom voices are not available in this build.');
       return pipeline.customizeVoice({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });

@@ -138,20 +138,16 @@
           <span class="switch-text"><b>Act out scenes</b><small>Grok reads a few lines ahead and tunes each one to the moment: excited, scared, whispered. Ren'Py games only. Uses about one Grok request per 15 lines.</small></span>
         </label>
         <label class="switch">
+          <input type="checkbox" id="opt-custom">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-text"><b>Custom voices <span class="tag tag-experimental">Experimental</span></b><small>Turn this on and dub.game designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (at most 8 characters per game) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
+        </label>
+        <label class="switch">
           <input type="checkbox" id="opt-clipboard">
           <span class="switch-track" aria-hidden="true"></span>
           <span class="switch-text"><b>Read lines from the clipboard</b><small>For games without a dub.game hook. Use Textractor with its copy-to-clipboard extension. Speakers are guessed.</small></span>
         </label>
       </div>
-
-      <section class="switches" aria-labelledby="experimental-title">
-        <h3 id="experimental-title">Experimental</h3>
-        <label class="switch">
-          <input type="checkbox" id="opt-custom">
-          <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-text"><b>Custom voices</b><small>Turn this on and dub.game designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (at most 8 characters per game) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
-        </label>
-      </section>
     </section>
   </main>
 

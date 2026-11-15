@@ -85,7 +85,7 @@
       return copy(voices[a.speaker]);
     },
     'voices:customize': async (a) => {
-      if (!settings.customVoices) throw new Error('Custom voices are off. Turn them on in Settings, under Experimental.');
+      if (!settings.customVoices) throw new Error('Custom voices are off. Turn them on in Settings.');
       await wait(1200);
       const voices = voicesOf(a);
       // The preset (voice_id) and the lock stay; the designed voice is the second set (see effective voice rule in CLAUDE.md).

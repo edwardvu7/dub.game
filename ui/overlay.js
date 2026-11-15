@@ -19,22 +19,16 @@
     dub,
     onError: showError,
     emptyText: 'No characters yet. They appear here as soon as the game sends its first line.',
+    scene: true, // only the characters of the current scene
   });
 
   // Whoever is speaking moves to the top, so their settings are the first thing in view.
   dub.on('line:received', (line) => {
-    if (line) cards.setCurrent(line.speaker || null);
+    if (line) cards.setCurrent(line.speaker || null, line.game);
   });
 
   // Main sends this each time the overlay is shown: voices may have changed while it was hidden.
   dub.on('overlay:toggle', () => cards.refresh());
 
-  // The main process turns close() into hide(), so the overlay reopens instantly.
-  const hide = () => window.close();
-  window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    // Esc inside an open dropdown should close the dropdown, not the overlay.
-    if (document.activeElement && document.activeElement.tagName === 'SELECT') return;
-    hide();
-  });
+  // Esc is left to the game (most games open their menu with it); Shift+F2 hides the overlay.
 })();

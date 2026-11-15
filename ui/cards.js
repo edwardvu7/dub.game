@@ -15,7 +15,10 @@
   }
 
   /**
-   * mount(container, { dub, onError, emptyText, pickText?, follow?, onStore }) -> { refresh, setCurrent, setGame, game, destroy }
+   * mount(container, { dub, onError, emptyText, pickText?, follow?, scene?, onStore }) -> { refresh, setCurrent, setGame, game, destroy }
+   * scene (the overlay): list only the characters of the current scene, meaning whoever spoke in
+   * this game's last SCENE_LINES lines since dub.game started, newest first. Everyone else is one
+   * click away ("Show all").
    * follow (default true): with no game picked, show the game that spoke last. pickText: shown
    * instead of emptyText while no game is picked.
    * dub: window.dub. onError(message): how the host window shows a failure.
@@ -37,16 +40,25 @@
     let destroyed = false;
     const openCards = new Set(); // speakers whose cards the player opened (kept across re-renders)
     const spoken = new Set();    // speakers heard since this window opened (before the store catches up)
+    const sceneOnly = opts.scene === true;
+    const SCENE_LINES = 40;      // about one scene: a character quiet for longer drops off the list
+    const heardAt = new Map();   // game -> Map(speaker -> line number when last heard)
+    const lineNo = new Map();    // game -> lines heard this session
+    let showAll = false;
     let cardSeq = 0;
 
     const emptyText = opts.emptyText || 'No characters yet. Voices appear here as soon as a game sends its first line.';
     const empty = el('p', 'cards-empty', emptyText);
     const list = el('div', 'cards');
-    const unheard = el('p', 'cards-empty cards-unheard');
+    const unheard = sceneOnly ? el('button', 'btn btn-quiet cards-more') : el('p', 'cards-empty cards-unheard');
     unheard.hidden = true;
+    if (sceneOnly) {
+      unheard.type = 'button';
+      unheard.addEventListener('click', () => { showAll = !showAll; render(); });
+    }
     container.replaceChildren(empty, list, unheard);
 
-    let customOn = false; // Settings > Experimental > Custom voices
+    let customOn = false; // Settings > Custom voices (experimental)
 
     // Two voice sets per character: the preset (voice_id) and the designed one (custom_voice). With Custom
     // voices on and a designed voice present, the list starts with "Custom: <name>" and shows whichever set
@@ -250,7 +262,18 @@
       const shown = (s) => s === current || spoken.has(s) || voices[s].spoken || voices[s].locked || voices[s].muted;
       const order = [...sorted.filter((s) => s === current || spoken.has(s)), ...sorted.filter((s) => s !== current && !spoken.has(s))]
         .filter(shown);
-      const hidden = sorted.length - order.length;
+      let hidden = sorted.length - order.length;
+      if (sceneOnly) {
+        const g = String(gameId());
+        const at = heardAt.get(g) || new Map();
+        const now = lineNo.get(g) || 0;
+        const inScene = (sp) => sp === current || (at.has(sp) && now - at.get(sp) < SCENE_LINES);
+        const scene = sorted.filter(inScene).sort((a, b) => (b === current) - (a === current) || (at.get(b) || 0) - (at.get(a) || 0));
+        const rest = order.filter((sp) => !scene.includes(sp));
+        order.length = 0;
+        order.push(...scene, ...(showAll ? rest : []));
+        hidden = rest.length;
+      }
       for (const [speaker, card] of cards) {
         if (!order.includes(speaker)) {
           card.root.remove();
@@ -267,8 +290,14 @@
       });
       empty.textContent = !gameId() && opts.pickText ? opts.pickText : emptyText;
       empty.hidden = order.length > 0;
-      unheard.textContent = hidden ? '+' + hidden + ' not heard yet' : '';
-      unheard.hidden = !hidden;
+      if (sceneOnly) {
+        empty.textContent = gameId() ? 'Characters show up here when they speak.' : emptyText;
+        unheard.textContent = showAll ? 'Only this scene' : 'Show all characters (' + hidden + ')';
+        unheard.hidden = !hidden;
+      } else {
+        unheard.textContent = hidden ? '+' + hidden + ' not heard yet' : '';
+        unheard.hidden = !hidden;
+      }
     }
 
     async function refresh() {
@@ -309,9 +338,19 @@
         customOn = !!on;
         for (const [speaker, card] of cards) if (voices[speaker]) patch(speaker, voices[speaker]);
       },
-      /** Highlight (and float to the top) whoever is speaking. Pass null to clear. */
-      setCurrent(speaker) {
-        if (speaker === current) return;
+      /**
+       * Highlight (and float to the top) whoever is speaking. Pass null to clear. Called once per
+       * line; game (the line's game) keeps the scene list per game.
+       */
+      setCurrent(speaker, game) {
+        if (speaker) {
+          const g = String(game || gameId());
+          const n = (lineNo.get(g) || 0) + 1;
+          lineNo.set(g, n);
+          if (!heardAt.has(g)) heardAt.set(g, new Map());
+          heardAt.get(g).set(speaker, n);
+        }
+        if (speaker === current && !sceneOnly) return;
         current = speaker || null;
         if (current) spoken.add(current);
         render();
