@@ -376,18 +376,11 @@
       color: var(--ink-muted);
     }
 
-    .section-hint {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--ink-muted);
-    }
-
-    /* Interactive Pipeline Grid */
+    /* Pipeline Grid */
     .steps-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: var(--space-4);
-      margin-bottom: var(--space-4);
     }
 
     .step-card {
@@ -395,11 +388,10 @@
       border: 1px solid var(--border-hairline);
       border-radius: 14px;
       padding: var(--space-5);
-      cursor: pointer;
       text-align: left;
       transition: all 180ms var(--ease-out);
     }
-    .step-card:hover, .step-card.active {
+    .step-card:hover {
       background: var(--g-900);
       border-color: var(--g-900);
       color: var(--ink-on-dark);
@@ -416,22 +408,10 @@
       border-radius: 6px;
       margin-bottom: var(--space-3);
     }
-    .step-card.active .step-idx, .step-card:hover .step-idx { background: var(--g-800); }
+    .step-card:hover .step-idx { background: var(--g-800); }
     .step-card h2 { font-family: var(--font-display); font-size: 1.18rem; margin-bottom: 4px; }
     .step-card p { font-size: 0.86rem; color: var(--ink-muted); }
-    .step-card.active p, .step-card:hover p { color: var(--ink-on-dark-muted); }
-
-    .pipeline-inspector {
-      background: var(--g-900);
-      color: var(--accent);
-      border-radius: 12px;
-      padding: 14px 18px;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .step-card:hover p { color: var(--ink-on-dark-muted); }
 
     /* Engines */
     .engines-grid {
@@ -621,33 +601,28 @@
       <section class="section" id="pipeline">
         <div class="section-header">
           <div class="section-label">Pipeline</div>
-          <div class="section-hint">Click any stage to inspect runtime hook</div>
         </div>
         <div class="steps-grid">
-          <article class="step-card active" data-step="0">
+          <article class="step-card">
             <div class="step-idx">01</div>
             <h2>Scan Library</h2>
             <p>Auto-detects installed Steam games.</p>
           </article>
-          <article class="step-card" data-step="1">
+          <article class="step-card">
             <div class="step-idx">02</div>
             <h2>Hook Script</h2>
             <p>Captures exact dialogue lines.</p>
           </article>
-          <article class="step-card" data-step="2">
+          <article class="step-card">
             <div class="step-idx">03</div>
             <h2>Cast Voices</h2>
             <p>Profiles every character once.</p>
           </article>
-          <article class="step-card" data-step="3">
+          <article class="step-card">
             <div class="step-idx">04</div>
             <h2>Tune Live</h2>
             <p>Adjust sliders mid-scene.</p>
           </article>
-        </div>
-        <div class="pipeline-inspector" id="pipeline-inspector">
-          <span id="pipeline-code">steam/scan.js → parses libraryfolders.vdf &amp; appmanifest_*.acf</span>
-          <span>READY</span>
         </div>
       </section>
 
@@ -833,21 +808,6 @@
     });
 
     [slStability, slStyle, slSpeed].forEach((s) => s.addEventListener("input", updateReadouts));
-
-    const stepSnippets = [
-      "steam/scan.js → parses libraryfolders.vdf & appmanifest_*.acf",
-      "mod/renpy/dubgame.rpy & mod/godot/generic.gd → streams { speaker, text } to :49210",
-      "main/cast.js + xai.js → infers character archetype, voice ID & emotional mood",
-      "ui/overlay.js → Shift+F2 frameless window anchored via game-window.ps1"
-    ];
-
-    document.querySelectorAll(".step-card").forEach((card) => {
-      card.addEventListener("click", () => {
-        document.querySelectorAll(".step-card").forEach((c) => c.classList.remove("active"));
-        card.classList.add("active");
-        document.getElementById("pipeline-code").textContent = stepSnippets[Number(card.dataset.step)];
-      });
-    });
 
     fetch("https://api.github.com/users/Craz33matt")
       .then((r) => (r.ok ? r.json() : null))
