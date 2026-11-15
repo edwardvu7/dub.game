@@ -169,3 +169,19 @@ test('voice design errors: a key without Voice Generation permission says how to
     fetch: async () => ({ ok: false, status: 403, text: async () => JSON.stringify({ detail: { code: 'feature_not_available', message: 'Not on your plan' } }) }) });
   await assert.rejects(() => other.design({ description: 'A calm man with a warm low voice.' }), /feature_not_available: Not on your plan/);
 });
+
+test('quality: Best uses Multilingual v2 with speaker boost; designs ask for quality and an enhanced prompt', async () => {
+  const tts = require('../main/tts');
+  const fast = tts.buildRequest({ text: 'Hi', voice_id: 'abc' });
+  const best = tts.buildRequest({ text: 'Hi', voice_id: 'abc', model: tts.BEST_MODEL });
+  assert.equal(fast.body.model_id, 'eleven_flash_v2_5');
+  assert.ok(!('use_speaker_boost' in fast.body.voice_settings));
+  assert.equal(best.body.model_id, 'eleven_multilingual_v2');
+  assert.equal(best.body.voice_settings.use_speaker_boost, true);
+  assert.match(fast.url, /mp3_44100_128/);
+  const { fetch, calls } = fakeEl([json(200, { previews: [{ generated_voice_id: 'g' }] }), json(200, { voice_id: 'V1' })]);
+  await designer(fetch).design({ description: 'A calm man with a warm low voice.', name: 'n' });
+  assert.equal(calls[0].body.should_enhance, true);
+  assert.equal(calls[0].body.quality, 0.6);
+  assert.equal(calls[0].body.loudness, 0.5);
+});

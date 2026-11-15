@@ -218,7 +218,25 @@
     return text + '.';
   }
 
-  return { SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
+  /**
+   * Gain that brings a clip to the same loudness as every other: the RMS of its non-silent samples
+   * is moved to about -20 dBFS, kept between x0.4 and x4, and never pushed past a 0.98 peak.
+   * samples: Float32Array of one channel (decoded audio).
+   */
+  function loudnessGain(samples) {
+    let sum = 0, n = 0, peak = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const a = Math.abs(samples[i]);
+      if (a > peak) peak = a;
+      if (a > 0.01) { sum += a * a; n++; } // skip silence, or pauses would make quiet clips louder
+    }
+    if (!n || !peak) return 1;
+    const rms = Math.sqrt(sum / n);
+    const g = Math.min(4, Math.max(0.4, 0.1 / rms));
+    return Math.min(g, 0.98 / peak);
+  }
+
+  return { loudnessGain, SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
     sortSpeakers, initials, voiceLabel, customVoiceLabel, errorText, base64ToBytes, keyState, needsSetup,
     gamesSummary, gameHint, engineName, gameLabel, gameIds, voicesFor, savedGameId, formatCount, planSummary };
 });

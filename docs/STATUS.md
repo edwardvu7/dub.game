@@ -136,3 +136,11 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
   taken from ElevenLabs preview URLs), not a live `GET /v1/voices`. Accent/age labels for the added voices are
   from memory of ElevenLabs' labels, not checked. All are English with no Asian/Indian/Irish accents.
   Check with the API; real accent variety needs the Voice Library.
+
+## Sound quality and levels
+- Speech is mp3 128 kbps again (64 kbps sounded thin on designed voices).
+- Settings > Best voice quality: Multilingual v2 + speaker boost instead of Flash v2.5. About 1 s slower
+  to start and 1 credit per character instead of 0.5.
+- Voice Design asks for `quality: 0.6`, `should_enhance: true`, `loudness: 0.5`. UNVERIFIED how much they help.
+- Every clip is levelled in the player (Web Audio gain from the clip's RMS, -20 dBFS target, x0.4-x4,
+  no clipping), so designed and preset voices play at the same loudness.

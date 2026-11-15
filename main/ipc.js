@@ -7,7 +7,7 @@ const INVOKE_CHANNELS = [
   'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
-  'settings:setClipboardMode', 'settings:setActing', 'settings:setCustomVoices',
+  'settings:setClipboardMode', 'settings:setActing', 'settings:setCustomVoices', 'settings:setQuality',
 ];
 const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'games:changed',
   'usage:changed', 'overlay:toggle', 'app:status'];
@@ -56,6 +56,8 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'settings:test': (arg) => settings.test(arg),
     'settings:setNarration': (arg) => settings.setNarration(arg === true),
     'settings:setActing': (arg) => settings.setActing(arg === true),
+    // true or 'best': Multilingual v2; anything else: Flash v2.5
+    'settings:setQuality': (arg) => settings.setQuality(arg === true || arg === 'best' ? 'best' : 'fast'),
     'settings:setCustomVoices': (arg) => {
       const out = settings.setCustomVoices(arg);
       if (pipeline && typeof pipeline.customVoicesChanged === 'function') pipeline.customVoicesChanged(out.customVoices);

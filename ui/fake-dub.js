@@ -119,6 +119,7 @@
     'settings:setClipboardMode': (a) => { settings.clipboardMode = a === true; return copy(settings); },
     'settings:setCustomVoices': (a) => { settings.customVoices = a === true; return copy(settings); },
     'settings:setActing': (a) => { settings.acting = a === true; return copy(settings); },
+    'settings:setQuality': (a) => { settings.quality = a === true || a === 'best' ? 'best' : 'fast'; return copy(settings); },
   };
 
   window.dub = {

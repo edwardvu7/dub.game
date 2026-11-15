@@ -390,6 +390,7 @@
     $('opt-narration').checked = !!settings.narration;
     $('opt-clipboard').checked = !!settings.clipboardMode;
     $('opt-acting').checked = settings.acting !== false;
+    $('opt-quality').checked = settings.quality === 'best';
     $('opt-custom').checked = settings.customVoices === true;
     if (cards) cards.setCustomVoices(settings.customVoices === true);
     $('settings-flag').hidden = !L.needsSetup(settings);
@@ -470,6 +471,7 @@
   bindSwitch('opt-narration', 'settings:setNarration');
   bindSwitch('opt-clipboard', 'settings:setClipboardMode');
   bindSwitch('opt-acting', 'settings:setActing');
+  bindSwitch('opt-quality', 'settings:setQuality');
   bindSwitch('opt-custom', 'settings:setCustomVoices');
 
   // ---------- Audio (volume lives in Settings) ----------
@@ -511,11 +513,35 @@
     if (cards) cards.setCurrent(currentSpeaker);
   }
 
-  dub.on('audio:play', (clip) => {
+  // Every clip plays through one gain node, set per clip so all voices sound equally loud
+  // (designed voices come out at different levels). Without Web Audio, clips play as they are.
+  let audioCtx = null;
+  let leveler = null;
+  function levelGraph() {
+    if (audioCtx || leveler === false) return !!audioCtx;
+    try {
+      audioCtx = new AudioContext();
+      leveler = audioCtx.createGain();
+      audioCtx.createMediaElementSource(audio).connect(leveler).connect(audioCtx.destination);
+      return true;
+    } catch { leveler = false; audioCtx = null; return false; }
+  }
+  async function levelFor(bytes) {
+    if (!levelGraph()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    try {
+      const decoded = await audioCtx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      leveler.gain.value = L.loudnessGain(decoded.getChannelData(0));
+    } catch { leveler.gain.value = 1; }
+  }
+
+  dub.on('audio:play', async (clip) => {
     stopAudio(); // only the newest line ever plays
     if (!clip || !clip.data) return;
+    let bytes;
     try {
-      clipUrl = URL.createObjectURL(new Blob([L.base64ToBytes(clip.data)], { type: clip.mime || 'audio/mpeg' }));
+      bytes = L.base64ToBytes(clip.data);
+      clipUrl = URL.createObjectURL(new Blob([bytes], { type: clip.mime || 'audio/mpeg' }));
     } catch {
       toast('A line arrived with audio that could not be read.', 'error');
       return;
@@ -524,8 +550,10 @@
     clipSpeaker = clip.speaker || null;
     clipVolume = Number.isFinite(clip.volume) ? L.clamp(clip.volume, 0, 1) : 1;
     audio.volume = Number(volume.value) * clipVolume;
-    audio.src = clipUrl;
     const mine = clipUrl;
+    await levelFor(bytes);
+    if (clipUrl !== mine) return; // a newer line arrived while this one was measured
+    audio.src = clipUrl;
     audio.play().catch((e) => {
       // AbortError just means a newer line replaced this one.
       if (clipUrl === mine && e && e.name !== 'AbortError') { stopAudio(); fail(e); }

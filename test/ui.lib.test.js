@@ -172,3 +172,17 @@ test('customVoiceLabel names the designed voice, with a fallback', () => {
   assert.equal(L.customVoiceLabel({}), 'Custom: designed voice');
   assert.equal(L.customVoiceLabel(null), 'Custom: designed voice');
 });
+
+test('loudnessGain: quiet and loud clips meet in the middle, silence ignored, peaks protected', () => {
+  const tone = (amp, n = 4000) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin(i / 5));
+  const quiet = L.loudnessGain(tone(0.05));
+  const loud = L.loudnessGain(tone(0.3));
+  assert.ok(quiet > 1 && loud < 1, `quiet ${quiet}, loud ${loud}`);
+  const rmsAfter = (amp, g) => amp * g / Math.SQRT2;
+  assert.ok(Math.abs(rmsAfter(0.05, quiet) - rmsAfter(0.3, loud)) < 0.02, 'both land near the same level');
+  const padded = new Float32Array(20000); padded.set(tone(0.05), 0);
+  assert.equal(L.loudnessGain(padded), quiet, 'long silences do not change the gain');
+  const spiky = tone(0.05); spiky[10] = 0.9;
+  assert.ok(L.loudnessGain(spiky) * spiky[10] <= 0.98 + 1e-9, 'never clips');
+  assert.equal(L.loudnessGain(new Float32Array(100)), 1, 'silent clip untouched');
+});

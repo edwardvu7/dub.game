@@ -12,13 +12,14 @@ const ENV_NAMES = { elevenlabs: 'ELEVENLABS_API_KEY', grok: 'XAI_API_KEY' };
  * testers: { elevenlabs(key) -> {ok,error?}, grok(key) -> {ok,error?} }
  */
 function createSettings({ file, safeStorage, env = process.env, testers = {} }) {
-  let data = { narration: true, clipboardMode: false, acting: true, customVoices: false, keys: {} };
+  let data = { narration: true, clipboardMode: false, acting: true, customVoices: false, quality: 'fast', keys: {} };
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     data = {
       narration: raw.narration !== false,
       clipboardMode: raw.clipboardMode === true,
       acting: raw.acting !== false,
+      quality: raw.quality === 'best' ? 'best' : 'fast',
       customVoices: raw.customVoices === true,
       keys: raw.keys && typeof raw.keys === 'object' ? raw.keys : {},
     };
@@ -54,6 +55,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
       narration: data.narration,
       clipboardMode: data.clipboardMode,
       acting: data.acting,
+      quality: data.quality,
       customVoices: data.customVoices,
     };
   }
@@ -64,6 +66,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     narration: () => data.narration,
     clipboardMode: () => data.clipboardMode,
     acting: () => data.acting,
+    quality: () => data.quality,
     customVoices: () => data.customVoices,
 
     /** setKeys({elevenlabs?, grok?}): a non-empty string saves, an empty string removes. */
@@ -85,6 +88,8 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     setNarration(on) { data.narration = !!on; save(); return getPublic(); },
     setClipboardMode(on) { data.clipboardMode = !!on; save(); return getPublic(); },
     setActing(on) { data.acting = !!on; save(); return getPublic(); },
+    /** 'best' (Multilingual v2) or 'fast' (Flash v2.5). */
+    setQuality(q) { data.quality = q === 'best' ? 'best' : 'fast'; save(); return getPublic(); },
     setCustomVoices(on) {
       if (typeof on !== 'boolean') throw new Error('customVoices must be true or false.');
       data.customVoices = on; save(); return getPublic();

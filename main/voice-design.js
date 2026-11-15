@@ -114,6 +114,11 @@ function createVoiceDesigner({ settings, fetch: doFetch = globalThis.fetch, log 
     const designed = await post(`${API}/v1/text-to-voice/design?output_format=mp3_44100_64`, key, {
       voice_description,
       auto_generate_text: true, // the preview sample is never played here; the API writes its own
+      // Quality over variety, and a fuller prompt: designed voices sounded thin with the defaults.
+      // UNVERIFIED: how much each helps; documented as "better output, less variety" and "expands the description".
+      quality: 0.6,
+      should_enhance: true,
+      loudness: 0.5, // the documented default, sent explicitly so every designed voice starts level
     }, 1);
     const first = designed && Array.isArray(designed.previews) && designed.previews[0];
     if (!first || typeof first.generated_voice_id !== 'string' || !first.generated_voice_id) {

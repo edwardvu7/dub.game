@@ -162,7 +162,8 @@ function createPipeline(deps) {
 
   const ttsParams = (profile, text) => ({
     text, voice_id: profile.voice_id, stability: profile.stability, style: profile.style,
-    speed: profile.speed, model: ttsModule.MODEL,
+    speed: profile.speed,
+    model: settings.quality && settings.quality() === 'best' ? ttsModule.BEST_MODEL : ttsModule.MODEL,
   });
 
   // context: {previous_text, next_text}. It shapes delivery but not the cache key: the same line in

@@ -1,25 +1,28 @@
 'use strict';
 // ElevenLabs text-to-speech. Runs in the main process only; the key never leaves it.
 const API = 'https://api.elevenlabs.io';
-const MODEL = 'eleven_flash_v2_5'; // fastest model
-const OUTPUT_FORMAT = 'mp3_44100_64'; // speech: half the download and cache of 128 kbps
+const MODEL = 'eleven_flash_v2_5'; // fastest model, 0.5 credit per character
+const BEST_MODEL = 'eleven_multilingual_v2'; // Settings > Best voice quality: richer, ~1 s slower, 1 credit per character
+const OUTPUT_FORMAT = 'mp3_44100_128'; // 64 kbps sounded thin on designed voices
 const MIME = 'audio/mpeg';
 
 const clamp = (n, lo, hi, dflt) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : dflt);
 
-function buildRequest({ text, voice_id, stability, style, speed, previous_text, next_text }) {
+function buildRequest({ text, voice_id, stability, style, speed, previous_text, next_text, model }) {
+  const best = model === BEST_MODEL;
   if (!voice_id || !/^[A-Za-z0-9]+$/.test(voice_id)) throw new Error('tts: bad voice_id');
   return {
     url: `${API}/v1/text-to-speech/${voice_id}?output_format=${OUTPUT_FORMAT}`,
     body: {
       text: String(text),
-      model_id: MODEL,
+      model_id: best ? BEST_MODEL : MODEL,
       // UNVERIFIED: flash v2.5 is believed to ignore `style`; `speed` is accepted in 0.7-1.2.
       voice_settings: {
         stability: clamp(stability, 0, 1, 0.5),
         similarity_boost: 0.75,
         style: clamp(style, 0, 1, 0),
         speed: clamp(speed, 0.7, 1.2, 1),
+        ...(best ? { use_speaker_boost: true } : {}), // clearer; adds latency, so Best only
       },
       // The lines around this one, so delivery follows the conversation. They are not spoken.
       // UNVERIFIED: accepted by flash v2.5 per ElevenLabs' API reference; not supported by eleven_v3.
@@ -106,4 +109,4 @@ async function subscription(key, deps = {}) {
   }
 }
 
-module.exports = { speak, testKey, subscription, buildRequest, MODEL, MIME };
+module.exports = { speak, testKey, subscription, buildRequest, MODEL, BEST_MODEL, MIME };
