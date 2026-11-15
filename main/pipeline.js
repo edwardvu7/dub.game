@@ -313,9 +313,26 @@ function createPipeline(deps) {
     try { return await work; } finally { designing.delete(k); }
   }
 
+  // Placeholder speakers ("Student 1", "Guard", "Voice 2") never earn a designed voice by themselves.
+  const GENERIC_SPEAKER = /^(?:the\s+)?(?:student|classmate|guy|girl|man|woman|boy|person|kid|child|npc|extra|voice|customer|villager|stranger|waiter|waitress|guard|crowd|everyone|all|both|someone|somebody|teacher|worker|clerk|passerby|male|female)s?(?:[\s_-]*[a-z]?\d+[a-z]?)?$|[\s_-]\d+$/i;
+  const ADAPT_LINES_RESEARCHED = 12; // a character the research missed must keep talking before it gets one
+  const ADAPT_LINES_UNRESEARCHED = 6; // no research for this game (no Grok key, or it failed)
+  /**
+   * Who gets a designed voice: the main characters Grok found for this game (a quick web search), first.
+   * Others are adapted in only once they clearly recur, and never when the name is a placeholder.
+   */
+  function qualifiesForDesign(game, speaker, p) {
+    if (!cast || typeof cast.has !== 'function') return true; // no research to go by
+    if (rankOf(game, speaker) >= 0) return true;
+    if (GENERIC_SPEAKER.test(String(speaker).trim())) return false;
+    const researched = cast.has(game);
+    return (Number.isFinite(p.lines) ? p.lines : 0) >= (researched ? ADAPT_LINES_RESEARCHED : ADAPT_LINES_UNRESEARCHED);
+  }
+
   function wantsDesign(game, speaker) {
     const p = store.forGame(game).get(speaker);
-    return !!p && !p.custom_voice && !p.muted && speaker !== NARRATOR && speaker !== UNKNOWN && !!roomFor(game, speaker, false);
+    return !!p && !p.custom_voice && !p.muted && speaker !== NARRATOR && speaker !== UNKNOWN &&
+      qualifiesForDesign(game, speaker, p) && !!roomFor(game, speaker, false);
   }
 
   /** Queue a character for automatic design (no-op unless the setting is on and it needs one). */

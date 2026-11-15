@@ -21,7 +21,7 @@ const PRESET = catalog[0].voice_id;
 const prof = (speaker, extra = {}) => ({ speaker, gender: 'female', age_range: 'adult', personality: 'p', voice_id: PRESET,
   stability: 0.5, style: 0.3, speed: 1, reason: 'r', source: 'grok', ...extra });
 
-function rig({ ranks = {}, settleMs = 0, quality } = {}) {
+function rig({ ranks = {}, researched = false, settleMs = 0, quality } = {}) {
   const dir = tmpDir();
   const store = createVoiceStore({ file: path.join(dir, 'voices.json'), catalogIds: catalog.map((v) => v.voice_id), catalog });
   const removed = [];
@@ -32,7 +32,7 @@ function rig({ ranks = {}, settleMs = 0, quality } = {}) {
     voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog, settleMs, castWaitMs: 50, designBackoffMs: 1,
     settings: { getKey: () => 'k', narration: () => true, customVoices: () => true, quality: () => quality || 'fast' },
     emit: (ch, p) => events.push([ch, p]), fetch: async () => { throw new Error('offline'); },
-    cast: { ensure() {}, resolve: (_g, s) => s, notes: () => '', setting: () => '', detail: () => ({}), rank: (_g, s) => (s in ranks ? ranks[s] : -1) },
+    cast: { ensure() {}, resolve: (_g, s) => s, notes: () => '', setting: () => '', detail: () => ({}), rank: (_g, s) => (s in ranks ? ranks[s] : -1), ...(researched ? { has: () => true } : {}) },
     speak: async (params) => { models.push(params.model); return Buffer.from('mp3'); },
     profileCharacter: async (c) => prof(c.speaker),
     designer: { design: async () => ({ voice_id: 'Cust' + (++n), name: 'n' }), remove: async (id) => { removed.push(id); return true; } },
@@ -247,4 +247,14 @@ test('voice design prompt carries setting, era, origin, speech, personality and 
     personality: 'Shy', origin: 'Japanese-American', speech: 'soft, casual' }, 'notes', setting);
   for (const s of ['THIS game', setting, 'Japanese-American', 'soft, casual', 'Shy', 'young adult']) assert.ok(p.includes(s), s);
   assert.match(profiler.fallbackVoiceDescription({ gender: 'male', age_range: 'adult', setting: 'Victorian London' }), /Victorian London/);
+});
+
+test('custom voices follow the research: Nicole gets one at once, "Student 1" never, a recurring unlisted name is adapted in', async () => {
+  const r = rig({ ranks: { Nicole: 0 }, researched: true });
+  await r.line('Nicole'); await r.pipeline.designIdle();
+  assert.ok(r.voices.get('Nicole').custom_voice, 'researched main character');
+  for (let k = 0; k < 20; k++) { await r.line('Student 1'); await r.pipeline.designIdle(); }
+  assert.ok(!r.voices.get('Student 1').custom_voice, 'placeholder never earns one');
+  for (let k = 0; k < 14; k++) { await r.line('Mr Reyes'); await r.pipeline.designIdle(); }
+  assert.ok(r.voices.get('Mr Reyes').custom_voice, 'recurring unlisted character is adapted in');
 });

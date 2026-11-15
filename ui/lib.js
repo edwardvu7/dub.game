@@ -42,7 +42,7 @@
   /** The badge on a game's cover: which engine, and whether voices work there yet. */
   function supportBadge(game) {
     const engine = engineName(game && game.engine);
-    if (game && game.voiceMode === 'generic') return { text: 'Godot · Generic hook beta', tone: 'beta', title: 'Reads live Godot 4 text nodes. Compatibility varies by game.' };
+    if (game && game.voiceMode === 'generic') return { text: 'Godot', tone: 'full', title: 'Reads live Godot 4 text nodes. Compatibility varies by game.' };
     if (game && game.voiceMode) return { text: 'Godot · ' + (game.voiceMode === 'integrated' ? 'Demo voices' : 'Launch available'),
       tone: 'beta', title: game.voiceMode === 'integrated' ? 'Dialogue integration included.' : 'Launching is supported. Voices require a game integration.' };
     if (game && game.support === 'soon') {
@@ -144,15 +144,9 @@
   function gameHint(game, justEnabled) {
     const status = gameStatus(game);
     if (game && game.voiceMode === 'generic') {
-      if (!game.enabled) return { tone: 'off', text: 'Voices turn on when you launch. Godot 4 games only.' };
+      if (!game.enabled) return { tone: 'off', text: 'Voices are off.' };
       if (!game.hookInstalled) return { tone: 'warn', text: 'Hook files are missing or changed. Reinstall with the game closed.' };
-      const messages = {
-        connected: 'Connected. Dialogue node detected. Narration must be enabled for unnamed text.',
-        'no-dialogue': 'Connected. Waiting for dialogue to show up in the game.',
-        waiting: 'Waiting for the game hook to connect…',
-        disconnected: 'Installed; no live connection. Start or restart the game. If this persists, this build may not support the hook.',
-      };
-      return { tone: game.hookStatus === 'connected' ? 'on' : 'note', text: messages[game.hookStatus] || messages.disconnected };
+      return { tone: 'on', text: 'Voices are on.' };
     }
     if (status === 'integrated') return { tone: 'on', text: 'Demo voices included. Select Godot 4 on first launch.' };
     if (status === 'launch') return { tone: 'off', text: 'Ready to launch. Voices require a dub.game integration in this game.' };
