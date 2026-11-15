@@ -48,8 +48,10 @@ then add and enable its new folder.
 
 The hook observes new scene nodes and scans at most 512 labels every 100 ms. It
 prefers dialogue, narration, subtitle and cutscene names, excludes menu/button
-contexts, and chooses one candidate. Automatic speaker detection requires a
-nearby explicitly named speaker label; otherwise it uses Narrator. Rich text is
+contexts, and chooses one candidate. Automatic speaker detection uses, in order: the speaker node the
+player picked, a name label (Name, Speaker, NameTag, Who) inside the same text box, then the nearest
+world node (Node2D/Node3D) above the text whose name is not a layout word, which is the character a
+speech bubble floats over. Otherwise it uses Narrator. Rich text is
 converted to plain text. A line must stay unchanged for 650 ms, and standard
 visible-character typewriters must finish. Hidden/changed text stops prior audio.
 An identical line can play again after hiding/clearing or a new typewriter reveal.

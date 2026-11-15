@@ -3,7 +3,7 @@
 extends Node
 
 const BASE_URL := "http://127.0.0.1:8000"
-const VERSION := 2
+const VERSION := 3
 const MAX_LABELS := 512
 var _labels: Array[WeakRef] = []
 var _config: Dictionary = {}
@@ -99,20 +99,63 @@ func _score(node: Node) -> int:
 			return 10 + mini(_text(node).length(), 200)
 	return 0
 
+# Steps up from `node` to the nearest parent that also holds `other` (99 when farther than 4).
+func _distance(node: Node, other: Node) -> int:
+	var up := node.get_parent()
+	for i in range(4):
+		if up == null:
+			break
+		if up.is_ancestor_of(other):
+			return i
+		up = up.get_parent()
+	return 99
+
+const GENERIC := ["bubble", "balloon", "speech", "dialog", "text", "label", "panel", "container", "box",
+	"ui", "hud", "canvas", "layer", "control", "root", "main", "world", "level", "scene", "stage", "node",
+	"anchor", "pivot", "offset", "marker", "position", "head", "body", "sprite", "visual", "model", "mesh",
+	"viewport", "character", "characters", "actor", "actors", "npc", "npcs", "entity", "entities", "player",
+	"overlay", "popup", "window", "hint", "margin", "vbox", "hbox", "center", "background", "bg"]
+
+# A node name that could be a character: not a layout word like "Bubble" or "VBoxContainer".
+func _person(name: String) -> String:
+	var clean := _stable(name).replace("_", " ").strip_edges()
+	var lower := clean.to_lower().replace(" ", "")
+	if clean.length() < 2 or clean.length() > 40:
+		return ""
+	for word in GENERIC:
+		if lower == word or lower.begins_with(word) or lower.ends_with(word):
+			return ""
+	return clean
+
 func _speaker(node: Node, labels: Array) -> String:
 	var chosen := str(_config.get("speakerPath", ""))
-	if not chosen.is_empty():
-		# With several text boxes on screen, the name beside this line wins.
-		var found: Node = null
-		for other in labels:
-			if _stable(str(other.get_path())) == _stable(chosen) and (found == null or other.get_parent() == node.get_parent()):
-				found = other
-		return _text(found).left(100) if found != null else "Narrator"
-	# Only a nearby explicitly named speaker label is evidence of a speaker.
+	var best: Node = null
+	var best_distance := 99
 	for other in labels:
-		var name_lower := str(other.name).to_lower()
-		if other != node and other.get_parent() == node.get_parent() and ("speaker" in name_lower or name_lower in ["name", "namelabel", "charactername", "nametag", "name_tag"]):
-			return _text(other).left(100)
+		if other == node:
+			continue
+		var match_it := false
+		if not chosen.is_empty():
+			match_it = _stable(str(other.get_path())) == _stable(chosen)
+		else:
+			var n := _stable(str(other.name)).to_lower()
+			match_it = "speaker" in n or n in ["name", "namelabel", "charactername", "nametag", "name_tag", "who"]
+		# With several text boxes on screen, the name inside this line's box wins.
+		var d := _distance(node, other)
+		if match_it and d < best_distance and not _text(other).is_empty():
+			best = other
+			best_distance = d
+	if best != null:
+		return _text(best).left(100)
+	# No name label: a bubble that floats over a character usually sits inside that character's
+	# node (/root/World/Cathy/Bubble/Text), so the nearest world node with a real name is the speaker.
+	var up := node.get_parent()
+	while up != null and up != get_tree().root:
+		if up is Node2D or up is Node3D:
+			var who := _person(str(up.name))
+			if not who.is_empty():
+				return who
+		up = up.get_parent()
 	return "Narrator"
 
 func _process(delta: float) -> void:

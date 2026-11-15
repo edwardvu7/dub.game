@@ -31,10 +31,34 @@ func _ready() -> void:
 	get_tree().quit()
 `;
 
-async function play({ bubble, name, pick }) {
+// Bubbles float over characters in the world and have no name label. The previous bubble is still
+// fading out when the next one appears, so two are on screen at once.
+const WORLD = `extends Node
+var lines := [["Mark", "Hey, did you finish the homework?"], ["Cathy", "Not yet. Let's do it together."], ["Mark", "Deal."]]
+func _ready() -> void:
+	var world := Node2D.new(); world.name = "World"; add_child(world)
+	for who in ["Mark", "Cathy"]:
+		var c := Node2D.new(); c.name = who; world.add_child(c)
+	var old: Node = null
+	for l in lines:
+		var bubble := Node2D.new(); bubble.name = "SpeechBubble"
+		var panel := PanelContainer.new(); bubble.add_child(panel)
+		var text := RichTextLabel.new(); text.name = "Text"; text.text = l[1]; text.visible_characters = 0
+		text.custom_minimum_size = Vector2(200, 40); panel.add_child(text)
+		world.get_node(l[0]).add_child(bubble)
+		for i in range(l[1].length() + 1):
+			text.visible_characters = i
+			await get_tree().create_timer(0.02).timeout
+		if old != null: old.queue_free()
+		old = bubble
+		await get_tree().create_timer(1.2).timeout
+	get_tree().quit()
+`;
+
+async function play({ bubble, name, pick, source }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dub-godot-generic-'));
   fs.writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n[application]\nrun/main_scene="res://main.tscn"\n');
-  fs.writeFileSync(path.join(dir, 'main.gd'), GAME.replace('%s', bubble).replace('%s', name));
+  fs.writeFileSync(path.join(dir, 'main.gd'), source || GAME.replace('%s', bubble).replace('%s', name));
   fs.writeFileSync(path.join(dir, 'main.tscn'),
     '[gd_scene load_steps=2 format=3]\n[ext_resource type="Script" path="res://main.gd" id="1"]\n[node name="Main" type="Node"]\nscript = ExtResource("1")\n');
   const game = { appid: 'local:test', installDir: dir, engine: 'godot' };
@@ -59,5 +83,7 @@ async function play({ bubble, name, pick }) {
   assert.deepEqual(await play({ bubble: 'Thing', name: 'Who', pick: {
     textPath: '/root/Main/UI/Thing/@VBoxContainer@5/Text', speakerPath: '/root/Main/UI/Thing/@VBoxContainer@5/Who' } }), want,
   'picked once: later copies of the node are voiced too');
-  console.log('PASS: generic Godot hook, automatic and picked-once, across re-created text boxes.');
+  assert.deepEqual(await play({ source: WORLD }), [['Mark', 'Hey, did you finish the homework?'],
+    ['Cathy', "Not yet. Let's do it together."], ['Mark', 'Deal.']], 'bubbles over characters: the character is the speaker');
+  console.log('PASS: generic Godot hook: automatic, picked-once, and speakers from the character a bubble floats over.');
 })().catch((e) => { console.error(e); process.exitCode = 1; });
