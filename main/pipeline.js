@@ -163,8 +163,11 @@ function createPipeline(deps) {
   const ttsParams = (profile, text) => ({
     text, voice_id: profile.voice_id, stability: profile.stability, style: profile.style,
     speed: profile.speed,
-    model: settings.quality && settings.quality() === 'best' ? ttsModule.BEST_MODEL : ttsModule.MODEL,
+    model: settings.quality && settings.quality() === 'best' || playsCustom(profile) ? ttsModule.BEST_MODEL : ttsModule.MODEL,
   });
+  // Designed voices sound thin on the fast model, so they always use the better one (few characters,
+  // so the extra cost and ~1 s delay stay small).
+  const playsCustom = (p) => !!(p && p.custom_voice && p.voice_id === p.custom_voice.voice_id);
 
   // context: {previous_text, next_text}. It shapes delivery but not the cache key: the same line in
   // the same voice replays from disk.

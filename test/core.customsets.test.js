@@ -221,3 +221,26 @@ test('error text names the service for 403', async () => {
   const t = await tts.speak({ text: 'a', voice_id: 'abc' }, 'k', { fetch: async () => ({ ok: false, status: 403, text: async () => '{}' }) }).catch((x) => x);
   assert.match(t.message, /^ElevenLabs refused the request \(403\)/);
 });
+
+test('custom voices always speak with the better model; preset voices keep the fast one', async () => {
+  const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+  const { createVoiceStore } = require('../main/voices');
+  const { createCache } = require('../main/cache');
+  const { createPipeline } = require('../main/pipeline');
+  const tts = require('../main/tts');
+  const catalog = require('../voices_catalog.json');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dub-best-'));
+  const store = createVoiceStore({ file: path.join(dir, 'voices.json') });
+  const v = store.forGame('g');
+  v.setAuto({ speaker: 'A', voice_id: catalog[0].voice_id, stability: 0.5, style: 0, speed: 1, source: 'grok' });
+  v.setAuto({ speaker: 'B', voice_id: catalog[1].voice_id, stability: 0.5, style: 0, speed: 1, source: 'grok' });
+  v.setCustom('B', { voice_id: 'Designed1', name: 'dub.game - B', description: 'x' });
+  const models = {};
+  const p = createPipeline({ voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog, emit: () => {}, settleMs: 0,
+    settings: { getKey: () => 'k', narration: () => true, customVoices: () => true, quality: () => 'fast' },
+    speak: async (params) => { models[params.voice_id] = params.model; return Buffer.from('mp3'); } });
+  await p.handleLine({ speaker: 'A', text: 'Preset line.', game: 'g' });
+  await p.handleLine({ speaker: 'B', text: 'Custom line.', game: 'g' });
+  assert.equal(models[catalog[0].voice_id], tts.MODEL);
+  assert.equal(models.Designed1, tts.BEST_MODEL);
+});

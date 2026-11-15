@@ -167,7 +167,7 @@ list, main sends `games:changed` with the new list.
 | `settings:test` | invoke | `{provider}` → `{ok, error?}` |
 | `settings:setNarration` | invoke | `boolean` |
 | `settings:setActing` | invoke | `boolean`: Grok directs each line ahead of time (default on) |
-| `settings:setQuality` | invoke | `true`/`'best'` → Multilingual v2 with speaker boost (richer, ~1 s slower, 1 credit/char); anything else → Flash v2.5 (default `'fast'`). The model is part of the audio cache key |
+| `settings:setQuality` | invoke | `true`/`'best'` → Multilingual v2 with speaker boost (richer, ~1 s slower, 1 credit/char); anything else → Flash v2.5 (default `'fast'`). A character speaking with its designed (custom) voice always uses Multilingual v2. The model is part of the audio cache key |
 | `settings:setCustomVoices` | invoke | `boolean` (anything else is an error): Experimental custom ElevenLabs voices (default off) |
 | `audio:play` | main → renderer event | `{speaker, text, mime, data /* base64 */, volume /* 0..1, that character's own */}` |
 | `line:received` | main → renderer event | `{speaker, text, engine}` |
