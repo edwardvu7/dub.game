@@ -122,17 +122,77 @@ function createPipeline(deps) {
     t.names.set(id, name);
     // Two researched, different characters under one id are not a rename (a hook that reuses ids).
     if (rankOf(game, prev) >= 0 && rankOf(game, name) >= 0) return name;
-    const voices = store.forGame(game);
-    if (voices.has(prev)) {
-      voices.rename(prev, name);
-      const a = keyOf(game, prev), b = keyOf(game, name);
-      renamedTo.set(a, name);
-      for (const m of [attempts, blockedUntil]) if (m.has(a)) { m.set(b, m.get(a)); m.delete(a); }
-      if (pending.has(a)) { pending.set(b, { ...pending.get(a), speaker: name }); pending.delete(a); }
-      if (lastSpeaker === a) lastSpeaker = b;
-      if (rankOf(game, name) >= 0) { voices.requeue(name); attempted.delete(keyOf(game, name)); } // cast again with the research
-    }
+    moveProfile(game, prev, name);
     return name;
+  }
+  // The profile `prev` is the same character as `name`: merge it (voices.rename) and carry the pipeline state with it.
+  function moveProfile(game, prev, name) {
+    const voices = store.forGame(game);
+    if (!voices.has(prev)) return;
+    voices.rename(prev, name);
+    const a = keyOf(game, prev), b = keyOf(game, name);
+    renamedTo.set(a, name);
+    for (const m of [attempts, blockedUntil]) if (m.has(a)) { m.set(b, m.get(a)); m.delete(a); }
+    if (pending.has(a)) { pending.set(b, { ...pending.get(a), speaker: name }); pending.delete(a); }
+    if (lastSpeaker === a) lastSpeaker = b;
+    const t = idTable.get(game);
+    if (t) for (const [id, n] of t.names) if (n === prev) t.names.set(id, name);
+    if (rankOf(game, name) >= 0) { voices.requeue(name); attempted.delete(keyOf(game, name)); } // cast again with the research
+  }
+
+  // Placeholder labels the game shows before a reveal, plus name variables that leaked ("m_name").
+  const isLabel = (n) => isPlaceholder(n) || /^\w+_name$/i.test(String(n).trim());
+  const learned = new Map();   // game -> Map(label -> real name) found by reconcile: the label keeps resolving this session
+  const reconciled = new Map(); // game -> {at, sig}: rate limit (3 min, only when the unresolved labels changed)
+  const RECONCILE_GAP_MS = 3 * 60 * 1000;
+  const reconciling = new Set();
+
+  /**
+   * Fold placeholder entries ("Girl 1", "???", "m_name") into the researched characters they really are.
+   * Order: research aliases (free), then one Grok wiki call for the rest. Silent no-op without a key or research;
+   * never throws. `force` skips the 3-minute gap (research just arrived). Returns how many entries were merged.
+   */
+  async function reconcile(game, force = false) {
+    if (!cast || typeof cast.reconcile !== 'function' || !settings.getKey('grok') || reconciling.has(game)) return 0;
+    const researched = cast.characters(game);
+    if (!researched.length) return 0;
+    const voices = store.forGame(game);
+    const labels = Object.values(voices.all()).map((p) => p.speaker)
+      .filter((n) => n !== NARRATOR && n !== UNKNOWN && isLabel(n) && !isHero(game, n));
+    const sig = labels.slice().sort().join('|');
+    const last = reconciled.get(game);
+    if (!labels.length || (last && (last.sig === sig || (!force && now() - last.at < RECONCILE_GAP_MS)))) return 0;
+    reconciling.add(game);
+    reconciled.set(game, { at: now(), sig });
+    let done = 0;
+    try {
+      const merge = (label, to) => {
+        const target = researched.find((c) => c.name === to);
+        const g = voices.get(label) && voices.get(label).gender;
+        const known = (x) => x === 'male' || x === 'female';
+        if (!target || target.protagonist || (known(g) && known(target.gender) && g !== target.gender)) return; // shortcut: gender clash = skip
+        if (!learned.has(game)) learned.set(game, new Map());
+        learned.get(game).set(label, to);
+        moveProfile(game, label, to);
+        done++;
+      };
+      const rest = [];
+      for (const l of labels) {
+        const c = cast.resolve(game, l);
+        if (c !== l) merge(l, c); else rest.push(l);
+      }
+      if (rest.length) {
+        if (usage) usage.recordAI();
+        const map = await cast.reconcile(game, rest.map((l) => ({ label: l, samples: samplesOf(game, l) })));
+        for (const l of rest) if (map[l]) merge(l, map[l]);
+      }
+      if (done) log(`reconcile ${game}: merged ${done} placeholder speaker(s) into researched characters`);
+    } catch (e) {
+      log('reconcile failed: ' + e.message);
+    } finally {
+      reconciling.delete(game);
+    }
+    return done;
   }
   // A speaker the hook gave a stable id ("s", "mc"): a defined character, even when its name looks like a placeholder.
   function hasId(game, speaker) {
@@ -468,6 +528,7 @@ function createPipeline(deps) {
         if (g) for (const [name, p] of Object.entries(store.forGame(g).all())) if (p.spoken) enqueueDesign(g, name);
       }
     },
+    reconcile,
     /** Resolves when the automatic design queue is idle (tests). */
     designIdle: async () => { while (pump || removals.size) await Promise.all([pump, ...removals]); },
 
@@ -490,6 +551,8 @@ function createPipeline(deps) {
           now() - lastLineAt < RESTART_GAP_MS) return;
       // Cast aliases first, then the offline same-person rule (Mark / MarkBorja / MarkSprite).
       let resolved = nameIn(game, heard);
+      const was = learned.get(game) && learned.get(game).get(resolved);
+      if (was && !line.speaker_id) resolved = was; // reconcile already placed this label
       resolved = trackId(game, line.speaker_id, resolved, true);
       const known = store.forGame(game);
       const speaker = known.canonical(resolved);
@@ -518,6 +581,7 @@ function createPipeline(deps) {
         return;
       }
       remember(game, speaker, text);
+      if (isLabel(speaker) && cast && typeof cast.reconcile === 'function') reconcile(game).catch(() => {}); // background, never awaited
       try {
         const casting = needsProfile(voices, speaker);
         const profiled = ensureProfile(voices, speaker, samplesOf(game, speaker));
@@ -701,6 +765,7 @@ function createPipeline(deps) {
       // Casting that started before the lookup finished must land first, or it would be skipped.
       const prefix = game + '\u0000';
       await Promise.all([...inFlight].filter(([k]) => k.startsWith(prefix)).map(([, w]) => w.catch(() => {})));
+      await reconcile(game, true); // research just arrived (and on startup data): fold placeholders in before recasting
       const key = settings.getKey('grok');
       const all = voices.all();
       const todo = Object.values(all).filter((p) => !p.locked && (!p.cast || (!p.researched && cast && cast.setting(game))) && p.source !== 'builtin' &&

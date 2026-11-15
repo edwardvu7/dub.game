@@ -29,6 +29,7 @@ function prompt(gameName, seen) {
     '"origin":"nationality or ethnic background if known, else empty","speech":"short: formal or slang, regional English, tone, pace"}]}',
     'List EVERY main and recurring character, including the player character (protagonist: true, with their gender and age_range), in order of first appearance in the game, up to 25.',
     'aliases: every other name the script may show for them, especially placeholder names before a reveal ("Girl 1", "???", "Unknown") and for the player ("MC", "You", "Protagonist"), plus nicknames and titles.',
+    'For each character, look on the Fandom wiki for the unnamed or placeholder labels the game shows for them before their name is revealed (for example "Girl 1", "Girl 2", "???") and list them in aliases.',
     'setting: where and when the game takes place and the language of the game text (voices are cast for that language); leave a field empty if unknown.',
     'speech: how the character sounds in the game text language. For an English-language game set in Japan, a teen speaks natural, casual American English, not accented English.',
     `gender is one of ${GENDERS.join(', ')}. age_range is one of ${AGES.join(', ')}.`,
@@ -157,8 +158,39 @@ function createCastBook({ file, settings, fetch: doFetch = globalThis.fetch, now
   }
 
   const characters = (game) => (book[game] && book[game].characters) || [];
+
+  /**
+   * One Grok call (web search, wiki first): which researched character is each unresolved speaker label?
+   * labels: [{label, samples}]. Returns {label: researched name}; labels Grok maps to null or to a name that is not in
+   * the researched list are left out. UNVERIFIED: not called live.
+   */
+  async function reconcile(game, labels) {
+    const list = characters(game);
+    if (!list.length || !labels.length) return {};
+    const text = await callGrok({ key: settings.getKey('grok'), model: MODEL, timeout: TIMEOUT_MS, fetch: doFetch, tools: [{ type: 'web_search' }],
+      input: [
+        `In the video game "${(book[game] && book[game].name) || game}" some speaker labels are placeholders for a character whose real name is revealed later (or leaked variable names).`,
+        'Use the web search tool, the game\'s Fandom wiki first, then the official wiki and Wikipedia.',
+        'Researched characters: ' + list.map((c) => c.name + (c.aliases.length ? ` (aka ${c.aliases.join(', ')})` : '')).join('; ') + '.',
+        'Labels with sample lines:',
+        ...labels.map((l) => `- ${JSON.stringify(l.label)}: ${l.samples.slice(0, 3).map((s) => JSON.stringify(String(s).slice(0, 120))).join(' | ')}`),
+        'Map each label to exactly one researched character name, or null when it is a crowd or other character not in the list.',
+        'Reply with strict JSON only: {"<label>": "<character name or null>"}.',
+      ].join('\n') });
+    const raw = extractJson(text) || {};
+    const out = {};
+    for (const { label } of labels) {
+      const c = typeof raw[label] === 'string' && list.find((x) => x.name.toLowerCase() === raw[label].trim().toLowerCase());
+      if (c) out[label] = c.name;
+    }
+    return out;
+  }
+
   return {
     ensure,
+    reconcile,
+    /** The researched characters of a game (name, aliases, gender, protagonist, ...). */
+    characters,
     has: (game) => characters(game).length > 0,
     /** The researched setting as one line for Grok, or ''. */
     setting: (game) => settingLine(book[game] && book[game].setting),
