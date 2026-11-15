@@ -28,7 +28,7 @@ test('designer: design then create, headers and bodies', async () => {
   const { fetch, calls } = fakeEl([json(200, { previews: [{ generated_voice_id: 'gen1' }, { generated_voice_id: 'gen2' }], text: 't' }),
     json(200, { voice_id: 'NewVoice123' })]);
   const out = await designer(fetch).design({ description: 'A young woman with a soft Midwestern accent.', name: 'dub.game X - Y' });
-  assert.deepEqual(out, { voice_id: 'NewVoice123', name: 'dub.game X - Y' });
+  assert.deepEqual(out, { voice_id: 'NewVoice123', name: 'dub.game X - Y', description: 'A young woman with a soft Midwestern accent.' });
   assert.match(calls[0].url, /\/v1\/text-to-voice\/design/);
   assert.match(calls[1].url, /\/v1\/text-to-voice$/);
   assert.equal(calls[0].init.headers['xi-api-key'], 'el-key');
@@ -41,8 +41,10 @@ test('designer: API errors are readable and keyless is refused', async () => {
     /ElevenLabs 402 during Voice Design \(step 1\/2\)\. ElevenLabs says: Free users cannot use this.*plan/);
   await assert.rejects(designer(async () => json(401, { detail: { status: 'invalid_api_key' } })).design({ description: 'x', name: 'n' }), /ElevenLabs refused Voice Design \(step 1\/2\) \(401\).*invalid_api_key/);
   const e403 = await designer(async () => json(403, { detail: { status: 'missing_permissions' } })).design({ description: 'x', name: 'n' }).catch((e) => e);
-  assert.match(e403.message, /^ElevenLabs refused Voice Design \(step 1\/2\) \(403\)\. ElevenLabs says: missing_permissions\./);
-  assert.match(e403.message, /plan includes Voice Design/);
+  assert.match(e403.message, /^Your ElevenLabs API key is not allowed to design voices \(403\)\. ElevenLabs says: missing_permissions\./);
+  assert.match(e403.message, /Voice Generation and Voices \(write\)/);
+  const plan403 = await designer(async () => json(403, { detail: { code: 'subscription_required', message: 'Upgrade' } })).design({ description: 'x', name: 'n' }).catch((e) => e);
+  assert.match(plan403.message, /^ElevenLabs refused Voice Design \(step 1\/2\) \(403\)\. ElevenLabs says: subscription_required: Upgrade\..*plan includes Voice Design/);
   const step2 = await designer(async (u) => (/design/.test(u) ? json(200, { previews: [{ generated_voice_id: 'g' }] }) : json(403, { detail: { message: 'nope' } }))).design({ description: 'x', name: 'n' }).catch((e) => e);
   assert.match(step2.message, /refused saving the voice \(step 2\/2\) \(403\)\. ElevenLabs says: nope/);
   assert.equal(e403.hard, true);
@@ -136,4 +138,34 @@ test('customizeVoice: per-game cap and concurrency guard', async () => {
   release();
   await Promise.all([a, b]);
   assert.equal(n, 1);
+});
+
+test('voice design prompt: no minor-age words and no character or game names', () => {
+  const d = sanitizeDescription('A teenage girl named Sayori from Doki Doki Literature Club, cheerful high-schooler, childlike giggle.',
+    ['Sayori', 'Doki Doki Literature Club']);
+  assert.doesNotMatch(d, /teen|girl|child|high-school|Sayori|Doki/i);
+  assert.match(d, /young woman/);
+  assert.equal(sanitizeDescription('Sayori is a bubbly teen.', ['Sayori']), 'This character is a bubbly young adult.');
+  assert.equal(sanitizeDescription('A gravelly elderly man, slow and kind.'), 'A gravelly elderly man, slow and kind.', 'adults untouched');
+  for (const age of ['child', 'teen']) {
+    const fb = profiler.fallbackVoiceDescription({ gender: 'female', age_range: age, personality: 'Shy' });
+    assert.doesNotMatch(fb, /teen|child/i);
+    assert.match(fb, /young adult woman with a light, youthful voice/);
+    assert.match(fb, /Shy\. Clear/, 'sentence ends before the pacing note');
+  }
+});
+
+test('voice design errors: a key without Voice Generation permission says how to fix it', async () => {
+  const designer = createVoiceDesigner({ settings: { getKey: () => 'k' },
+    fetch: async () => ({ ok: false, status: 403, text: async () => JSON.stringify({ detail: { code: 'insufficient_permissions', message: 'The API key is missing the permission voice_generation' } }) }) });
+  await assert.rejects(() => designer.design({ description: 'A calm man with a warm low voice.' }), (e) => {
+    assert.equal(e.hard, true);
+    assert.equal(e.code, 'insufficient_permissions');
+    assert.match(e.message, /Voice Generation/);
+    assert.match(e.message, /insufficient_permissions: The API key is missing/);
+    return true;
+  });
+  const other = createVoiceDesigner({ settings: { getKey: () => 'k' },
+    fetch: async () => ({ ok: false, status: 403, text: async () => JSON.stringify({ detail: { code: 'feature_not_available', message: 'Not on your plan' } }) }) });
+  await assert.rejects(() => other.design({ description: 'A calm man with a warm low voice.' }), /feature_not_available: Not on your plan/);
 });

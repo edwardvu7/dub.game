@@ -149,6 +149,7 @@ function buildVoiceDescriptionPrompt(profile, notes, setting) {
     'Describe age, gender, accent, tone, pitch, pacing and emotional color in one or two sentences, 150-400 characters.',
     'The accent must fit the character\'s origin and the game\'s setting. Do NOT use a British or Australian accent unless that fits; if unknown, use a neutral American accent.',
     'Never name a real person, actor or celebrity and never ask for a soundalike.',
+    'Do not mention the character\'s name, the game\'s title, or any age under 18: describe young characters as a young adult with a light, youthful voice.',
     'Reply with JSON only: {"description": "..."}',
   ].filter(Boolean).join('\n');
 }
@@ -156,11 +157,14 @@ function buildVoiceDescriptionPrompt(profile, notes, setting) {
 /** Deterministic description from the profile alone (Grok failed). */
 function fallbackVoiceDescription(profile) {
   const p = profile || {};
-  const age = { child: 'child', teen: 'teenage', young_adult: 'young adult', adult: 'adult', elder: 'elderly' }[p.age_range] || 'adult';
-  const g = p.gender === 'female' ? 'woman' : p.gender === 'male' ? 'man' : 'person';
+  // Children and teens are described as young adults with a light voice: voices of minors may be refused.
+  const age = { child: 'young adult', teen: 'young adult', young_adult: 'young adult', adult: 'adult', elder: 'elderly' }[p.age_range] || 'adult';
+  const light = p.age_range === 'child' || p.age_range === 'teen' ? ' with a light, youthful voice' : '';
+  const g = (p.gender === 'female' ? 'woman' : p.gender === 'male' ? 'man' : 'person') + light;
   const accent = p.origin ? `with an accent fitting ${short(p.origin, 60)}` : 'with a neutral American accent';
   const tone = p.speech ? short(p.speech, 160) : p.personality ? short(p.personality, 160) : 'natural, conversational tone';
-  return `A ${age} ${g} ${accent}. Tone and manner: ${tone} Clear, natural pacing.`.replace('..', '.').slice(0, VOICE_DESC_MAX);
+  const t = /[.!?]$/.test(tone) ? tone : tone + '.';
+  return `A ${age} ${g} ${accent}. Tone and manner: ${t} Clear, natural pacing.`.slice(0, VOICE_DESC_MAX);
 }
 
 /** Parse Grok's reply; null when unusable (not an object, too short or too long to be useful). */

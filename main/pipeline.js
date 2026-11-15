@@ -210,8 +210,9 @@ function createPipeline(deps) {
       const { description } = grokKey
         ? await profiler.voiceDescription(asked, asked.notes, asked.setting, grokKey, { fetch: deps.fetch })
         : { description: profiler.fallbackVoiceDescription(asked) };
-      const made = await designer.design({ description, name: voiceName(titleOf(g), speaker) });
-      return voices.setCustom(speaker, { voice_id: made.voice_id, name: made.name, description });
+      // Names stay out of the prompt: the voice is described, never identified.
+      const made = await designer.design({ description, name: voiceName(titleOf(g), speaker), avoid: [speaker, titleOf(g)] });
+      return voices.setCustom(speaker, { voice_id: made.voice_id, name: made.name, description: made.description || description });
     })();
     designing.set(k, work);
     try { return await work; } finally { designing.delete(k); }
