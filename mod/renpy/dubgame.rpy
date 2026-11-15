@@ -5,24 +5,27 @@
 # it never changes the game's own files, and the game runs normally when the app is closed.
 #
 # Contract (see CLAUDE.md):
-#   POST /line        {speaker, text, engine: "renpy", game, seq, upcoming: [{speaker, text}]}
+#   POST /line        {speaker, speaker_id?, text, engine: "renpy", game, seq, upcoming: [{speaker, text}]}
 #   POST /stop        {engine: "renpy", game, seq}      (player clicked past the line)
-#   POST /characters  {engine: "renpy", game, characters: [{speaker, samples}]}   (once, at launch)
+#   POST /characters  {engine: "renpy", game, characters: [{speaker, id?, samples}]}   (once, at launch)
 #   game is "renpy:<game folder name>", so each game keeps its own voices in the app.
-#   GET  /health      (once, at launch) is the app running? If so, go borderless fullscreen.
+#   GET  /health      (once, at launch) is the app running? If so, start windowed (first run only).
 #
 # Display mode: the dub.game overlay can sit on top of a windowed or borderless game, but not
-# an exclusive-fullscreen one. Ren'Py 7 and 8 draw "fullscreen" as a borderless window the size
-# of the screen (SDL fullscreen-desktop), so while the app is running the hook switches the game
-# to fullscreen once, at the first interaction. After that the player's own choice wins: if they
-# switch to windowed, it stays windowed. With the app closed the game is left as the player set it.
+# an exclusive-fullscreen one (Ren'Py 6.99, DDLC, may use one). So the first time the game runs
+# with the app open, the hook switches it to windowed (preferences.fullscreen = False) and records
+# that in persistent.dubgame_windowed. After that the player's own choice wins: they can go
+# fullscreen again and it stays. With the app closed the game is left as the player set it.
+#
+# speaker_id / id: DynamicCharacter names change (Girl 1 -> Sayori), so /line carries the optional
+# speaker_id (the variable holding the Character, else its image tag) and /characters entries an id.
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
 # UNVERIFIED (DDLC, Ren'Py 6.99 / Python 2): DynamicCharacter names (s_name), [player] substitution via
 # renpy.substitute (if missing on 6.99 the text keeps "[player]"), garbled glitch text sent as is, and
 # `extend` lines (Ren'Py passes the whole accumulated text). The hook binds no keys, so Shift+F2 is never eaten.
-# DUBGAME_HOOK_VERSION 8
+# DUBGAME_HOOK_VERSION 9
 
 init -999 python:
     import json as _dubgame_json
@@ -142,35 +145,62 @@ init -999 python:
     def _dubgame_speaker():
         return _dubgame_name_of(getattr(store, "_last_say_who", None))
 
+    def _dubgame_char_of(who):
+        if who is None:
+            return None
+        try:
+            ast = _dubgame_sys.modules.get("renpy.ast")
+            return ast.eval_who(who)
+        except Exception:
+            try:
+                return eval(who, vars(store))  # a variable name, or a quoted literal name
+            except Exception:
+                return None
+
     def _dubgame_name_of(who):
         if who is None:
             return u"Narrator"
-        char = None
-        try:
-            ast = _dubgame_sys.modules.get("renpy.ast")
-            char = ast.eval_who(who)
-        except Exception:
-            try:
-                char = eval(who, vars(store))  # a variable name, or a quoted literal name
-            except Exception:
-                char = None
-        return _dubgame_char_name(char) or u"Narrator"
+        return _dubgame_char_name(_dubgame_char_of(who)) or u"Narrator"
 
-    def _dubgame_borderless():
-        """Main thread only. Once per launch, turns the fullscreen preference on (borderless)."""
+    def _dubgame_speaker_id():
+        who = getattr(store, "_last_say_who", None)
+        return _dubgame_id_of(who, _dubgame_char_of(who))
+
+    def _dubgame_windowed():
+        """Main thread only. The first time the game runs with the app open, start it windowed."""
         # UNVERIFIED: relies on Ren'Py re-reading preferences.fullscreen at the next interaction,
-        # which is how its own Display > Fullscreen preference works.
+        # which is how its own Display > Window preference works (6.99 and 7/8 alike).
         try:
             if not _dubgame_state["app_running"] or _dubgame_state.get("display_set"):
                 return
             _dubgame_state["display_set"] = True
+            pers = getattr(store, "persistent", None)
+            if pers is None or getattr(pers, "dubgame_windowed", False):
+                return  # already done once: the player's own choice wins from now on
+            pers.dubgame_windowed = True
             prefs = getattr(_dubgame_sys.modules.get("renpy.game"), "preferences", None)
             if prefs is None:
                 prefs = getattr(store, "_preferences", None)
-            if prefs is not None and not getattr(prefs, "fullscreen", False):
-                prefs.fullscreen = True
+            if prefs is not None and getattr(prefs, "fullscreen", False):
+                prefs.fullscreen = False
         except Exception:
             pass
+
+    _dubgame_ID = _dubgame_re.compile(r"^[A-Za-z0-9_]{1,40}$")
+
+    def _dubgame_id_of(who, char):
+        """Stable per-character id: the variable holding the Character (DDLC: s, m, n, y, mc), else its image tag."""
+        try:
+            if who is None:
+                return None
+            if isinstance(who, (_dubgame_text_type, str)) and _dubgame_ID.match(who) and char is not None:
+                return str(who)
+            tag = getattr(char, "image_tag", None)
+            if tag and _dubgame_ID.match(tag):
+                return str(tag)
+        except Exception:
+            pass
+        return None
 
     _dubgame_STOPS = ("Menu", "Jump", "Call", "Return", "If", "While")
 
@@ -203,7 +233,7 @@ init -999 python:
             if not interact:
                 return
             if event == "begin":
-                _dubgame_borderless()
+                _dubgame_windowed()
                 if config.skipping:
                     return  # player is fast-forwarding; do not voice skipped lines
                 what = kwargs.get("what") or getattr(store, "_last_say_what", None)
@@ -211,14 +241,18 @@ init -999 python:
                 if not text:
                     return
                 _dubgame_state["seq"] += 1
-                _dubgame_post("/line", {
+                payload = {
                     "speaker": _dubgame_speaker(),
                     "text": text,
                     "engine": "renpy",
                     "game": _dubgame_game,
                     "seq": _dubgame_state["seq"],
                     "upcoming": _dubgame_upcoming(),
-                })
+                }
+                sid = _dubgame_speaker_id()
+                if sid:
+                    payload["speaker_id"] = sid
+                _dubgame_post("/line", payload)
             elif event == "end":
                 # The player moved on. The app ignores this if a newer line already arrived.
                 _dubgame_post("/stop", {"engine": "renpy", "game": _dubgame_game, "seq": _dubgame_state["seq"]})
@@ -259,7 +293,17 @@ init -999 python:
         names = sorted(set(by_var.values()))
         if samples:
             names = [n for n in names if n in samples]  # drop characters that never speak
-        return [{"speaker": n, "samples": samples.get(n, [])} for n in names[:60]]
+        ids = {}
+        for key, name in by_var.items():
+            if _dubgame_ID.match(key):
+                ids.setdefault(name, key)
+        out = []
+        for n in names[:60]:
+            entry = {"speaker": n, "samples": samples.get(n, [])}
+            if n in ids:
+                entry["id"] = ids[n]
+            out.append(entry)
+        return out
 
     def _dubgame_send_characters():
         if _dubgame_state["sent_characters"]:
@@ -294,8 +338,8 @@ init -999 python:
     except Exception:
         pass
     try:
-        # Every interaction (menus included), so the game is borderless before the first line.
-        config.interact_callbacks.append(_dubgame_borderless)
+        # Every interaction (menus included), so the first-run windowed switch happens before the first line.
+        config.interact_callbacks.append(_dubgame_windowed)
     except Exception:
         pass
     try:

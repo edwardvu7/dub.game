@@ -72,8 +72,8 @@ function createFullscreenCheck(opts = {}) {
 }
 
 const EXCLUSIVE_MESSAGE =
-  "Your game is in exclusive fullscreen, so the overlay can't appear over it. Switch the game to " +
-  'windowed or borderless fullscreen (in most Ren\'Py games: Preferences, then Display, then Window), ' +
+  "Windows reports your game as exclusive fullscreen (it also does for some borderless ones), so the overlay may not appear over it. " +
+  'If it does not, switch the game to windowed (in most Ren\'Py games: Preferences, then Display, then Window), ' +
   'or tune voices in the Voices tab of the dub.game window.';
 
 module.exports = { createFullscreenCheck, parseState, STATES, SCRIPT, EXCLUSIVE_MESSAGE };

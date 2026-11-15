@@ -30,6 +30,14 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
   game to windowed or borderless, and a Windows notification appears once the game leaves fullscreen.
   Borderless fullscreen is fine. Checked by unit tests with a stand-in PowerShell; not yet on Windows.
 
+## Ren'Py hook v9: windowed first run and speaker ids
+- The v5 to v8 hook forced fullscreen at launch. In Ren'Py 6.99 (DDLC) that can be exclusive fullscreen, which hides
+  the overlay and trips the exclusive-fullscreen warning. v9 does the opposite: the first run with the app open starts
+  windowed (`persistent.dubgame_windowed` remembers it), then the player's choice wins. Fullscreen.js now words its
+  warning as "may" because Windows can report some borderless games as exclusive. UNVERIFIED on a real DDLC install.
+- `/line` carries optional `speaker_id`, `/characters` entries an `id` (DDLC: s, m, n, y, mc). App side is separate.
+- `npm run smoke:hook` could not run here (port 8000 refused); the hook block was only compile-checked.
+
 ## Changed on the `ui-changes` branch
 - Overlay is a compact 340 x 600 panel at the left edge, voice settings only (no title, no last line).
 - Launch turns voices on for the game if needed, then starts it. While the app is running, the Ren'Py

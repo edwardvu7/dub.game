@@ -22,7 +22,8 @@ function prompt(characters, catalog, opts) {
     // notes: what is known about the character (from the Grok cast lookup), trusted over guesses.
     const known = (c.notes ? `    Known about them: ${c.notes}\n` : '') + (c.origin ? `    Origin: ${c.origin}\n` : '') +
       (c.speech ? `    How they speak: ${c.speech}\n` : '');
-    return `- ${c.speaker}\n${known}${lines || '    (no sample lines; judge from the name)'}`;
+    const hero = c.protagonist ? '    The PLAYER CHARACTER: a teenage boy (gender male, age_range teen). Pick a young male voice, never a female one.\n' : '';
+    return `- ${c.speaker}\n${hero}${known}${lines || '    (no sample lines; judge from the name)'}`;
   }).join('\n');
   const game = characters.find((c) => c.game);
   const setting = (characters.find((c) => c.setting) || {}).setting;
@@ -57,10 +58,13 @@ function fallbackVoice(speaker, catalog) {
   return catalog[h.readUInt32BE(0) % catalog.length];
 }
 
-function fallbackProfile(speaker, catalog, why) {
-  const v = fallbackVoice(speaker, catalog);
+function fallbackProfile(speaker, catalog, why, known) {
+  const hero = !!(known && known.protagonist);
+  // The protagonist is a teenage boy: a young American-sounding male voice (no invented ids: the catalog has them).
+  const pool = hero ? catalog.filter((x) => MALE.test(x.description) && YOUNG.test(x.description) && !ACCENT.test(x.description)) : [];
+  const v = fallbackVoice(speaker, pool.length ? pool : catalog);
   return {
-    speaker, gender: 'neutral', age_range: 'adult', personality: 'Not profiled yet.',
+    speaker, gender: hero ? 'male' : 'neutral', age_range: hero ? 'teen' : 'adult', personality: 'Not profiled yet.',
     voice_id: v.voice_id, stability: 0.5, style: 0.3, speed: 1.0,
     reason: `Placeholder voice (${why || 'Grok unavailable'}). Re-roll once a Grok key is set.`,
     locked: false, source: 'fallback',
@@ -81,6 +85,8 @@ function noteFields(known) {
 }
 
 const YOUNG_AGES = ['child', 'teen', 'young_adult'];
+const FEMALE = /\b(woman|girl|female)\b/i;
+const MALE = /\b(man|boy|male)\b/i;
 const ACCENT = /\b(British|Australian|Swedish|Transatlantic|NZ|Irish|Scottish)\b/i;
 const ACCENT_OK = /brit|engl|\buk\b|austral|swed|new zealand|\bnz\b|irish|ireland|scot/i;
 const OLD = /middle-aged|\bolder\b|\belder|\b[4-9]0s\b/i;
@@ -98,8 +104,9 @@ function fitVoice(voiceId, speaker, gender, age, catalog, known) {
   const context = [known && known.origin, known && known.setting, known && known.speech].filter(Boolean).join(' ');
   const accentOk = ACCENT_OK.test(context);
   const badAccent = ACCENT.test(d) && !accentOk && (young || !!context); // an adult with no known setting is left to Grok
-  if (!(young && (OLD.test(d) || !YOUNG.test(d))) && !badAccent) return voiceId;
-  const sex = { female: /\b(woman|girl|female)\b/i, male: /\b(man|boy|male)\b/i }[gender];
+  const sex = { female: FEMALE, male: MALE }[gender];
+  const wrongSex = !!v && ((gender === 'male' && FEMALE.test(d)) || (gender === 'female' && MALE.test(d)));
+  if (!(young && (OLD.test(d) || !YOUNG.test(d))) && !badAccent && !wrongSex) return voiceId;
   const pool = catalog.filter((x) => (!sex || sex.test(x.description)) &&
     (!young || (!OLD.test(x.description) && YOUNG.test(x.description))) && (accentOk || !ACCENT.test(x.description)));
   return pool.length ? fallbackVoice(speaker, pool).voice_id : voiceId;
@@ -108,8 +115,9 @@ function fitVoice(voiceId, speaker, gender, age, catalog, known) {
 function sanitizeProfile(raw, speaker, catalog, known) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const ids = catalog.map((v) => v.voice_id);
-  const gender = GENDERS.includes(r.gender) ? r.gender : 'neutral';
-  const age_range = AGES.includes(r.age_range) ? r.age_range : 'adult';
+  const hero = !!(known && known.protagonist); // the player character is always a teenage boy
+  const gender = hero ? 'male' : GENDERS.includes(r.gender) ? r.gender : 'neutral';
+  const age_range = hero ? (r.age_range === 'young_adult' ? 'young_adult' : 'teen') : AGES.includes(r.age_range) ? r.age_range : 'adult';
   const picked = ids.includes(r.voice_id) ? r.voice_id : fallbackVoice(speaker, catalog).voice_id;
   return {
     speaker,
@@ -178,6 +186,7 @@ function buildVoiceDescriptionPrompt(profile, notes, setting) {
     `Character: ${short(p.speaker, 80)}${p.game ? ` from "${short(p.game, 80)}"` : ''}`,
     `Gender: ${short(p.gender, 20) || 'unknown'}. Age: ${short(p.age_range, 20).replace('_', ' ') || 'adult'}.`,
     setting ? `Game setting (place, language, era, how people talk): ${short(setting, 300)}` : '',
+    p.protagonist ? 'This is the male player character, a teenage boy: describe a young male voice (light, youthful), never female.' : '',
     p.origin ? `Origin: ${short(p.origin, 80)}` : '',
     p.speech ? `How they speak: ${short(p.speech, 160)}` : '',
     p.personality ? `Personality: ${short(p.personality, 300)}` : '',

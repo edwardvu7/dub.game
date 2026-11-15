@@ -211,6 +211,36 @@ function createVoiceStore({ file, catalogIds, catalog }) {
         return { ...v[profile.speaker] };
       },
 
+      /**
+       * The same character under a new name (the game revealed "Girl 1" as "Sayori"): move the profile and merge into
+       * an existing one. The profile the player locked wins, else the old one (it carries the edits and designed voice).
+       */
+      rename(from, to) {
+        const v = voicesOf(false);
+        if (!v || !own(v, from) || from === to) return;
+        const a = v[from], b = own(v, to) ? v[to] : null;
+        const keep = b && b.locked && !a.locked ? b : a, other = keep === a ? b : a;
+        const merged = { ...keep, speaker: to };
+        if (!merged.custom_voice && other && other.custom_voice) merged.custom_voice = other.custom_voice;
+        if (other) {
+          merged.spoken = !!(a.spoken || b.spoken);
+          merged.muted = !!(a.muted || b.muted);
+          merged.lines = (a.lines || 0) + (b.lines || 0);
+          merged.last_spoken = Math.max(a.last_spoken || 0, b.last_spoken || 0);
+        }
+        delete v[from];
+        v[to] = merged;
+        save();
+      },
+
+      /** Ask for one more casting (the profile was cast for the wrong person): not for locked profiles. */
+      requeue(speaker) {
+        const v = voicesOf(false);
+        if (!v || !v[speaker] || v[speaker].locked) return;
+        v[speaker].source = 'fallback';
+        save();
+      },
+
       /** A line from this speaker was voiced: they are a real character, shown in the UI. */
       markSpoken(speaker) {
         const v = voicesOf(false);

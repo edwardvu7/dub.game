@@ -8,6 +8,7 @@ const { isCrowdName } = require('./godot-names');
 const { voiceName } = require('./voice-design');
 
 const { effectiveVoiceId } = require('./voices');
+const { isProtagonistName } = require('./cast');
 
 // ElevenLabs voice slots are limited per plan: each game keeps at most this many designed voices live. When the pool
 // is full, a character that matters more takes the slot of the one that matters least (see pickVictim).
@@ -15,6 +16,7 @@ const MAX_CUSTOM_PER_GAME = 8;
 const DESIGN_ATTEMPTS = 3;     // automatic design: transient failures retry this many times per character
 const DESIGN_BACKOFF_MS = 30000; // ... waiting attempt * this long
 
+const EARLY_CHARACTERS = 4; // the first this many characters (by stable speaker_id) met in a game are likely main ones
 const NARRATOR = 'Narrator';
 const UNKNOWN = 'unknown';
 const RESTART_GAP_MS = 3000; // a game restart takes longer than this
@@ -66,6 +68,10 @@ function createPipeline(deps) {
   const attempted = new Set(); // keys Grok was already asked about this session
   const recent = new Map();  // key -> last few lines, used as samples
   const lastStatus = new Map();
+  // Stable ids from the hook (Ren'Py character tag, e.g. "s", "mc"): game -> {names: id -> current name, met: ids in first-heard order}.
+  const idTable = new Map();
+  const heroes = new Map(); // game -> Set of names of the player character (speaker_id "mc")
+  const tableOf = (game) => idTable.get(game) || idTable.set(game, { names: new Map(), met: [] }).get(game);
   const keyOf = (game, speaker) => game + '\u0000' + speaker;
   const gameOf = (x) => String((x && x.game) || store.current() || 'unknown');
 
@@ -78,6 +84,10 @@ function createPipeline(deps) {
     const title = titleOf(game);
     const notes = cast ? cast.notes(game, c.speaker) : '';
     if (title) out.game = title;
+    if (isHero(game, c.speaker)) { // the player character is a teenage boy, whatever the name or an earlier guess says
+      out.protagonist = true; out.gender = 'male';
+      if (out.age_range !== 'young_adult') out.age_range = 'teen';
+    }
     if (notes) out.notes = notes;
     if (cast) {
       const setting = cast.setting(game);
@@ -88,6 +98,40 @@ function createPipeline(deps) {
     }
     return out;
   };
+
+  const isHero = (game, speaker) => (heroes.has(game) && heroes.get(game).has(speaker)) ||
+    !!(cast && typeof cast.protagonist === 'function' && cast.protagonist(game, speaker)) || isProtagonistName(String(speaker).trim().toLowerCase());
+  const fallbackFor = (game, speaker, why) => profiler.fallbackProfile(speaker, catalog, why, { protagonist: isHero(game, speaker) });
+  // "Girl 1" and "???" before a reveal; the same test that keeps "Student 2" from earning a designed voice.
+  const isPlaceholder = (n) => /^[?\s]+$/.test(n) || GENERIC_SPEAKER.test(String(n).trim());
+
+  /**
+   * A line or /characters entry carried a stable speaker_id. The same id under a new name (Girl 1 -> Sayori) is one
+   * character: the profile (voice, designed voice, lock, lines) moves to the new name. Returns the name to file it under.
+   */
+  function trackId(game, id, name, met) {
+    if (!id || name === NARRATOR || name === UNKNOWN) return name;
+    const t = tableOf(game);
+    if (met && !t.met.includes(id)) t.met.push(id);
+    const prev = t.names.get(id);
+    if (id === 'mc') heroes.set(game, new Set([...(heroes.get(game) || []), name]));
+    if (!prev || prev === name) { t.names.set(id, name); return name; }
+    if (isPlaceholder(name) && !isPlaceholder(prev)) return prev; // "???" again after the reveal
+    t.names.set(id, name);
+    // Two researched, different characters under one id are not a rename (a hook that reuses ids).
+    if (rankOf(game, prev) >= 0 && rankOf(game, name) >= 0) return name;
+    const voices = store.forGame(game);
+    if (voices.has(prev)) {
+      voices.rename(prev, name);
+      if (rankOf(game, name) >= 0) { voices.requeue(name); attempted.delete(keyOf(game, name)); } // cast again with the research
+    }
+    return name;
+  }
+  function earlyId(game, speaker) {
+    const t = idTable.get(game);
+    const id = t && [...t.names].find(([, n]) => n === speaker);
+    return !!id && t.met.indexOf(id[0]) >= 0 && t.met.indexOf(id[0]) < EARLY_CHARACTERS;
+  }
 
   function activate(game) {
     store.setCurrent(game, gameName(game));
@@ -115,9 +159,11 @@ function createPipeline(deps) {
 
   function builtinProfile(speaker) {
     // Narration and unknown speakers get one calm voice; Grok is not asked.
-    const voice = catalog.find((v) => /narrator/i.test(v.description)) || catalog[catalog.length - 1];
+    // An older-leaning adult American man; never British or Australian, never a young or female voice.
+    const voice = [/\b(older|middle-aged) man, American/i, /\badult man, American/i, /\bman\b.*American/i]
+      .reduce((hit, re) => hit || catalog.find((v) => re.test(v.description)), null) || catalog[catalog.length - 1];
     return {
-      speaker, gender: 'neutral', age_range: 'adult',
+      speaker, gender: 'male', age_range: 'adult',
       personality: speaker === NARRATOR ? 'Calm narrator.' : 'Speaker not identified by the game.',
       voice_id: voice.voice_id, stability: 0.6, style: 0.1, speed: 1.0,
       reason: speaker === NARRATOR ? 'One calm voice for narration.' : 'Default voice until the speaker is known.',
@@ -129,6 +175,10 @@ function createPipeline(deps) {
     const existing = voices.get(speaker);
     if (!existing) return true;
     if (existing.locked) return false;
+    // A builtin narrator saved with an older choice of voice is moved to the current one.
+    if (speaker === NARRATOR && existing.source === 'builtin' && existing.voice_id !== builtinProfile(speaker).voice_id) return true;
+    // The player character cast as anything but a boy is cast once more (as a boy).
+    if (existing.gender !== 'male' && isHero(voices.game, speaker)) return !attempted.has(keyOf(voices.game, speaker));
     // A placeholder is upgraded once, as soon as a Grok key is available.
     return existing.source === 'fallback' && !!settings.getKey('grok') &&
       !attempted.has(keyOf(voices.game, speaker));
@@ -143,7 +193,8 @@ function createPipeline(deps) {
       const key = settings.getKey('grok');
       if (!key) {
         status('warn', 'No Grok key: characters get placeholder voices. Add one in Settings.');
-        return voices.get(speaker) || voices.setAuto(profiler.fallbackProfile(speaker, catalog, 'no Grok key'));
+        const cur = voices.get(speaker);
+        return cur && (cur.gender === 'male' || !isHero(voices.game, speaker)) ? cur : voices.setAuto(fallbackFor(voices.game, speaker, 'no Grok key'));
       }
       attempted.add(k);
       try {
@@ -154,7 +205,7 @@ function createPipeline(deps) {
         return voices.setAuto({ ...profile, cast: !!asked.notes, researched: !!asked.setting }); // cast: picked with looked-up notes
       } catch (e) {
         status('error', e.message);
-        return voices.get(speaker) || voices.setAuto(profiler.fallbackProfile(speaker, catalog, 'Grok error'));
+        return voices.get(speaker) || voices.setAuto(fallbackFor(voices.game, speaker, 'Grok error'));
       }
     })();
     inFlight.set(k, work);
@@ -323,7 +374,8 @@ function createPipeline(deps) {
    */
   function qualifiesForDesign(game, speaker, p) {
     if (!cast || typeof cast.has !== 'function') return true; // no research to go by
-    if (rankOf(game, speaker) >= 0) return true;
+    // Researched (placeholder names are aliases there), the player character, or among the first few met by id.
+    if (rankOf(game, speaker) >= 0 || isHero(game, speaker) || earlyId(game, speaker)) return true;
     if (GENERIC_SPEAKER.test(String(speaker).trim())) return false;
     const researched = cast.has(game);
     return (Number.isFinite(p.lines) ? p.lines : 0) >= (researched ? ADAPT_LINES_RESEARCHED : ADAPT_LINES_UNRESEARCHED);
@@ -426,7 +478,8 @@ function createPipeline(deps) {
       if (line.seq !== undefined && lastLineSeq !== undefined && line.seq <= lastLineSeq &&
           now() - lastLineAt < RESTART_GAP_MS) return;
       // Cast aliases first, then the offline same-person rule (Mark / MarkBorja / MarkSprite).
-      const resolved = nameIn(game, heard);
+      let resolved = nameIn(game, heard);
+      resolved = trackId(game, line.speaker_id, resolved, true);
       const known = store.forGame(game);
       const speaker = known.canonical(resolved);
       // Godot names come from scene nodes: a crowd or UI label that never matched a known character
@@ -461,7 +514,7 @@ function createPipeline(deps) {
         // is saved, so her next lines speak at once, and Grok's answer replaces it when it lands.
         const base = await (!casting ? profiled : Promise.race([profiled, new Promise((resolve) => {
           const timer = setTimeout(() => resolve(voices.get(speaker) ||
-            voices.setAuto(profiler.fallbackProfile(speaker, catalog, 'Grok is slow'))), castWaitMs);
+            voices.setAuto(fallbackFor(game, speaker, 'Grok is slow'))), castWaitMs);
           if (timer.unref) timer.unref();
         })]));
         voices.markSpoken(speaker);
@@ -492,7 +545,7 @@ function createPipeline(deps) {
       // The same person under two names ("MARK", "Mark Borja") is one character.
       const merged = new Map();
       for (const c of payload.characters || []) {
-        const speaker = voices.canonical(nameIn(game, c.speaker));
+        const speaker = voices.canonical(trackId(game, c.id, nameIn(game, c.speaker), false));
         const prev = merged.get(speaker);
         merged.set(speaker, { speaker, samples: [...(prev ? prev.samples : []), ...(c.samples || [])] });
       }
@@ -509,7 +562,7 @@ function createPipeline(deps) {
       if (!key) {
         status('warn', 'No Grok key: characters get placeholder voices. Add one in Settings.');
         for (const c of todo) {
-          if (!voices.has(c.speaker)) voices.setAuto(profiler.fallbackProfile(c.speaker, catalog, 'no Grok key'));
+          if (!voices.has(c.speaker)) voices.setAuto(fallbackFor(game, c.speaker, 'no Grok key'));
         }
         return;
       }
@@ -528,7 +581,7 @@ function createPipeline(deps) {
         const p = batch.then((profiles) => {
           const found = profiles.find((x) => x.speaker === c.speaker);
           if (found) return voices.setAuto({ ...found, cast: withNotes.has(c.speaker), researched: withSetting.has(c.speaker) });
-          return voices.get(c.speaker) || voices.setAuto(profiler.fallbackProfile(c.speaker, catalog, 'not profiled'));
+          return voices.get(c.speaker) || voices.setAuto(fallbackFor(game, c.speaker, 'not profiled'));
         });
         inFlight.set(keyOf(game, c.speaker), p);
         return p.finally(() => inFlight.delete(keyOf(game, c.speaker)));

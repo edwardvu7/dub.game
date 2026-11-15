@@ -18,20 +18,21 @@ const MAIN_RANK = 12; // researched characters are listed most important first; 
 
 function prompt(gameName, seen) {
   return [
-    `Search the web (wikis, guides, the store page) for the main characters of the video game "${gameName}".`,
+    `Research the cast of the video game "${gameName}" with the web search tool; do not answer from memory.`,
+    // UNVERIFIED: xAI's web_search may accept allowed_domains, but a wrong parameter would fail every lookup, so sources are named here instead.
+    'Sources, in order: the game\'s Fandom wiki (search "' + gameName + ' fandom wiki characters"), its official wiki, then Wikipedia. Read the character pages.',
     seen.length ? `Names the game has shown so far: ${seen.slice(0, 30).join(', ')}.` : '',
     'Reply with JSON only, no other text, in exactly this shape:',
-    '{"setting":{"country":"","region":"","language":"","era":"","notes":"one sentence on the world and how people talk"},',
+    '{"setting":{"country":"","region":"","language":"","era":"","notes":"one sentence on the world and how people talk; say if the narrator is a character"},',
     '"characters":[{"name":"","aliases":[],"protagonist":false,"gender":"male","age_range":"teen",',
     '"personality":"one sentence","voice":"one sentence on how they sound",',
     '"origin":"nationality or ethnic background if known, else empty","speech":"short: formal or slang, regional English, tone, pace"}]}',
-    'setting: where and when the game takes place and the language the game text is written in (voices are cast for that language); leave a field empty if unknown.',
+    'List EVERY main and recurring character, including the player character (protagonist: true, with their gender and age_range), in order of first appearance in the game, up to 25.',
+    'aliases: every other name the script may show for them, especially placeholder names before a reveal ("Girl 1", "???", "Unknown") and for the player ("MC", "You", "Protagonist"), plus nicknames and titles.',
+    'setting: where and when the game takes place and the language of the game text (voices are cast for that language); leave a field empty if unknown.',
     'speech: how the character sounds in the game text language. For an English-language game set in Japan, a teen speaks natural, casual American English, not accented English.',
-    'protagonist: true for the player character; put the names the script uses for them in aliases (e.g. MC, Protagonist, the default name).',
     `gender is one of ${GENDERS.join(', ')}. age_range is one of ${AGES.join(', ')}.`,
-    'aliases: full names, nicknames and titles the game may show instead of the name.',
-    'Up to 25 characters, most important first. No plot spoilers in personality or voice.',
-    'If you cannot find the game, reply {"setting":{},"characters":[]}.',
+    'No plot spoilers in personality or voice. If you cannot find the game, reply {"setting":{},"characters":[]}.',
   ].filter(Boolean).join('\n');
 }
 
@@ -166,6 +167,11 @@ function createCastBook({ file, settings, fetch: doFetch = globalThis.fetch, now
       const c = match(characters(game), speaker);
       return { origin: clean(c && c.origin, 80), speech: clean(c && c.speech, 160) };
     },
+    /** True when the speaker is the researched player character (flag or a label like MC/You). */
+    protagonist(game, speaker) {
+      const c = match(characters(game), speaker);
+      return !!(c && c.protagonist);
+    },
     /** Importance of a speaker: 0 = most important researched character; -1 = not a main character. */
     rank(game, speaker) {
       const list = characters(game);
@@ -196,4 +202,4 @@ async function testKey(key, deps = {}) {
   }
 }
 
-module.exports = { createCastBook, parseCast, parseSetting, settingLine, replyText, match, testKey, prompt, MODEL };
+module.exports = { createCastBook, parseCast, parseSetting, settingLine, replyText, match, isProtagonistName, testKey, prompt, MODEL };

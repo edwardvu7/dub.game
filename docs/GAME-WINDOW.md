@@ -7,6 +7,10 @@ negative desktop coordinates. It applies this once; later player-selected window
 sizes are respected. This is a window-style change, not a guarantee that an engine
 has exited exclusive fullscreen. Use the game's own borderless setting if necessary.
 
+Ren'Py games start windowed the first time they run through dub.game (hook v9), so the overlay always
+shows; the player can switch to fullscreen afterwards and it stays. The overlay is always-on-top
+(screen-saver level), so it also works over a borderless fullscreen SDL window.
+
 Shift+F2 opens/closes the overlay. Its bounds use the game's **client rectangle**,
 converted from physical pixels to Electron DIP. Dragging is clamped to that rectangle;
 the panel shrinks for smaller game windows and follows the game when it moves. The

@@ -38,13 +38,20 @@ code against the contracts below (or fake data), never edit their folder.
   call per ~15 lines, never waited on. Each line's mood shifts stability/style/speed for that line
   only. The previous and next line also go to ElevenLabs as `previous_text`/`next_text`.
 - `speaker` is `"Narrator"` when Ren'Py gives no name, `"unknown"` when the engine can't tell.
+- `speaker_id` (optional, Ren'Py hook v9+): stable id of the character, `[A-Za-z0-9_]{1,40}`: the store variable holding
+  the Character (DDLC: `s`, `m`, `n`, `y`, `mc`), else its `image_tag`; omitted for the narrator. It survives a
+  DynamicCharacter name change (Girl 1 -> Sayori). The app merges a character whose name changes under the same id,
+  and treats id `mc` as the protagonist.
 - `engine` defaults to `"renpy"` if missing. Reply `204` immediately; never make the game wait.
+- Display mode (Ren'Py hook v9+): the first time a game runs with the app open, the hook sets `preferences.fullscreen = False`
+  (remembered in `persistent.dubgame_windowed`) so the overlay can show; after that the player's choice is kept.
 
 ### Hook → app: `POST http://127.0.0.1:8000/characters`
 ```json
-{ "engine": "renpy", "game": "renpy:The Question", "characters": [{ "speaker": "Sylvie", "samples": ["line 1", "line 2"] }] }
+{ "engine": "renpy", "game": "renpy:The Question", "characters": [{ "speaker": "Sylvie", "id": "s", "samples": ["line 1", "line 2"] }] }
 ```
-Sent once at game launch so every character is profiled before the first line.
+Sent once at game launch so every character is profiled before the first line. `id` is optional: the same
+`speaker_id` the `/line` posts will carry for that character.
 
 ### `voices_catalog.json` (repo root, curated by B)
 ```json

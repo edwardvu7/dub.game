@@ -144,7 +144,8 @@ test('pipeline: narrator uses one calm built-in voice, or is skipped when narrat
   const r = rig();
   await r.pipeline.handleLine({ speaker: 'Narrator', text: 'It was raining.' });
   assert.equal(r.calls.one.length, 0, 'Grok is not asked about the narrator');
-  assert.match(catalog.find((v) => v.voice_id === r.voices.get('Narrator').voice_id).description, /narrator/i);
+  assert.match(catalog.find((v) => v.voice_id === r.voices.get('Narrator').voice_id).description, /(older|middle-aged|adult) man, American/);
+  assert.equal(r.voices.get('Narrator').gender, 'male');
   r.state.narration = false;
   await r.pipeline.handleLine({ speaker: 'Narrator', text: 'Still raining.' });
   assert.equal(r.of('audio:play').length, 1);

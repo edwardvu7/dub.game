@@ -30,6 +30,9 @@ function normalizeGame(body) {
   return g || undefined;
 }
 
+// Stable per-character id from the hook (Ren'Py character tag/variable: "s", "mc"); anything else is ignored.
+const normalizeId = (v) => (typeof v === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(v) ? v : undefined);
+
 function normalizeLine(body) {
   if (!body || typeof body.text !== 'string') return null;
   const text = body.text.trim().slice(0, MAX_TEXT);
@@ -39,6 +42,8 @@ function normalizeLine(body) {
   if (typeof body.source === 'string') line.source = body.source;
   const game = normalizeGame(body);
   if (game) line.game = game;
+  const id = normalizeId(body.speaker_id);
+  if (id) line.speaker_id = id;
   if (Number.isFinite(body.seq)) line.seq = body.seq;
   // The next lines of the script (Ren'Py only), so Grok can direct them before they are reached.
   if (Array.isArray(body.upcoming)) {
@@ -61,7 +66,8 @@ function normalizeCharacters(body) {
     seen.add(speaker);
     const samples = Array.isArray(c.samples)
       ? c.samples.filter((s) => typeof s === 'string' && s.trim()).slice(0, 8).map((s) => s.trim().slice(0, 300)) : [];
-    characters.push({ speaker, samples });
+    const id = normalizeId(c.id);
+    characters.push(id ? { id, speaker, samples } : { speaker, samples });
   }
   const engine = typeof body.engine === 'string' && body.engine ? body.engine : 'renpy';
   const out = { engine, characters: engine === 'godot' ? characters.filter((c) => !isCrowdName(c.speaker)) : characters };
