@@ -104,28 +104,41 @@ function createVoiceDesigner({ settings, fetch: doFetch = globalThis.fetch, log 
     return res.json();
   }
 
-  /** design({description, name, avoid?}) -> {voice_id, name, description}. avoid: names kept out of the prompt. */
-  async function design({ description, name, avoid = [] } = {}) {
+  /**
+   * previews({description, avoid?}) -> {description, previews: [{id, mime, data}]}: ElevenLabs makes a
+   * few versions of the voice (step 1). Nothing is saved yet; data is base64 audio to audition.
+   */
+  async function previews({ description, avoid = [] } = {}) {
     const key = settings.getKey('elevenlabs');
     if (!key) throw Object.assign(new Error('No ElevenLabs API key. Add one in Settings.'), { hard: true });
     const voice_description = sanitizeDescription(description, avoid);
-    const voice_name = clean(name).slice(0, NAME_MAX) || 'dub.game voice';
     log(`voice design prompt: ${voice_description}`); // printed so a refused prompt can be read
-    const designed = await post(`${API}/v1/text-to-voice/design?output_format=mp3_44100_64`, key, {
+    const designed = await post(`${API}/v1/text-to-voice/design?output_format=mp3_44100_128`, key, {
       voice_description,
-      auto_generate_text: true, // the preview sample is never played here; the API writes its own
+      auto_generate_text: true, // the API writes a sample line that suits the voice
       // Quality over variety, and a fuller prompt: designed voices sounded thin with the defaults.
       // UNVERIFIED: how much each helps; documented as "better output, less variety" and "expands the description".
       quality: 0.6,
       should_enhance: true,
       loudness: 0.5, // the documented default, sent explicitly so every designed voice starts level
     }, 1);
-    const first = designed && Array.isArray(designed.previews) && designed.previews[0];
-    if (!first || typeof first.generated_voice_id !== 'string' || !first.generated_voice_id) {
-      throw new Error('ElevenLabs returned no voice preview.');
-    }
+    const list = (designed && Array.isArray(designed.previews) ? designed.previews : [])
+      .filter((p) => p && typeof p.generated_voice_id === 'string' && p.generated_voice_id)
+      .slice(0, 3)
+      .map((p) => ({ id: p.generated_voice_id, mime: p.media_type || 'audio/mpeg',
+        data: typeof p.audio_base_64 === 'string' ? p.audio_base_64 : '' }));
+    if (!list.length) throw new Error('ElevenLabs returned no voice preview.');
+    return { description: voice_description, previews: list };
+  }
+
+  /** save({id, description, name}) -> {voice_id, name, description}: keeps one preview as a voice (step 2). */
+  async function save({ id, description, name } = {}) {
+    const key = settings.getKey('elevenlabs');
+    if (!key) throw Object.assign(new Error('No ElevenLabs API key. Add one in Settings.'), { hard: true });
+    const voice_name = clean(name).slice(0, NAME_MAX) || 'dub.game voice';
+    const voice_description = sanitizeDescription(description);
     const created = await post(`${API}/v1/text-to-voice`, key, {
-      voice_name, voice_description, generated_voice_id: first.generated_voice_id,
+      voice_name, voice_description, generated_voice_id: String(id),
     }, 2);
     if (!created || typeof created.voice_id !== 'string' || !/^[A-Za-z0-9]+$/.test(created.voice_id)) {
       throw new Error('ElevenLabs did not return a voice id.');
@@ -134,7 +147,13 @@ function createVoiceDesigner({ settings, fetch: doFetch = globalThis.fetch, log 
     return { voice_id: created.voice_id, name: voice_name, description: voice_description };
   }
 
-  return { design };
+  /** design({description, name, avoid?}): automatic path, keeps the first preview without asking. */
+  async function design({ description, name, avoid = [] } = {}) {
+    const made = await previews({ description, avoid });
+    return save({ id: made.previews[0].id, description: made.description, name });
+  }
+
+  return { design, previews, save };
 }
 
 module.exports = { createVoiceDesigner, sanitizeDescription, voiceName, DESC_MIN, DESC_MAX, NAME_MAX };

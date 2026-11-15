@@ -4,7 +4,7 @@
 
 const INVOKE_CHANNELS = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
-  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:preview', 'voices:clearGame',
+  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:designPreviews', 'voices:pickPreview', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
   'settings:setClipboardMode', 'settings:setActing', 'settings:setCustomVoices', 'settings:setQuality',
@@ -18,6 +18,11 @@ const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:cha
  * plan() asks ElevenLabs how much of the account's monthly quota is used.
  */
 function createHandlers({ games, voices, settings, pipeline, catalog, usage, plan, onClipboardMode }) {
+  const canCustomize = (fn) => {
+    if (!settings.customVoices()) throw new Error('Custom voices are off. Turn them on in Settings.');
+    if (!settings.getKey('elevenlabs') || !settings.getKey('grok')) throw new Error('Custom voices need both an ElevenLabs key and a Grok key. Add them in Settings.');
+    if (!pipeline || typeof pipeline[fn] !== 'function') throw new Error('Custom voices are not available in this build.');
+  };
   const gameArg = (arg) => (arg && typeof arg.game === 'string' && arg.game ? arg.game : (voices.current() || 'unknown'));
   const need = (arg, field) => {
     if (!arg || typeof arg !== 'object' || arg[field] === undefined) throw new Error(`Missing "${field}"`);
@@ -36,10 +41,17 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'voices:update': (arg) => voices.forGame(gameArg(arg)).update(String(need(arg, 'speaker').speaker), arg.patch || {}),
     'voices:reroll': (arg) => pipeline.reroll({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) }),
     'voices:customize': async (arg) => {
-      if (!settings.customVoices()) throw new Error('Custom voices are off. Turn them on in Settings.');
-      if (!settings.getKey('elevenlabs') || !settings.getKey('grok')) throw new Error('Custom voices need both an ElevenLabs key and a Grok key. Add them in Settings.');
-      if (!pipeline || typeof pipeline.customizeVoice !== 'function') throw new Error('Custom voices are not available in this build.');
+      canCustomize('customizeVoice');
       return pipeline.customizeVoice({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });
+    },
+    // Manual design: audition up to 3 versions ({id, mime, data}), then keep one.
+    'voices:designPreviews': async (arg) => {
+      canCustomize('designPreviews');
+      return pipeline.designPreviews({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });
+    },
+    'voices:pickPreview': async (arg) => {
+      canCustomize('pickPreview');
+      return pipeline.pickPreview({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), id: String(need(arg, 'id').id) });
     },
     'voices:preview': (arg) => pipeline.preview({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), text: arg.text }),
     'voices:clearGame': (arg) => voices.clearGame(String(need(arg, 'game').game)),

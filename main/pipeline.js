@@ -197,6 +197,26 @@ function createPipeline(deps) {
       volume: profile && Number.isFinite(profile.volume) ? Math.min(1, Math.max(0, profile.volume)) : 1 });
 
   // Design (or redo) one character's custom voice. The preset and the lock are never touched.
+  // The prompt Grok writes for a character's designed voice (fallback: built from the profile).
+  async function voicePrompt(g, speaker, existing) {
+    const grokKey = settings.getKey('grok');
+    const asked = describe(g, { ...existing, samples: samplesOf(g, speaker) });
+    if (grokKey && usage) usage.recordAI();
+    const { description } = grokKey
+      ? await profiler.voiceDescription(asked, asked.notes, asked.setting, grokKey, { fetch: deps.fetch })
+      : { description: profiler.fallbackVoiceDescription(asked) };
+    return description;
+  }
+  function checkCanDesign(voices, speaker, existing) {
+    if (!existing) throw new Error('Unknown character: ' + speaker);
+    if (!designer) throw new Error('Custom voices are not available.');
+    if (!existing.custom_voice && voices.customCount() >= MAX_CUSTOM_PER_GAME) {
+      throw new Error(`This game already has ${MAX_CUSTOM_PER_GAME} custom voices (ElevenLabs limits voice slots). Delete some on ElevenLabs and pick catalog voices instead.`);
+    }
+  }
+  const PREVIEW_TTL_MS = 30 * 60 * 1000; // UNVERIFIED how long ElevenLabs keeps unsaved previews; 30 min is cautious
+  const auditions = new Map(); // key -> {description, ids, at}: previews shown to the player, not saved yet
+
   async function designVoice(g, speaker) {
     const voices = store.forGame(g);
     const existing = voices.get(speaker);
@@ -208,12 +228,7 @@ function createPipeline(deps) {
       throw new Error(`This game already has ${MAX_CUSTOM_PER_GAME} custom voices (ElevenLabs limits voice slots). Delete some on ElevenLabs and pick catalog voices instead.`);
     }
     const work = (async () => {
-      const grokKey = settings.getKey('grok');
-      const asked = describe(g, { ...existing, samples: samplesOf(g, speaker) });
-      if (grokKey && usage) usage.recordAI();
-      const { description } = grokKey
-        ? await profiler.voiceDescription(asked, asked.notes, asked.setting, grokKey, { fetch: deps.fetch })
-        : { description: profiler.fallbackVoiceDescription(asked) };
+      const description = await voicePrompt(g, speaker, existing);
       // Names stay out of the prompt: the voice is described, never identified.
       const made = await designer.design({ description, name: voiceName(titleOf(g), speaker), avoid: [speaker, titleOf(g)] });
       return voices.setCustom(speaker, { voice_id: made.voice_id, name: made.name, description: made.description || description });
@@ -464,6 +479,38 @@ function createPipeline(deps) {
      * EXPERIMENTAL: design a custom ElevenLabs voice for one character (Grok writes the description).
      * On any failure the profile is untouched. One call per character at a time.
      */
+    /**
+     * Manual design, step 1: ElevenLabs makes up to 3 versions of the character's voice for the player
+     * to audition. Nothing is saved and no voice slot is used until pickPreview.
+     */
+    async designPreviews({ game, speaker } = {}) {
+      const g = gameOf({ game });
+      const voices = store.forGame(g);
+      const existing = voices.get(speaker);
+      checkCanDesign(voices, speaker, existing);
+      const description = await voicePrompt(g, speaker, existing);
+      const made = await designer.previews({ description, avoid: [speaker, titleOf(g)] });
+      auditions.set(keyOf(g, speaker), { description: made.description, ids: made.previews.map((p) => p.id), at: now() });
+      return made.previews;
+    },
+
+    /** Manual design, step 2: keep the version the player picked. */
+    async pickPreview({ game, speaker, id } = {}) {
+      const g = gameOf({ game });
+      const voices = store.forGame(g);
+      const existing = voices.get(speaker);
+      checkCanDesign(voices, speaker, existing);
+      const k = keyOf(g, speaker);
+      const a = auditions.get(k);
+      if (!a || !a.ids.includes(id) || now() - a.at > PREVIEW_TTL_MS) {
+        throw new Error('That preview is no longer available. Click Custom voice to make new ones.');
+      }
+      const made = await designer.save({ id, description: a.description, name: voiceName(titleOf(g), speaker) });
+      auditions.delete(k);
+      hardStop = null; // a manual success proves the key works again
+      return voices.setCustom(speaker, { voice_id: made.voice_id, name: made.name, description: made.description });
+    },
+
     async customizeVoice({ game, speaker } = {}) {
       const out = await designVoice(gameOf({ game }), speaker);
       hardStop = null; // a manual success proves the key works again

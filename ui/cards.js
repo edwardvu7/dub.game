@@ -103,6 +103,52 @@
       }
     }
 
+    // One player for auditions in this window; a new version stops the one playing.
+    const listen = new Audio();
+    let listenUrl = null;
+    function stopListening() {
+      listen.pause();
+      if (listenUrl) { URL.revokeObjectURL(listenUrl); listenUrl = null; }
+    }
+    function playVersion(v) {
+      stopListening();
+      if (!v.data) return;
+      const bin = atob(v.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      listenUrl = URL.createObjectURL(new Blob([bytes], { type: v.mime || 'audio/mpeg' }));
+      listen.src = listenUrl;
+      listen.play().catch(() => {});
+    }
+
+    function showAudition(card, speaker, versions) {
+      const box = card.audition;
+      const close = () => { stopListening(); box.hidden = true; box.replaceChildren(); };
+      const title = el('p', 'card-audition-title', 'Pick a version. Only the one you keep uses a voice slot.');
+      const rows = (versions || []).map((v, i) => {
+        const row = el('div', 'card-audition-row');
+        const play = el('button', 'btn btn-quiet', 'Play ' + (i + 1));
+        play.type = 'button';
+        play.disabled = !v.data;
+        play.addEventListener('click', () => playVersion(v));
+        const keep = el('button', 'btn', 'Keep');
+        keep.type = 'button';
+        keep.addEventListener('click', () => run(card, keep, async () => {
+          stopListening();
+          await dub.invoke('voices:pickPreview', { ...target(speaker), id: v.id });
+          close();
+        }));
+        row.append(play, keep);
+        return row;
+      });
+      const cancel = el('button', 'btn btn-quiet', 'Cancel');
+      cancel.type = 'button';
+      cancel.addEventListener('click', close);
+      box.replaceChildren(title, ...rows, cancel);
+      box.hidden = false;
+      if (versions && versions[0]) playVersion(versions[0]);
+    }
+
     function paintOpen(card, open) {
       card.root.classList.toggle('is-open', open);
       card.toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -197,23 +243,32 @@
       const custom = el('button', 'btn btn-quiet card-custom', 'Custom voice');
       custom.type = 'button';
       custom.title = 'Design a unique voice for this character. Uses ElevenLabs credits and a voice slot.';
+      // ElevenLabs makes up to 3 versions; the player listens and keeps one (only that one uses a slot).
+      const audition = el('div', 'card-audition');
+      audition.hidden = true;
       custom.addEventListener('click', async () => {
         if (card.busy) return;
         custom.textContent = 'Designing\u2026';
         custom.setAttribute('aria-busy', 'true');
-        try { await run(card, custom, () => dub.invoke('voices:customize', target(speaker))); } finally {
+        try {
+          await run(card, custom, async () => {
+            const versions = await dub.invoke('voices:designPreviews', target(speaker));
+            showAudition(card, speaker, versions);
+          });
+        } finally {
           custom.removeAttribute('aria-busy');
           if (!destroyed && voices[speaker]) patch(speaker, voices[speaker]);
         }
       });
       card.custom = custom;
+      card.audition = audition;
       actions.append(preview, reset, mute, custom);
 
       // grid-template-rows 0fr -> 1fr animates the height; the inner wrapper clips.
       const body = el('div', 'card-body');
       body.id = bodyId;
       const inner = el('div', 'card-body-inner');
-      inner.append(about, voiceRow, faders, actions);
+      inner.append(about, voiceRow, faders, actions, audition);
       body.append(inner);
       card.toggle = toggle;
       card.body = body;
@@ -361,7 +416,7 @@
         accept(store);
       },
       game: gameId,
-      destroy() { destroyed = true; off(); container.replaceChildren(); cards.clear(); },
+      destroy() { destroyed = true; stopListening(); off(); container.replaceChildren(); cards.clear(); },
     };
   }
 

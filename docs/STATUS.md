@@ -144,3 +144,8 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 - Voice Design asks for `quality: 0.6`, `should_enhance: true`, `loudness: 0.5`. UNVERIFIED how much they help.
 - Every clip is levelled in the player (Web Audio gain from the clip's RMS, -20 dBFS target, x0.4-x4,
   no clipping), so designed and preset voices play at the same loudness.
+
+- Custom voice button: ElevenLabs makes up to 3 versions; the card plays them and the player keeps one
+  (`voices:designPreviews`, `voices:pickPreview`). The automatic queue still keeps the first.
+- Flash lines are spelled out before sending (`main/speakable.js`: titles, times, money, ordinals,
+  percents, years, numbers); Multilingual v2 gets the text as is.

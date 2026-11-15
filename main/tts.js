@@ -5,6 +5,7 @@ const MODEL = 'eleven_flash_v2_5'; // fastest model, 0.5 credit per character
 const BEST_MODEL = 'eleven_multilingual_v2'; // Settings > Best voice quality: richer, ~1 s slower, 1 credit per character
 const OUTPUT_FORMAT = 'mp3_44100_128'; // 64 kbps sounded thin on designed voices
 const MIME = 'audio/mpeg';
+const { speakable } = require('./speakable');
 
 const clamp = (n, lo, hi, dflt) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : dflt);
 
@@ -14,7 +15,7 @@ function buildRequest({ text, voice_id, stability, style, speed, previous_text, 
   return {
     url: `${API}/v1/text-to-speech/${voice_id}?output_format=${OUTPUT_FORMAT}`,
     body: {
-      text: String(text),
+      text: best ? String(text) : speakable(text), // Flash skips number/abbreviation reading: spell them out
       model_id: best ? BEST_MODEL : MODEL,
       // UNVERIFIED: flash v2.5 is believed to ignore `style`; `speed` is accepted in 0.7-1.2.
       voice_settings: {

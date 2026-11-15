@@ -309,6 +309,10 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius
 .fader-value { text-align: right; font: 500 12px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--paper); }
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); padding-top: var(--s-1); }
 .card-mute { margin-left: auto; }
+.card-audition { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-m); background: var(--raised); }
+.card-audition[hidden] { display: none; }
+.card-audition-title { flex-basis: 100%; margin: 0; color: var(--dim); font-size: 12.5px; }
+.card-audition-row { display: inline-flex; gap: 4px; }
 
 /* ---------- Settings ---------- */
 .guide { margin: 0 0 var(--s-8); padding-left: var(--s-5); color: var(--dim); max-width: 62ch; }

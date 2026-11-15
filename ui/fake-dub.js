@@ -84,6 +84,19 @@
       emit('voices:changed', copy(store));
       return copy(voices[a.speaker]);
     },
+    'voices:designPreviews': async () => {
+      if (!settings.customVoices) throw new Error('Custom voices are off. Turn them on in Settings.');
+      await wait(800);
+      return [1, 2, 3].map((n) => ({ id: 'gen' + n, mime: 'audio/mpeg', data: '' }));
+    },
+    'voices:pickPreview': async (a) => {
+      await wait(500);
+      const voices = voicesOf(a);
+      voices[a.speaker] = { ...voices[a.speaker], use_preset: undefined,
+        custom_voice: { voice_id: 'custom-' + a.speaker, name: a.speaker + ' (designed)', description: 'A designed voice.' } };
+      emit('voices:changed', copy(store));
+      return copy(voices[a.speaker]);
+    },
     'voices:customize': async (a) => {
       if (!settings.customVoices) throw new Error('Custom voices are off. Turn them on in Settings.');
       await wait(1200);
