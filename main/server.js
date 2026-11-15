@@ -1,7 +1,8 @@
 'use strict';
 // Localhost server the game hooks talk to. Replies 204 at once, then hands the payload on:
-// the game must never wait on Gemini or ElevenLabs.
+// the game must never wait on Grok or ElevenLabs.
 const http = require('node:http');
+const { isCrowdName } = require('./godot-names');
 
 const HOST = '127.0.0.1';
 const PORT = 8000;
@@ -39,7 +40,7 @@ function normalizeLine(body) {
   const game = normalizeGame(body);
   if (game) line.game = game;
   if (Number.isFinite(body.seq)) line.seq = body.seq;
-  // The next lines of the script (Ren'Py only), so Gemini can direct them before they are reached.
+  // The next lines of the script (Ren'Py only), so Grok can direct them before they are reached.
   if (Array.isArray(body.upcoming)) {
     line.upcoming = body.upcoming.slice(0, 20)
       .filter((u) => u && typeof u.text === 'string' && u.text.trim())
@@ -62,7 +63,8 @@ function normalizeCharacters(body) {
       ? c.samples.filter((s) => typeof s === 'string' && s.trim()).slice(0, 8).map((s) => s.trim().slice(0, 300)) : [];
     characters.push({ speaker, samples });
   }
-  const out = { engine: typeof body.engine === 'string' && body.engine ? body.engine : 'renpy', characters };
+  const engine = typeof body.engine === 'string' && body.engine ? body.engine : 'renpy';
+  const out = { engine, characters: engine === 'godot' ? characters.filter((c) => !isCrowdName(c.speaker)) : characters };
   const game = normalizeGame(body);
   if (game) out.game = game;
   return out;

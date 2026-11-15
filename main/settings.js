@@ -4,21 +4,22 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const ENV_NAMES = { elevenlabs: 'ELEVENLABS_API_KEY', gemini: 'GEMINI_API_KEY', grok: 'XAI_API_KEY' };
+const ENV_NAMES = { elevenlabs: 'ELEVENLABS_API_KEY', grok: 'XAI_API_KEY' };
 
 /**
  * createSettings({file, safeStorage, env?, testers?})
  * safeStorage: Electron's safeStorage (or a stand-in with the same three methods).
- * testers: { elevenlabs(key) -> {ok,error?}, gemini(key) -> {ok,error?} }
+ * testers: { elevenlabs(key) -> {ok,error?}, grok(key) -> {ok,error?} }
  */
 function createSettings({ file, safeStorage, env = process.env, testers = {} }) {
-  let data = { narration: true, clipboardMode: false, acting: true, keys: {} };
+  let data = { narration: true, clipboardMode: false, acting: true, customVoices: false, keys: {} };
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     data = {
       narration: raw.narration !== false,
       clipboardMode: raw.clipboardMode === true,
       acting: raw.acting !== false,
+      customVoices: raw.customVoices === true,
       keys: raw.keys && typeof raw.keys === 'object' ? raw.keys : {},
     };
   } catch { /* first launch */ }
@@ -49,11 +50,11 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
   function getPublic() {
     return {
       hasElevenLabsKey: !!getKey('elevenlabs'),
-      hasGeminiKey: !!getKey('gemini'),
       hasGrokKey: !!getKey('grok'),
       narration: data.narration,
       clipboardMode: data.clipboardMode,
       acting: data.acting,
+      customVoices: data.customVoices,
     };
   }
 
@@ -63,8 +64,9 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     narration: () => data.narration,
     clipboardMode: () => data.clipboardMode,
     acting: () => data.acting,
+    customVoices: () => data.customVoices,
 
-    /** setKeys({elevenlabs?, gemini?, grok?}): a non-empty string saves, an empty string removes. */
+    /** setKeys({elevenlabs?, grok?}): a non-empty string saves, an empty string removes. */
     setKeys(keys) {
       for (const provider of Object.keys(ENV_NAMES)) {
         const value = keys && keys[provider];
@@ -83,6 +85,10 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     setNarration(on) { data.narration = !!on; save(); return getPublic(); },
     setClipboardMode(on) { data.clipboardMode = !!on; save(); return getPublic(); },
     setActing(on) { data.acting = !!on; save(); return getPublic(); },
+    setCustomVoices(on) {
+      if (typeof on !== 'boolean') throw new Error('customVoices must be true or false.');
+      data.customVoices = on; save(); return getPublic();
+    },
 
     /** test({provider}) -> {ok, error?}: one tiny call with the saved key. */
     async test(arg) {

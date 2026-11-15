@@ -6,10 +6,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const INVOKE = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
-  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
+  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
-  'settings:setClipboardMode', 'settings:setActing',
+  'settings:setClipboardMode', 'settings:setActing', 'settings:setCustomVoices',
 ];
 const EVENTS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'overlay:toggle', 'games:changed',
   'usage:changed', 'app:status'];

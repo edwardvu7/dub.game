@@ -3,13 +3,14 @@
 // names and nicknames, gender, age, personality and how they should sound. The result is saved in
 // userData/cast.json and used two ways:
 //   - recognition: "MARK", "Mark Borja" and a Godot node like "MarkSprite" all resolve to "Mark";
-//   - casting: Gemini gets the notes when it picks a voice, instead of guessing from a name.
+//   - casting: Grok gets the notes when it picks a voice, instead of guessing from a name.
 // Optional: without an xAI key nothing is looked up and everything works as before.
-// UNVERIFIED: xAI's Responses API and web_search tool are used as documented; not yet called live.
+// Request shape, `web_search` tool type and model `grok-4.7` confirmed from docs.x.ai (not yet called live).
 const fs = require('node:fs');
 const path = require('node:path');
+const { callGrok, replyText, extractJson, API } = require('./xai');
 
-const API = 'https://api.x.ai/v1';
+
 const MODEL = process.env.GROK_MODEL || 'grok-4.7';
 const TIMEOUT_MS = 90000;            // web search runs several queries: allow time, it is in the background
 const RETRY_MS = 60 * 60 * 1000;     // after a failed lookup, try that game again in an hour
@@ -21,35 +22,41 @@ function prompt(gameName, seen) {
     `Search the web (wikis, guides, the store page) for the main characters of the video game "${gameName}".`,
     seen.length ? `Names the game has shown so far: ${seen.slice(0, 30).join(', ')}.` : '',
     'Reply with JSON only, no other text, in exactly this shape:',
-    '{"characters":[{"name":"Mark","aliases":["Mark Borja"],"gender":"male","age_range":"teen",',
-    '"personality":"one sentence","voice":"one sentence on how they sound"}]}',
+    '{"setting":{"country":"Philippines","region":"Manila","language":"Filipino-English","era":"modern day","notes":"one sentence on the world and how people talk"},',
+    '"characters":[{"name":"Mark","aliases":["Mark Borja"],"gender":"male","age_range":"teen",',
+    '"personality":"one sentence","voice":"one sentence on how they sound",',
+    '"origin":"nationality or ethnic background if known, else empty","speech":"short: formal or slang, regional English, tone, pace"}]}',
+    'setting: where and when the game takes place and what language the characters speak; leave a field empty if unknown.',
     `gender is one of ${GENDERS.join(', ')}. age_range is one of ${AGES.join(', ')}.`,
     'aliases: full names, nicknames and titles the game may show instead of the name.',
     'Up to 25 characters, most important first. No plot spoilers in personality or voice.',
-    'If you cannot find the game, reply {"characters":[]}.',
+    'If you cannot find the game, reply {"setting":{},"characters":[]}.',
   ].filter(Boolean).join('\n');
 }
 
-/** The text of a Responses API reply (OpenAI-compatible shape). */
-function replyText(json) {
-  if (json && typeof json.output_text === 'string') return json.output_text;
-  const parts = [];
-  for (const item of (json && json.output) || []) {
-    for (const c of (item && item.content) || []) if (c && typeof c.text === 'string') parts.push(c.text);
-  }
-  return parts.join('');
+const clean = (v, n) => String(v == null || typeof v === 'object' ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n);
+
+/** The game's setting from the reply: {country, region, language, era, notes}; '' when unknown. */
+function parseSetting(text) {
+  const raw = extractJson(text);
+  const s = raw && raw.setting && typeof raw.setting === 'object' && !Array.isArray(raw.setting) ? raw.setting : {};
+  return { country: clean(s.country, 60), region: clean(s.region, 60), language: clean(s.language, 60),
+    era: clean(s.era, 60), notes: clean(s.notes, 240) };
+}
+
+/** One line for the casting prompt, e.g. "Philippines (Manila); language Filipino-English; modern day. notes", or ''. */
+function settingLine(s) {
+  if (!s || typeof s !== 'object') return '';
+  const region = clean(s.region, 60);
+  const place = [clean(s.country, 60), region && `(${region})`].filter(Boolean).join(' ');
+  const out = [place, clean(s.language, 60) && 'language ' + clean(s.language, 60), clean(s.era, 60)].filter(Boolean).join('; ');
+  return [out, clean(s.notes, 240)].filter(Boolean).join('. ');
 }
 
 /** Characters from the reply, cleaned: the model's text is never trusted as-is. */
 function parseCast(text) {
-  const s = String(text || '');
-  const start = s.indexOf('{');
-  const end = s.lastIndexOf('}');
-  if (start < 0 || end <= start) return [];
-  let raw;
-  try { raw = JSON.parse(s.slice(start, end + 1)); } catch { return []; }
+  const raw = extractJson(text);
   const list = raw && Array.isArray(raw.characters) ? raw.characters : [];
-  const clean = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
   return list.slice(0, 25).map((c) => ({
     name: clean(c && c.name, 60),
     aliases: (Array.isArray(c && c.aliases) ? c.aliases : []).map((a) => clean(a, 60)).filter(Boolean).slice(0, 8),
@@ -57,6 +64,8 @@ function parseCast(text) {
     age_range: AGES.includes(c && c.age_range) ? c.age_range : 'adult',
     personality: clean(c && c.personality, 240),
     voice: clean(c && c.voice, 240),
+    origin: clean(c && c.origin, 80),
+    speech: clean(c && c.speech, 160),
   })).filter((c) => c.name.length >= 2);
 }
 
@@ -80,14 +89,15 @@ function match(characters, speaker) {
   return hits.length === 1 ? hits[0] : null;
 }
 
-const notesOf = (c) => [c.gender, c.age_range.replace('_', ' '), c.personality, c.voice ? 'Sounds: ' + c.voice : '']
+const notesOf = (c) => [c.gender, c.age_range.replace('_', ' '), c.origin ? 'Origin: ' + c.origin : '', c.personality,
+  c.voice ? 'Sounds: ' + c.voice : '', c.speech ? 'Speech: ' + c.speech : '']
   .filter(Boolean).join('; ');
 
 /**
  * createCastBook({file, settings, fetch?, now?, onReady?, log?})
  *   ensure(game, gameName, seen?) -> starts a lookup in the background when none is saved
  *   resolve(game, speaker) -> the cast name for a speaker (unchanged when unknown)
- *   notes(game, speaker) -> one line about the character for Gemini, or ''
+ *   notes(game, speaker) -> one line about the character for Grok, or ''
  * onReady(game) fires when a lookup finds characters, so voices cast without notes can be redone.
  */
 function createCastBook({ file, settings, fetch: doFetch = globalThis.fetch, now = Date.now, onReady = () => {}, log = () => {} }) {
@@ -105,32 +115,25 @@ function createCastBook({ file, settings, fetch: doFetch = globalThis.fetch, now
   }
 
   async function lookup(game, gameName, seen) {
-    const key = settings.getKey('grok');
-    const res = await doFetch(`${API}/responses`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, input: [{ role: 'user', content: prompt(gameName, seen) }],
-        tools: [{ type: 'web_search' }] }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      let detail = '';
-      try { const j = await res.json(); detail = (j.error && (j.error.message || j.error)) || j.message || ''; } catch { /* no body */ }
-      throw new Error(`Grok ${res.status}${detail ? ': ' + String(detail).slice(0, 200) : ''}`);
-    }
-    return parseCast(replyText(await res.json()));
+    const text = await callGrok({ key: settings.getKey('grok'), model: MODEL, timeout: TIMEOUT_MS, fetch: doFetch,
+      input: prompt(gameName, seen), tools: [{ type: 'web_search' }] });
+    return { characters: parseCast(text), setting: parseSetting(text) };
   }
 
   function ensure(game, gameName, seen = []) {
-    if (!game || !gameName || game === 'clipboard' || book[game] || running.has(game)) return;
+    // Entries saved before `setting` existed are researched once more: a lookup always writes
+    // `setting` (empty if unknown), so it cannot repeat. A failure retries hourly like any other.
+    if (!game || !gameName || game === 'clipboard' || (book[game] && book[game].setting !== undefined) || running.has(game)) return;
     if (!settings.getKey('grok')) return;
     if (failedAt.has(game) && now() - failedAt.get(game) < RETRY_MS) return;
     running.add(game);
-    lookup(game, gameName, seen).then((characters) => {
-      book[game] = { name: gameName, at: now(), characters };
+    lookup(game, gameName, seen).then(({ characters, setting }) => {
+      const old = book[game] && book[game].characters;
+      // A refresh that finds no characters keeps the ones already saved.
+      book[game] = { name: gameName, at: now(), characters: characters.length || !old ? characters : old, setting };
       save();
       log(`cast of ${gameName}: ${characters.map((c) => c.name).join(', ') || 'not found'}`);
-      if (characters.length) onReady(game);
+      if (characters.length || settingLine(setting)) onReady(game);
     }).catch((e) => {
       failedAt.set(game, now());
       log('cast lookup failed: ' + e.message);
@@ -141,6 +144,13 @@ function createCastBook({ file, settings, fetch: doFetch = globalThis.fetch, now
   return {
     ensure,
     has: (game) => characters(game).length > 0,
+    /** The researched setting as one line for Grok, or ''. */
+    setting: (game) => settingLine(book[game] && book[game].setting),
+    /** {origin, speech} of a speaker (short strings, maybe empty). */
+    detail(game, speaker) {
+      const c = match(characters(game), speaker);
+      return { origin: clean(c && c.origin, 80), speech: clean(c && c.speech, 160) };
+    },
     resolve(game, speaker) {
       const c = match(characters(game), speaker);
       return c ? c.name : speaker;
@@ -164,4 +174,4 @@ async function testKey(key, deps = {}) {
   }
 }
 
-module.exports = { createCastBook, parseCast, replyText, match, testKey, prompt, MODEL };
+module.exports = { createCastBook, parseCast, parseSetting, settingLine, replyText, match, testKey, prompt, MODEL };

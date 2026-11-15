@@ -53,7 +53,7 @@ launches Godot headlessly, and verifies cast registration, speakers, narration,
 repeated lines, ordering, rapid skip cancellation, stop events, and offline use.
 Run `npm test` for the existing desktop app tests.
 
-Source bridge verified with Godot 4.6.3 on Linux. See the generic hook guide for its separate results. UNVERIFIED: live Gemini/ElevenLabs audio,
+Source bridge verified with Godot 4.6.3 on Linux. See the generic hook guide for its separate results. UNVERIFIED: live Grok/ElevenLabs audio,
 Windows execution, exported desktop binaries, Godot 3, and browser/mobile exports.
 For rehearsal, run the Windows build with your keys, confirm two distinct
 character voices, toggle narration, and skip a line while speech is playing.

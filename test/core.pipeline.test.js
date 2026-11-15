@@ -10,11 +10,11 @@ const { createPipeline } = require('../main/pipeline');
 const catalog = require('../voices_catalog.json');
 
 const profileFor = (speaker, i = 0) => ({ speaker, gender: 'female', age_range: 'adult', personality: 'p',
-  voice_id: catalog[i].voice_id, stability: 0.5, style: 0.3, speed: 1, reason: 'r', locked: false, source: 'gemini' });
+  voice_id: catalog[i].voice_id, stability: 0.5, style: 0.3, speed: 1, reason: 'r', locked: false, source: 'grok' });
 
 function rig(over = {}) {
   const dir = tmpDir();
-  const keys = { elevenlabs: 'el-test', gemini: 'gm-test', ...(over.keys || {}) };
+  const keys = { elevenlabs: 'el-test', grok: 'gm-test', ...(over.keys || {}) };
   const state = { narration: true };
   const events = [];
   const calls = { speak: [], one: [], many: [] };
@@ -38,11 +38,11 @@ test('pipeline: first line profiles the character once, speaks, and emits audio:
   const r = rig();
   await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Hi!', engine: 'renpy' });
   await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Again.', engine: 'renpy' });
-  assert.equal(r.calls.one.length, 1, 'Gemini is asked once per character');
+  assert.equal(r.calls.one.length, 1, 'Grok is asked once per character');
   assert.deepEqual(r.calls.one[0].c, { speaker: 'Sylvie', samples: ['Hi!'] });
   assert.deepEqual(r.of('line:received')[0], { speaker: 'Sylvie', text: 'Hi!', engine: 'renpy', game: 'unknown' });
   assert.deepEqual(r.of('audio:play')[0], { speaker: 'Sylvie', text: 'Hi!', mime: 'audio/mpeg',
-    data: Buffer.from('mp3:Hi!').toString('base64') });
+    data: Buffer.from('mp3:Hi!').toString('base64'), volume: 1 });
   assert.equal(r.calls.speak[0].key, 'el-test');
   assert.equal(r.calls.speak[0].params.voice_id, catalog[1].voice_id);
   assert.equal(JSON.parse(fs.readFileSync(path.join(r.dir, 'voices.json'), 'utf8')).games.unknown.voices.Sylvie.voice_id, catalog[1].voice_id);
@@ -94,7 +94,7 @@ test('pipeline: /stop silences, but a stale stop (older seq) is ignored', async 
   assert.equal(r.events.filter((e) => e.channel === 'audio:stop').length, 2);
 });
 
-test('pipeline: locked profiles are never sent to Gemini or overwritten', async () => {
+test('pipeline: locked profiles are never sent to Grok or overwritten', async () => {
   const r = rig();
   r.voices.setAuto(profileFor('Sylvie', 0));
   r.voices.update('Sylvie', { voice_id: catalog[5].voice_id });
@@ -115,7 +115,7 @@ test('pipeline: /characters profiles the cast in one batch; lines arriving meanw
   await new Promise((s) => setImmediate(s));
   release();
   await Promise.all([batch, line]);
-  assert.equal(r.calls.one.length, 0, 'no second Gemini call for B');
+  assert.equal(r.calls.one.length, 0, 'no second Grok call for B');
   assert.equal(r.voices.get('B').voice_id, catalog[3].voice_id);
   assert.equal(r.calls.speak[0].params.voice_id, catalog[3].voice_id);
   assert.equal(r.voices.has('Narrator'), false);
@@ -123,16 +123,16 @@ test('pipeline: /characters profiles the cast in one batch; lines arriving meanw
   assert.equal(r.calls.speak.length, 1, 'second launch: nothing to profile');
 });
 
-test('pipeline: no Gemini key or a Gemini error gives a placeholder that is upgraded later', async () => {
-  const r = rig({ keys: { gemini: '' } });
+test('pipeline: no Grok key or a Grok error gives a placeholder that is upgraded later', async () => {
+  const r = rig({ keys: { grok: '' } });
   await r.pipeline.handleLine({ speaker: 'Mika', text: 'Hello' });
   assert.equal(r.voices.get('Mika').source, 'fallback');
   assert.equal(r.of('audio:play').length, 1, 'still speaks with the placeholder voice');
-  r.keys.gemini = 'gm-test';
+  r.keys.grok = 'gm-test';
   await r.pipeline.handleLine({ speaker: 'Mika', text: 'Hello again' });
-  assert.equal(r.voices.get('Mika').source, 'gemini');
+  assert.equal(r.voices.get('Mika').source, 'grok');
 
-  const failing = rig({ profileCharacter: async () => { throw new Error('Gemini 429: Quota exceeded'); } });
+  const failing = rig({ profileCharacter: async () => { throw new Error('Grok 429: Quota exceeded'); } });
   await failing.pipeline.handleLine({ speaker: 'Mika', text: 'Hello' });
   await failing.pipeline.handleLine({ speaker: 'Mika', text: 'Two' });
   assert.equal(failing.voices.get('Mika').source, 'fallback');
@@ -143,7 +143,7 @@ test('pipeline: no Gemini key or a Gemini error gives a placeholder that is upgr
 test('pipeline: narrator uses one calm built-in voice, or is skipped when narration is off', async () => {
   const r = rig();
   await r.pipeline.handleLine({ speaker: 'Narrator', text: 'It was raining.' });
-  assert.equal(r.calls.one.length, 0, 'Gemini is not asked about the narrator');
+  assert.equal(r.calls.one.length, 0, 'Grok is not asked about the narrator');
   assert.match(catalog.find((v) => v.voice_id === r.voices.get('Narrator').voice_id).description, /narrator/i);
   r.state.narration = false;
   await r.pipeline.handleLine({ speaker: 'Narrator', text: 'Still raining.' });
@@ -166,16 +166,16 @@ test('pipeline: preview and re-roll', async () => {
   const next = await r.pipeline.reroll({ speaker: 'Sylvie' });
   assert.equal(r.calls.one[0].opts.avoidVoiceId, catalog[1].voice_id);
   assert.deepEqual([next.voice_id, next.locked], [catalog[4].voice_id, false]);
-  r.keys.gemini = '';
-  await assert.rejects(() => r.pipeline.reroll({ speaker: 'Sylvie' }), /Gemini key/);
+  r.keys.grok = '';
+  await assert.rejects(() => r.pipeline.reroll({ speaker: 'Sylvie' }), /Grok key/);
 });
 
-test('pipeline: a re-roll Gemini cannot answer says so in plain words and keeps the voice', async () => {
+test('pipeline: a re-roll Grok cannot answer says so in plain words and keeps the voice', async () => {
   const { profileCharacter } = require('../main/profiler');
   const failures = [
-    [async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); }, /keeps the current one\. Gemini did not answer within 20 seconds\.$/],
-    [async () => { throw new TypeError('fetch failed'); }, /keeps the current one\. Could not reach Gemini: fetch failed$/],
-    [async () => ({ ok: false, status: 429, json: async () => ({ error: { message: 'Quota exceeded.' } }) }), /keeps the current one\. Gemini 429: Quota exceeded\.$/],
+    [async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); }, /keeps the current one\. Grok did not answer within 20 seconds\.$/],
+    [async () => { throw new TypeError('fetch failed'); }, /keeps the current one\. Could not reach Grok: fetch failed$/],
+    [async () => ({ ok: false, status: 429, json: async () => ({ error: { message: 'Quota exceeded.' } }) }), /keeps the current one\. Grok 429: Quota exceeded\.$/],
   ];
   for (const [fetch, message] of failures) {
     const r = rig({ profileCharacter: (c, cat, key, opts) => profileCharacter(c, cat, key, { ...opts, fetch }) });
@@ -203,7 +203,7 @@ test('pipeline: a line that arrives after a newer one is dropped; a restarted ga
   assert.equal(r.of('audio:play').pop().text, 'No seq.', 'sources without seq are unaffected');
 });
 
-// OMORI's first run: Gemini did not answer, and every line of a new character stayed silent
+// OMORI's first run: Grok did not answer, and every line of a new character stayed silent
 // until it gave up (20 seconds).
 test('pipeline: slow casting does not silence a new character', async () => {
   let answer;
@@ -217,16 +217,16 @@ test('pipeline: slow casting does not silence a new character', async () => {
   const stuck = Symbol('stuck');
   const first = r.pipeline.handleLine({ speaker: 'MARI', text: 'Hi, OMORI!', engine: 'rpgmaker-mv', game, seq: 1 });
   assert.notEqual(await Promise.race([first, new Promise((res) => setTimeout(() => res(stuck), 500))]), stuck,
-    'the line is spoken without waiting for Gemini');
+    'the line is spoken without waiting for Grok');
   assert.deepEqual(r.of('audio:play').map((a) => a.text), ['Hi, OMORI!']);
-  assert.equal(mari().source, 'fallback', 'placeholder voice until Gemini answers');
+  assert.equal(mari().source, 'fallback', 'placeholder voice until Grok answers');
   const t = Date.now();
   await r.pipeline.handleLine({ speaker: 'MARI', text: 'Cheer up!', engine: 'rpgmaker-mv', game, seq: 2 });
   assert.ok(Date.now() - t < 15, 'her next lines do not wait at all');
   assert.equal(r.of('audio:play').length, 2);
   answer();
   await new Promise((res) => setTimeout(res, 5));
-  assert.equal(mari().source, 'gemini', 'Gemini\'s late answer replaces the placeholder');
+  assert.equal(mari().source, 'grok', 'Grok\'s late answer replaces the placeholder');
   assert.equal(asked, 1);
 });
 
@@ -255,7 +255,7 @@ test('per game: two games keep separate voices for the same speaker name', async
   const all = r.store.all();
   assert.equal(all.current, 'renpy:GameB', 'the game that spoke last is current');
   assert.equal(all.games['renpy:GameA'].voices.Mom.voice_id, catalog[1].voice_id);
-  assert.equal(all.games['renpy:GameB'].voices.Mom.voice_id, catalog[2].voice_id, 'GameB asked Gemini for its own Mom');
+  assert.equal(all.games['renpy:GameB'].voices.Mom.voice_id, catalog[2].voice_id, 'GameB asked Grok for its own Mom');
   r.store.forGame('renpy:GameA').update('Mom', { speed: 1.2 });
   assert.equal(r.store.forGame('renpy:GameB').get('Mom').locked, false, 'locking in one game does not touch the other');
   assert.deepEqual(r.of('line:received').map((l) => l.game), ['renpy:GameA', 'renpy:GameB']);
@@ -316,7 +316,7 @@ test('cost: characters are counted, cache hits are free, and the monthly limit s
   assert.equal(u.session.cached, 1);
   assert.equal(u.monthChars, 12);
   assert.equal(u.byGame['renpy:Q'], 12);
-  assert.equal(u.session.gemini, 1, 'one Gemini call for Sylvie');
+  assert.equal(u.session.ai, 1, 'one Grok call for Sylvie');
   usage.setLimit(20);
   await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'This one is far too long.', game: 'renpy:Q' });
   assert.equal(r.calls.speak.length, 1, 'over the limit: not sent');
@@ -369,4 +369,39 @@ test('cost: the same line arriving twice at once is bought once', async () => {
   release();
   await Promise.all([a, b]);
   assert.deepEqual(calls, ['Same line.']);
+});
+
+test('usage: an old usage.json with monthGemini still counts as monthAI', () => {
+  const file = path.join(tmpDir(), 'usage.json');
+  const month = new Date().toISOString().slice(0, 7);
+  require('node:fs').writeFileSync(file, JSON.stringify({ month, monthChars: 5, monthGemini: 7, totalChars: 5, limit: 0, byGame: {} }));
+  const u = require('../main/usage').createUsage({ file });
+  assert.equal(u.get().monthAI, 7);
+  u.recordAI();
+  assert.equal(u.get().monthAI, 8);
+  assert.ok(!('monthGemini' in JSON.parse(require('node:fs').readFileSync(file, 'utf8'))));
+});
+
+test('godot: /characters creates no entries; a spoken line does', async () => {
+  const r = rig();
+  await r.pipeline.handleCharacters({ engine: 'godot', game: 'godot:G', characters: [{ speaker: 'Mark', samples: ['hi'] }, { speaker: 'Crowd', samples: [] }] });
+  assert.equal(r.calls.many.length, 0);
+  assert.equal(r.store.forGame('godot:G').has('Mark'), false);
+  await r.pipeline.handleLine({ engine: 'godot', game: 'godot:G', speaker: 'Mark', text: 'Hello' });
+  assert.equal(r.store.forGame('godot:G').has('Mark'), true);
+});
+
+test('volume: playback-only, default 1, never locks, survives re-cast, sent with audio:play', async () => {
+  const r = rig();
+  r.voices.setAuto(profileFor('Sylvie', 0));
+  assert.equal(r.voices.get('Sylvie').volume, 1);
+  const p = r.voices.update('Sylvie', { volume: 0.4 });
+  assert.equal(p.volume, 0.4);
+  assert.equal(p.locked, false);
+  assert.equal(r.voices.update('Sylvie', { volume: 9 }).volume, 1, 'clamped');
+  r.voices.update('Sylvie', { volume: 0.4 });
+  assert.equal(r.voices.setAuto(profileFor('Sylvie', 2)).volume, 0.4);
+  await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'Hi' });
+  assert.equal(r.of('audio:play').at(-1).volume, 0.4);
+  assert.throws(() => r.voices.update('Sylvie', { volume: 'loud' }));
 });

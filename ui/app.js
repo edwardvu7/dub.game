@@ -319,6 +319,7 @@
       pickText: 'Pick a game to see its voices, or start one and they show up here.',
       emptyText: 'No characters for this game yet. Voices appear here as soon as it sends its first line.',
     });
+    if (settings) cards.setCustomVoices(settings.customVoices === true);
     cards.setGame(shownGame());
     cards.setCurrent(currentSpeaker);
   };
@@ -369,7 +370,7 @@
   dub.on('usage:changed', paintUsage);
 
   // ---------- Settings ----------
-  const HAS = { elevenlabs: 'hasElevenLabsKey', gemini: 'hasGeminiKey', grok: 'hasGrokKey' };
+  const HAS = { elevenlabs: 'hasElevenLabsKey', grok: 'hasGrokKey' };
   const keyrows = Array.from(document.querySelectorAll('.keyrow'));
   let settings = null;
 
@@ -389,6 +390,8 @@
     $('opt-narration').checked = !!settings.narration;
     $('opt-clipboard').checked = !!settings.clipboardMode;
     $('opt-acting').checked = settings.acting !== false;
+    $('opt-custom').checked = settings.customVoices === true;
+    if (cards) cards.setCustomVoices(settings.customVoices === true);
     $('settings-flag').hidden = !L.needsSetup(settings);
     // First launch opens here, so say why: nothing can speak until both keys are in.
     $('settings-title').textContent = L.needsSetup(settings) ? 'Welcome. Add two keys to start' : 'Settings';
@@ -467,12 +470,15 @@
   bindSwitch('opt-narration', 'settings:setNarration');
   bindSwitch('opt-clipboard', 'settings:setClipboardMode');
   bindSwitch('opt-acting', 'settings:setActing');
+  bindSwitch('opt-custom', 'settings:setCustomVoices');
 
   // ---------- Audio (volume lives in Settings) ----------
   const volume = $('volume');
   const audio = new Audio();
   let clipUrl = null;
 
+  let clipVolume = 1; // the playing character's own volume, on top of the master one
+  let clipSpeaker = null;
   function paintVolume() {
     volume.style.setProperty('--fill', (Number(volume.value) * 100) + '%');
   }
@@ -483,7 +489,7 @@
   audio.volume = Number(volume.value);
   paintVolume();
   volume.addEventListener('input', () => {
-    audio.volume = Number(volume.value);
+    audio.volume = Number(volume.value) * clipVolume;
     paintVolume();
   });
   volume.addEventListener('change', () => {
@@ -515,6 +521,9 @@
       return;
     }
     showLine(clip);
+    clipSpeaker = clip.speaker || null;
+    clipVolume = Number.isFinite(clip.volume) ? L.clamp(clip.volume, 0, 1) : 1;
+    audio.volume = Number(volume.value) * clipVolume;
     audio.src = clipUrl;
     const mine = clipUrl;
     audio.play().catch((e) => {
@@ -530,7 +539,13 @@
     renderGames();
   });
   // The Games page needs the saved voices too: Reset voices is only offered where there are some.
-  dub.on('voices:changed', (store) => { lastStore = store; renderGames(); });
+  dub.on('voices:changed', (store) => {
+    lastStore = store;
+    renderGames();
+    // A volume change in the overlay applies to the clip that is playing.
+    const p = clipUrl && clipSpeaker && L.voicesFor(store, store && store.current)[clipSpeaker];
+    if (p && Number.isFinite(p.volume)) { clipVolume = L.clamp(p.volume, 0, 1); audio.volume = Number(volume.value) * clipVolume; }
+  });
   dub.on('line:received', showLine);
   dub.on('app:status', (s) => {
     if (s && s.message) toast(s.message, s.level === 'error' ? 'error' : 'note');

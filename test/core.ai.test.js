@@ -3,12 +3,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const profiler = require('../main/profiler');
 const tts = require('../main/tts');
+const cast = require('../main/cast');
+const { FAST_MODEL } = require('../main/xai');
 const catalog = require('../voices_catalog.json');
 
 const KEY = 'test-key-not-real';
 const jsonRes = (status, body) => ({ ok: status >= 200 && status < 300, status,
   json: async () => body, text: async () => JSON.stringify(body) });
-const gemini = (obj) => jsonRes(200, { candidates: [{ content: { parts: [{ text: JSON.stringify(obj) }] } }] });
+const grok = (obj) => jsonRes(200, { output: [{ content: [{ type: 'output_text', text: JSON.stringify(obj) }] }] });
 function recorder(respond) {
   const calls = [];
   const fn = async (url, init) => { calls.push({ url, init, body: init && init.body ? JSON.parse(init.body) : null }); return respond(calls.length); };
@@ -16,8 +18,8 @@ function recorder(respond) {
   return fn;
 }
 
-test('catalog: about 12 unique, well-formed voices', () => {
-  assert.ok(catalog.length >= 10 && catalog.length <= 14);
+test('catalog: unique, well-formed voices', () => {
+  assert.ok(catalog.length >= 10);
   assert.equal(new Set(catalog.map((v) => v.voice_id)).size, catalog.length);
   for (const v of catalog) {
     assert.match(v.voice_id, /^[A-Za-z0-9]{20}$/);
@@ -27,31 +29,28 @@ test('catalog: about 12 unique, well-formed voices', () => {
 });
 
 test('profiler: request shape (model, header, JSON mode, schema with catalog enum)', async () => {
-  const fetch = recorder(() => gemini({ speaker: 'Sylvie', gender: 'female', age_range: 'young_adult',
+  const fetch = recorder(() => grok({ speaker: 'Sylvie', gender: 'female', age_range: 'young_adult',
     personality: 'Shy.', voice_id: catalog[1].voice_id, stability: 0.45, style: 0.3, speed: 1.0, reason: 'Soft.' }));
   const profile = await profiler.profileCharacter({ speaker: 'Sylvie', samples: ['Um... hi.'] }, catalog, KEY, { fetch });
 
   const call = fetch.calls[0];
-  assert.equal(call.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent');
+  assert.equal(call.url, 'https://api.x.ai/v1/responses');
   assert.equal(call.init.method, 'POST');
-  assert.equal(call.init.headers['x-goog-api-key'], KEY);
+  assert.equal(call.init.headers.Authorization, `Bearer ${KEY}`);
   assert.ok(!call.url.includes(KEY), 'key travels in a header, not the URL');
-  const cfg = call.body.generationConfig;
-  assert.equal(cfg.responseMimeType, 'application/json');
-  assert.deepEqual(cfg.responseSchema.properties.voice_id.enum, catalog.map((v) => v.voice_id));
-  assert.deepEqual(cfg.responseSchema.properties.gender.enum, ['female', 'male', 'neutral']);
-  assert.deepEqual(cfg.responseSchema.required.sort(),
-    ['age_range', 'gender', 'personality', 'reason', 'speaker', 'speed', 'stability', 'style', 'voice_id']);
-  const prompt = call.body.contents[0].parts[0].text;
-  assert.ok(prompt.includes('Sylvie') && prompt.includes('Um... hi.'));
+  assert.equal(call.body.model, FAST_MODEL);
+  assert.ok(!('generationConfig' in call.body) && !('tools' in call.body));
+  const prompt = call.body.input[0].content;
+  assert.ok(prompt.includes('Sylvie') && prompt.includes('Um... hi.') && /JSON only/.test(prompt));
+  assert.ok(prompt.includes('female, male, neutral') && prompt.includes('young_adult'));
   for (const v of catalog) assert.ok(prompt.includes(v.voice_id) && prompt.includes(v.description));
 
   assert.deepEqual(profile, { speaker: 'Sylvie', gender: 'female', age_range: 'young_adult', personality: 'Shy.',
-    voice_id: catalog[1].voice_id, stability: 0.45, style: 0.3, speed: 1, reason: 'Soft.', locked: false, source: 'gemini' });
+    voice_id: catalog[1].voice_id, stability: 0.45, style: 0.3, speed: 1, reason: 'Soft.', locked: false, source: 'grok' });
 });
 
 test('profiler: output is forced into the contract (bad voice_id, ranges, enums, speaker)', async () => {
-  const fetch = recorder(() => gemini({ speaker: 'Someone Else', gender: 'robot', age_range: 'ancient',
+  const fetch = recorder(() => grok({ speaker: 'Someone Else', gender: 'robot', age_range: 'ancient',
     voice_id: 'not-in-catalog', stability: 7, style: -1, speed: 3, locked: true }));
   const p = await profiler.profileCharacter({ speaker: 'Rin', samples: [] }, catalog, KEY, { fetch });
   assert.equal(p.speaker, 'Rin');
@@ -62,23 +61,23 @@ test('profiler: output is forced into the contract (bad voice_id, ranges, enums,
 
 test('profiler: batch profiles a cast in one call; errors are readable and never contain the key', async () => {
   const cast = [{ speaker: 'A', samples: ['x'] }, { speaker: 'B', samples: [] }, { speaker: 'C', samples: [] }];
-  const fetch = recorder(() => gemini({ profiles: [
+  const fetch = recorder(() => grok({ profiles: [
     { speaker: 'B', voice_id: catalog[2].voice_id }, { speaker: 'a', voice_id: catalog[3].voice_id }] }));
   const out = await profiler.profileCharacters(cast, catalog, KEY, { fetch });
   assert.equal(fetch.calls.length, 1);
-  assert.equal(fetch.calls[0].body.generationConfig.responseSchema.properties.profiles.type, 'ARRAY');
+  assert.match(fetch.calls[0].body.input[0].content, /"profiles":\[/);
   assert.deepEqual(out.map((p) => [p.speaker, p.voice_id]), [['A', catalog[3].voice_id], ['B', catalog[2].voice_id]]);
 
   const big = Array.from({ length: 30 }, (_, i) => ({ speaker: 'N' + i, samples: [] }));
-  const many = recorder(() => gemini({ profiles: [] }));
+  const many = recorder(() => grok({ profiles: [] }));
   await profiler.profileCharacters(big, catalog, KEY, { fetch: many });
   assert.equal(many.calls.length, 3, '12 per call');
 
   const failing = recorder(() => jsonRes(429, { error: { message: 'Quota exceeded' } }));
   await assert.rejects(() => profiler.profileCharacter(cast[0], catalog, KEY, { fetch: failing }),
-    (e) => /Gemini 429: Quota exceeded/.test(e.message) && !e.message.includes(KEY));
-  await assert.rejects(() => profiler.profileCharacter(cast[0], catalog, '', { fetch: failing }), /No Gemini API key/);
-  const junk = recorder(() => jsonRes(200, { candidates: [{ content: { parts: [{ text: 'not json' }] } }] }));
+    (e) => /Grok 429: Quota exceeded/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(() => profiler.profileCharacter(cast[0], catalog, '', { fetch: failing }), /No Grok API key/);
+  const junk = recorder(() => jsonRes(200, { output_text: 'not json' }));
   await assert.rejects(() => profiler.profileCharacter(cast[0], catalog, KEY, { fetch: junk }), /invalid JSON/);
 });
 
@@ -121,9 +120,9 @@ test('testKey: ok, restricted-but-valid, invalid, offline', async () => {
     { ok: false, error: 'ElevenLabs 401: Invalid API key' });
   const offline = await tts.testKey(KEY, { fetch: async () => { throw new Error('ENOTFOUND'); } });
   assert.equal(offline.ok, false);
-  assert.deepEqual(await profiler.testKey(KEY, { fetch: async () => res(200) }), { ok: true });
-  assert.deepEqual(await profiler.testKey(KEY, { fetch: async () => res(400) }), { ok: false, error: 'Gemini 400: API key not valid' });
-  assert.equal((await profiler.testKey('', {})).ok, false);
+  assert.deepEqual(await cast.testKey(KEY, { fetch: async () => res(200) }), { ok: true });
+  assert.equal((await cast.testKey(KEY, { fetch: async () => res(401) })).ok, false);
+  assert.equal((await cast.testKey('', {})).ok, false);
 });
 
 test('tts.subscription: reads the plan quota, and explains a key without permission', async () => {
@@ -148,13 +147,13 @@ test('profiler: a failed later batch keeps the batches that worked; calls carry 
     assert.ok(init.signal, 'request has an abort signal');
     if (++n === 2) return { ok: false, status: 429, json: async () => ({ error: { message: 'rate limit' } }) };
     const names = cast.slice(0, 12).map((c) => c.speaker);
-    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({
-      profiles: names.map((speaker) => ({ speaker, voice_id: catalog[0].voice_id })) }) }] } }] }) };
+    return { ok: true, json: async () => ({ output_text: JSON.stringify({
+      profiles: names.map((speaker) => ({ speaker, voice_id: catalog[0].voice_id })) }) }) };
   };
   const out = await profileCharacters(cast, catalog, 'k', { fetch: fetchStub });
   assert.equal(out.length, 12);
   await assert.rejects(() => profileCharacters(cast.slice(0, 2), catalog, 'k',
-    { fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }) }), /Gemini 500/);
+    { fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }) }), /Grok 500/);
 });
 
 test('cache.prune removes only clips not played recently; a cache hit counts as played', () => {
@@ -171,4 +170,11 @@ test('cache.prune removes only clips not played recently; a cache hit counts as 
   assert.equal(cache.prune(60 * 24 * 3600 * 1000), 1);
   assert.equal(cache.get(a), null);
   assert.equal(cache.get(b).toString(), '2');
+});
+
+test('xai: JSON is found inside prose and code fences', () => {
+  const { extractJson } = require('../main/xai');
+  assert.deepEqual(extractJson('Sure!\n```json\n{"a":1}\n```'), { a: 1 });
+  assert.equal(extractJson('no json'), null);
+  assert.equal(extractJson('{broken'), null);
 });

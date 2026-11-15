@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { tmpDir } = require('./helpers');
-const { createCastBook, parseCast, replyText, match, testKey } = require('../main/cast');
+const { createCastBook, parseCast, parseSetting, settingLine, replyText, match, testKey } = require('../main/cast');
 const { createVoiceStore } = require('../main/voices');
 const { createCache } = require('../main/cache');
 const { createPipeline } = require('../main/pipeline');
@@ -84,14 +84,14 @@ test('cast book: a failed lookup is not retried for an hour', async () => {
   assert.equal(calls, 2);
 });
 
-test('Gemini casting gets the game name and the looked-up notes', () => {
+test('Grok casting gets the game name and the looked-up notes', () => {
   const text = profiler.prompt([{ speaker: 'Mark', samples: ['Hm.'], game: 'Until Then', notes: 'male; teen; Easygoing.' }], catalog, {});
   assert.match(text, /from the game "Until Then"/);
   assert.match(text, /Known about them: male; teen; Easygoing\./);
   assert.doesNotMatch(profiler.prompt([{ speaker: 'Mark', samples: [] }], catalog, {}), /from the game/);
 });
 
-test('pipeline: names resolve to the cast, Gemini gets notes, and the cast arriving recasts unlocked voices', async () => {
+test('pipeline: names resolve to the cast, Grok gets notes, and the cast arriving recasts unlocked voices', async () => {
   const dir = tmpDir();
   const store = createVoiceStore({ file: path.join(dir, 'voices.json') });
   const asked = [];
@@ -100,15 +100,17 @@ test('pipeline: names resolve to the cast, Gemini gets notes, and the cast arriv
     ensure() {}, has: () => castReady,
     resolve: (_g, s) => (castReady && /^mark/i.test(s) ? 'Mark' : s),
     notes: (_g, s) => (castReady && s === 'Mark' ? 'male; teen' : ''),
+    setting: () => (castReady ? 'Philippines (Manila); modern day' : ''),
+    detail: (_g, s) => (castReady && s === 'Mark' ? { origin: 'Filipino', speech: 'casual Taglish' } : {}),
   };
   const pick = (c, i) => ({ speaker: c.speaker, voice_id: catalog[i].voice_id, stability: 0.5, style: 0.3, speed: 1 });
   const p = createPipeline({ voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog, cast,
     settings: { getKey: () => 'k', narration: () => true }, emit: () => {}, settleMs: 0, gameName: () => 'Until Then',
     speak: async () => Buffer.from('mp3'),
     profileCharacter: async (c) => { asked.push(c); return profiler.sanitizeProfile(pick(c, 1), c.speaker, catalog); },
-    profileCharacters: async (list) => { asked.push(...list); return list.map((c) => profiler.sanitizeProfile(pick(c, 2), c.speaker, catalog)); } });
+    profileCharacters: async (list) => { asked.push(...list); return list.map((c) => profiler.sanitizeProfile(pick(c, 2), c.speaker, catalog, c)); } });
   await p.handleLine({ speaker: 'Cathy', text: 'Hi.', game: 'godot:Until Then' });
-  assert.equal(asked[0].game, 'Until Then', 'Gemini is told which game, even before any lookup');
+  assert.equal(asked[0].game, 'Until Then', 'Grok is told which game, even before any lookup');
   assert.equal(asked[0].notes, undefined);
   store.forGame('godot:Until Then').update('Cathy', { speed: 1.1 }); // the player tuned Cathy
   await p.handleLine({ speaker: 'Mark', text: 'Yo.', game: 'godot:Until Then' });
@@ -118,9 +120,75 @@ test('pipeline: names resolve to the cast, Gemini gets notes, and the cast arriv
   assert.equal(mark.voice_id, catalog[2].voice_id);
   assert.equal(mark.cast, true);
   assert.equal(asked.at(-1).notes, 'male; teen');
+  assert.equal(asked.at(-1).setting, 'Philippines (Manila); modern day');
+  assert.equal(mark.origin, 'Filipino', 'research notes copied into the profile');
+  assert.equal(mark.speech, 'casual Taglish');
+  assert.equal(mark.researched, true);
+  assert.equal(store.forGame('godot:Until Then').get('Cathy').origin, undefined, 'locked profile untouched');
+  store.forGame('godot:Until Then').update('Mark', { speed: 1.05 });
+  assert.equal(store.forGame('godot:Until Then').get('Mark').origin, 'Filipino', 'a manual edit keeps the notes');
   assert.equal(await p.recast('godot:Until Then'), 0, 'not twice');
   await p.handleLine({ speaker: 'MarkSprite', text: 'Later.', game: 'godot:Until Then' });
   assert.ok(!store.forGame('godot:Until Then').has('MarkSprite'), 'a node name resolves to Mark, no new voice');
+});
+
+test('cast: setting and origin/speech are parsed, capped and tolerant', () => {
+  const reply = JSON.stringify({ setting: { country: ' Philippines ', region: 'Manila', language: 'Filipino-English', era: 'modern day',
+    notes: 'x'.repeat(500), extra: 'ignored' },
+  characters: [{ name: 'Mark', origin: 'Filipino', speech: 'y'.repeat(500) }, { name: 'Odd', origin: { a: 1 }, speech: 5 }] });
+  const s = parseSetting(reply);
+  assert.equal(s.country, 'Philippines');
+  assert.equal(s.notes.length, 240);
+  assert.equal(s.extra, undefined);
+  const list = parseCast(reply);
+  assert.equal(list[0].origin, 'Filipino');
+  assert.equal(list[0].speech.length, 160);
+  assert.equal(list[1].origin, '', 'object ignored');
+  assert.equal(list[1].speech, '5');
+  assert.deepEqual(parseSetting('{"setting":"nope","characters":[]}'), { country: '', region: '', language: '', era: '', notes: '' });
+  assert.deepEqual(parseSetting('garbage'), { country: '', region: '', language: '', era: '', notes: '' });
+  assert.equal(settingLine(s).startsWith('Philippines (Manila); language Filipino-English; modern day.'), true);
+  assert.equal(settingLine({}), '');
+  assert.equal(settingLine(undefined), '');
+});
+
+test('cast book: old entries without setting are researched once more, keeping their characters', async () => {
+  const file = path.join(tmpDir(), 'cast.json');
+  fs.writeFileSync(file, JSON.stringify({ g: { name: 'Game', at: 1, characters: [{ name: 'Mark', aliases: [], gender: 'male', age_range: 'teen', personality: 'p', voice: 'v' }] } }));
+  let calls = 0;
+  const ready = [];
+  const reply = { setting: { country: 'Philippines' }, characters: [] }; // refresh finds no characters
+  const book = createCastBook({ file, settings: { getKey: () => 'k' }, onReady: (g) => ready.push(g),
+    fetch: async () => { calls++; return { ok: true, json: async () => grokReply(reply) }; } });
+  assert.equal(book.setting('g'), '');
+  assert.match(book.notes('g', 'Mark'), /male; teen; p; Sounds: v/, 'old entry works without origin/speech');
+  book.ensure('g', 'Game'); await new Promise((r) => setTimeout(r, 20));
+  book.ensure('g', 'Game'); await new Promise((r) => setTimeout(r, 10));
+  assert.equal(calls, 1, 'once only');
+  assert.equal(book.setting('g'), 'Philippines');
+  assert.ok(book.has('g'), 'saved characters kept');
+  assert.deepEqual(ready, ['g']);
+  const again = createCastBook({ file, settings: { getKey: () => 'k' }, fetch: async () => { throw new Error('should not fetch'); } });
+  again.ensure('g', 'Game');
+  assert.equal(again.setting('g'), 'Philippines', 'persisted');
+});
+
+test('Grok casting prompt carries the setting and refuses a British default', () => {
+  const text = profiler.prompt([{ speaker: 'Mark', samples: [], game: 'Until Then', setting: 'Philippines (Manila); modern day',
+    origin: 'Filipino', speech: 'casual Taglish' }], catalog, {});
+  assert.match(text, /Researched setting of the game: Philippines \(Manila\); modern day/);
+  assert.match(text, /Origin: Filipino/);
+  assert.match(text, /How they speak: casual Taglish/);
+  assert.match(text, /Do NOT default to British or Australian/);
+  assert.match(text, /neutral or American/);
+  assert.doesNotMatch(profiler.prompt([{ speaker: 'Mark', samples: [] }], catalog, {}), /Researched setting|Do NOT default/);
+});
+
+test('profiler: origin/speech come from the research, not the model reply', () => {
+  const p = profiler.sanitizeProfile({ voice_id: catalog[0].voice_id, origin: 'Mars' }, 'Mark', catalog, { origin: ' Filipino ', speech: { x: 1 } });
+  assert.equal(p.origin, 'Filipino');
+  assert.equal('speech' in p, false);
+  assert.equal('origin' in profiler.sanitizeProfile({ origin: 'Mars' }, 'Mark', catalog), false);
 });
 
 test('grok testKey: ok, refused, offline', async () => {

@@ -5,7 +5,7 @@
 // with setGame() (follow: false, the main window's Voices tab).
 (function () {
   'use strict';
-  const { SLIDERS, formatSlider, sortSpeakers, voiceLabel, errorText, voicesFor } = window.DubLib;
+  const { SLIDERS, formatSlider, sortSpeakers, voiceLabel, customVoiceLabel, errorText, voicesFor } = window.DubLib;
 
   function el(tag, cls, text) {
     const node = document.createElement(tag);
@@ -35,15 +35,33 @@
     const target = (speaker) => ({ game: gameId(), speaker });
     let current = null; // speaker of the line being spoken
     let destroyed = false;
+    const openCards = new Set(); // speakers whose cards the player opened (kept across re-renders)
+    const spoken = new Set();    // speakers heard since this window opened (before the store catches up)
+    let cardSeq = 0;
 
     const emptyText = opts.emptyText || 'No characters yet. Voices appear here as soon as a game sends its first line.';
     const empty = el('p', 'cards-empty', emptyText);
     const list = el('div', 'cards');
-    container.replaceChildren(empty, list);
+    const unheard = el('p', 'cards-empty cards-unheard');
+    unheard.hidden = true;
+    container.replaceChildren(empty, list, unheard);
 
-    function fillVoices(select, selected) {
+    let customOn = false; // Settings > Experimental > Custom voices
+
+    // Two voice sets per character: the preset (voice_id) and the designed one (custom_voice). With Custom
+    // voices on and a designed voice present, the list starts with "Custom: <name>" and shows whichever set
+    // plays (the designed one unless the player picked a preset: use_preset). Otherwise it edits the preset.
+    const CUSTOM = '__custom__';
+    const usesCustom = (p) => customOn && !!p.custom_voice && !p.use_preset;
+    function fillVoices(select, profile) {
       select.replaceChildren();
+      const selected = profile.voice_id;
       const known = catalog.some((v) => v.voice_id === selected);
+      if (customOn && profile.custom_voice) {
+        const opt = el('option', null, customVoiceLabel(profile.custom_voice));
+        opt.value = CUSTOM;
+        select.append(opt);
+      }
       if (!known && selected) {
         const opt = el('option', null, 'Current voice');
         opt.value = selected;
@@ -54,7 +72,7 @@
         opt.value = v.voice_id;
         select.append(opt);
       }
-      select.value = selected || '';
+      select.value = usesCustom(profile) ? CUSTOM : (selected || '');
     }
 
     async function run(card, button, work) {
@@ -73,15 +91,29 @@
       }
     }
 
+    function paintOpen(card, open) {
+      card.root.classList.toggle('is-open', open);
+      card.toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      card.body.inert = !open; // collapsed controls are not tabbable
+    }
+
     function build(speaker) {
       const root = el('article', 'card enter');
       root.addEventListener('animationend', () => root.classList.remove('enter'), { once: true });
       root.dataset.speaker = speaker;
 
+      // The header is one real button: name, status badge and a chevron. It opens the settings.
       const head = el('header', 'card-head');
+      const toggle = el('button', 'card-toggle');
+      toggle.type = 'button';
+      const bodyId = 'card-body-' + (++cardSeq);
+      toggle.setAttribute('aria-controls', bodyId);
       const name = el('h3', 'card-name', speaker);
       const badge = el('span', 'pick');
-      head.append(name, badge);
+      const chevron = el('span', 'chevron');
+      chevron.setAttribute('aria-hidden', 'true');
+      toggle.append(name, badge, chevron);
+      head.append(toggle);
 
       const about = el('p', 'card-about');
 
@@ -92,8 +124,13 @@
 
       const card = { root, badge, about, select, sliders: {}, busy: false };
 
-      select.addEventListener('change', () => run(card, null, () =>
-        dub.invoke('voices:update', { ...target(speaker), patch: { voice_id: select.value } })));
+      select.addEventListener('change', () => run(card, null, () => {
+        const p = voices[speaker] || {};
+        let change;
+        if (select.value === CUSTOM) change = { use_preset: false }; // back to the designed voice; not a lock
+        else change = { voice_id: select.value, ...(customOn && p.custom_voice ? { use_preset: true } : {}) };
+        return dub.invoke('voices:update', { ...target(speaker), patch: change });
+      }));
 
       const faders = el('div', 'faders');
       for (const def of SLIDERS) {
@@ -132,7 +169,7 @@
       preview.type = 'button';
       preview.addEventListener('click', () => run(card, preview, () =>
         dub.invoke('voices:preview', target(speaker))));
-      // Reset: drop the player's changes and let Gemini cast this character again.
+      // Reset: drop the player's changes and let Grok cast this character again.
       const reset = el('button', 'btn btn-quiet', 'Reset');
       reset.type = 'button';
       reset.title = 'Undo your changes and let AI choose this voice again.';
@@ -144,9 +181,38 @@
       mute.addEventListener('click', () => run(card, mute, () =>
         dub.invoke('voices:update', { ...target(speaker), patch: { muted: !(voices[speaker] && voices[speaker].muted) } })));
       card.mute = mute;
-      actions.append(preview, reset, mute);
+      // Experimental: Grok writes a description, ElevenLabs Voice Design makes the voice.
+      const custom = el('button', 'btn btn-quiet card-custom', 'Custom voice');
+      custom.type = 'button';
+      custom.title = 'Design a unique voice for this character. Uses ElevenLabs credits and a voice slot.';
+      custom.addEventListener('click', async () => {
+        if (card.busy) return;
+        custom.textContent = 'Designing\u2026';
+        custom.setAttribute('aria-busy', 'true');
+        try { await run(card, custom, () => dub.invoke('voices:customize', target(speaker))); } finally {
+          custom.removeAttribute('aria-busy');
+          if (!destroyed && voices[speaker]) patch(speaker, voices[speaker]);
+        }
+      });
+      card.custom = custom;
+      actions.append(preview, reset, mute, custom);
 
-      root.append(head, about, voiceRow, faders, actions);
+      // grid-template-rows 0fr -> 1fr animates the height; the inner wrapper clips.
+      const body = el('div', 'card-body');
+      body.id = bodyId;
+      const inner = el('div', 'card-body-inner');
+      inner.append(about, voiceRow, faders, actions);
+      body.append(inner);
+      card.toggle = toggle;
+      card.body = body;
+      const setOpen = (open) => {
+        open ? openCards.add(speaker) : openCards.delete(speaker);
+        paintOpen(card, open);
+      };
+      toggle.addEventListener('click', () => setOpen(!openCards.has(speaker)));
+      paintOpen(card, openCards.has(speaker));
+
+      root.append(head, body);
       return card;
     }
 
@@ -156,6 +222,8 @@
       card.badge.textContent = profile.muted ? 'Muted' : (profile.locked ? 'Custom' : 'Auto');
       card.badge.className = 'pick ' + (profile.muted ? 'pick-muted' : (profile.locked ? 'pick-custom' : 'pick-auto'));
       card.root.classList.toggle('is-muted', !!profile.muted);
+      card.custom.hidden = !customOn;
+      if (!card.custom.hasAttribute('aria-busy')) card.custom.textContent = profile.custom_voice ? 'Redo custom voice' : 'Custom voice';
       card.mute.textContent = profile.muted ? 'Unmute' : 'Mute';
       card.mute.setAttribute('aria-pressed', profile.muted ? 'true' : 'false');
       card.mute.title = profile.muted ? 'Speak this character again.' : 'Stop speaking this character. Saves ElevenLabs credits.';
@@ -164,7 +232,7 @@
         : (profile.reason || 'Chosen automatically.');
       card.about.textContent = profile.personality || '';
       card.about.hidden = !profile.personality;
-      if (document.activeElement !== card.select) fillVoices(card.select, profile.voice_id);
+      if (document.activeElement !== card.select) fillVoices(card.select, profile);
       for (const def of SLIDERS) {
         const slot = card.sliders[def.key];
         if (slot.dirty) continue; // the player is dragging this one
@@ -176,9 +244,15 @@
     function render() {
       if (destroyed) return;
       voices = voicesFor(store, gameId());
-      const order = sortSpeakers(voices, current);
+      // Only characters that have spoken (voices.json "spoken") are listed; so are ones the player
+      // changed or muted, and whoever speaks right now. The rest are counted, not shown.
+      const sorted = sortSpeakers(voices, current);
+      const shown = (s) => s === current || spoken.has(s) || voices[s].spoken || voices[s].locked || voices[s].muted;
+      const order = [...sorted.filter((s) => s === current || spoken.has(s)), ...sorted.filter((s) => s !== current && !spoken.has(s))]
+        .filter(shown);
+      const hidden = sorted.length - order.length;
       for (const [speaker, card] of cards) {
-        if (!Object.prototype.hasOwnProperty.call(voices, speaker)) {
+        if (!order.includes(speaker)) {
           card.root.remove();
           cards.delete(speaker);
         }
@@ -193,6 +267,8 @@
       });
       empty.textContent = !gameId() && opts.pickText ? opts.pickText : emptyText;
       empty.hidden = order.length > 0;
+      unheard.textContent = hidden ? '+' + hidden + ' not heard yet' : '';
+      unheard.hidden = !hidden;
     }
 
     async function refresh() {
@@ -202,6 +278,7 @@
           dub.invoke('voices:get'),
         ]);
         catalog = Array.isArray(cat) ? cat : [];
+        try { const s = await dub.invoke('settings:get'); customOn = !!(s && s.customVoices === true); } catch { /* keep the last value */ }
         accept(all);
       } catch (e) {
         onError(errorText(e));
@@ -226,10 +303,17 @@
 
     return {
       refresh,
+      /** The main window tells its cards when the Custom voices switch changes. */
+      setCustomVoices(on) {
+        if (customOn === !!on) return;
+        customOn = !!on;
+        for (const [speaker, card] of cards) if (voices[speaker]) patch(speaker, voices[speaker]);
+      },
       /** Highlight (and float to the top) whoever is speaking. Pass null to clear. */
       setCurrent(speaker) {
         if (speaker === current) return;
         current = speaker || null;
+        if (current) spoken.add(current);
         render();
       },
       /** Show one game's voices; null follows the game that is playing. */

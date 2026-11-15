@@ -19,18 +19,18 @@ const fakeSafeStorage = (available = true) => ({
   decryptString: (b) => Buffer.from(b).map((x) => x ^ 0x5a).toString('utf8'),
 });
 const SECRET_EL = 'sk_player_elevenlabs_secret';
-const SECRET_GM = 'AIza_player_gemini_secret';
+const SECRET_GM = 'xai_player_grok_secret';
 
 test('settings: public shape never contains a key, and the file on disk is encrypted', async () => {
   const file = path.join(tmpDir(), 'settings.json');
   const seen = [];
   const s = createSettings({ file, safeStorage: fakeSafeStorage(), env: {},
-    testers: { elevenlabs: async (k) => { seen.push(k); return { ok: true }; }, gemini: async () => ({ ok: false, error: 'bad' }) } });
-  assert.deepEqual(s.getPublic(), { hasElevenLabsKey: false, hasGeminiKey: false, hasGrokKey: false, narration: true, clipboardMode: false, acting: true });
+    testers: { elevenlabs: async (k) => { seen.push(k); return { ok: true }; }, grok: async () => ({ ok: false, error: 'bad' }) } });
+  assert.deepEqual(s.getPublic(), { hasElevenLabsKey: false, hasGrokKey: false, narration: true, clipboardMode: false, acting: true, customVoices: false });
 
-  const out = s.setKeys({ elevenlabs: `  ${SECRET_EL} `, gemini: SECRET_GM });
-  assert.deepEqual(out, { hasElevenLabsKey: true, hasGeminiKey: true, hasGrokKey: false, narration: true, clipboardMode: false, acting: true });
-  for (const value of [out, s.getPublic(), s.setNarration(false), await s.test({ provider: 'elevenlabs' }), await s.test({ provider: 'gemini' })]) {
+  const out = s.setKeys({ elevenlabs: `  ${SECRET_EL} `, grok: SECRET_GM });
+  assert.deepEqual(out, { hasElevenLabsKey: true, hasGrokKey: true, narration: true, clipboardMode: false, acting: true, customVoices: false });
+  for (const value of [out, s.getPublic(), s.setNarration(false), await s.test({ provider: 'elevenlabs' }), await s.test({ provider: 'grok' })]) {
     const text = JSON.stringify(value);
     assert.ok(!text.includes(SECRET_EL) && !text.includes(SECRET_GM));
   }
@@ -38,22 +38,22 @@ test('settings: public shape never contains a key, and the file on disk is encry
   assert.ok(!disk.includes(SECRET_EL) && !disk.includes(SECRET_GM), 'no plaintext key on disk');
   assert.equal(s.getKey('elevenlabs'), SECRET_EL, 'main process can still read it');
   assert.deepEqual(seen, [SECRET_EL]);
-  assert.deepEqual(await s.test({ provider: 'gemini' }), { ok: false, error: 'bad' });
+  assert.deepEqual(await s.test({ provider: 'grok' }), { ok: false, error: 'bad' });
   assert.deepEqual(await s.test({ provider: 'nope' }), { ok: false, error: 'Unknown provider.' });
 
   const reopened = createSettings({ file, safeStorage: fakeSafeStorage(), env: {} });
-  assert.equal(reopened.getKey('gemini'), SECRET_GM);
+  assert.equal(reopened.getKey('grok'), SECRET_GM);
   assert.equal(reopened.narration(), false);
-  reopened.setKeys({ gemini: '' });
-  assert.equal(reopened.getPublic().hasGeminiKey, false);
+  reopened.setKeys({ grok: '' });
+  assert.equal(reopened.getPublic().hasGrokKey, false);
   assert.equal(reopened.getPublic().hasElevenLabsKey, true, 'omitted key is left alone');
 });
 
 test('settings: .env keys are the dev fallback; player keys win', () => {
   const file = path.join(tmpDir(), 'settings.json');
-  const env = { ELEVENLABS_API_KEY: 'dev-el', GEMINI_API_KEY: '' };
+  const env = { ELEVENLABS_API_KEY: 'dev-el', XAI_API_KEY: '' };
   const s = createSettings({ file, safeStorage: fakeSafeStorage(), env });
-  assert.deepEqual([s.getPublic().hasElevenLabsKey, s.getPublic().hasGeminiKey], [true, false]);
+  assert.deepEqual([s.getPublic().hasElevenLabsKey, s.getPublic().hasGrokKey], [true, false]);
   assert.equal(s.getKey('elevenlabs'), 'dev-el');
   s.setKeys({ elevenlabs: 'player-el' });
   assert.equal(s.getKey('elevenlabs'), 'player-el');
@@ -142,7 +142,7 @@ test('ipc: every contract channel has a handler and settings handlers never retu
   await assert.rejects(() => registered['settings:get']({ ok: false }), /Untrusted/);
 
   const out = await registered['settings:setKeys']({ ok: true }, { elevenlabs: SECRET_EL });
-  assert.deepEqual(Object.keys(out).sort(), ['acting', 'clipboardMode', 'hasElevenLabsKey', 'hasGeminiKey', 'hasGrokKey', 'narration']);
+  assert.deepEqual(Object.keys(out).sort(), ['acting', 'clipboardMode', 'customVoices', 'hasElevenLabsKey', 'hasGrokKey', 'narration']);
   for (const c of ['settings:get', 'settings:setNarration', 'settings:test']) {
     const value = await registered[c]({ ok: true }, c === 'settings:test' ? { provider: 'elevenlabs' } : true);
     assert.ok(!JSON.stringify(value).includes(SECRET_EL), c);
@@ -207,4 +207,37 @@ test('clipboard mode: new text becomes an "unknown" line; repeats, short strings
     { speaker: 'unknown', text: 'Second line.', engine: 'clipboard', game: 'clipboard' }]);
   w.stop();
   assert.equal(w.running(), false);
+});
+
+test('customVoices: off by default, persists, only accepts a boolean', () => {
+  const file = path.join(tmpDir(), 'settings.json');
+  const make = () => createSettings({ file, safeStorage: fakeSafeStorage(), env: {} });
+  const s = make();
+  assert.equal(s.customVoices(), false);
+  assert.equal(s.setCustomVoices(true).customVoices, true);
+  assert.equal(make().customVoices(), true);
+  for (const bad of ['true', 1, undefined, null]) assert.throws(() => s.setCustomVoices(bad), /true or false/);
+  assert.equal(make().customVoices(), true);
+});
+
+test('ipc voices:customize: refuses when off, without keys or pipeline fn; succeeds otherwise', async () => {
+  const file = path.join(tmpDir(), 'settings.json');
+  const settings = createSettings({ file, safeStorage: fakeSafeStorage(), env: {} });
+  const calls = [];
+  const pipeline = {};
+  const h = createHandlers({ settings, catalog, games: {}, voices: { current: () => 'g:cur' }, pipeline });
+  const arg = { speaker: 'Sylvie' };
+  await assert.rejects(() => h['voices:customize'](arg), /off/);
+  settings.setCustomVoices(true);
+  await assert.rejects(() => h['voices:customize'](arg), /ElevenLabs key and a Grok key/);
+  settings.setKeys({ elevenlabs: 'a', grok: 'b' });
+  await assert.rejects(() => h['voices:customize'](arg), /not available/);
+  pipeline.customizeVoice = async (a) => { calls.push(a); return { speaker: a.speaker, locked: true }; };
+  assert.deepEqual(await h['voices:customize'](arg), { speaker: 'Sylvie', locked: true });
+  assert.deepEqual(calls, [{ game: 'g:cur', speaker: 'Sylvie' }]);
+  await h['voices:customize']({ game: 'g:x', speaker: 'Bo' });
+  assert.equal(calls[1].game, 'g:x');
+  await assert.rejects(() => h['voices:customize']({}), /Missing "speaker"/);
+  assert.equal((await h['settings:setCustomVoices'](false)).customVoices, false);
+  assert.throws(() => h['settings:setCustomVoices']('yes'), /true or false/);
 });

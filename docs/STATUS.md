@@ -4,7 +4,7 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 
 ## Verified
 - `npm run smoke`: boots the real `main/index.js` with a stand-in for Electron, a fake Steam library
-  and fake ElevenLabs/Gemini, then acts as the game and the UI. Checks windows and pages, the
+  and fake ElevenLabs/Grok, then acts as the game and the UI. Checks windows and pages, the
   Shift+F2 hotkey, IPC wiring, key handling, Steam scan, installing/removing the hook, /characters,
   /line, audio to the main window only, the cache, voice tuning, preview, narration off, /stop, and
   that IPC from other pages is refused. All pass.
@@ -62,7 +62,7 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 - Overlay over a real game: windowed, borderless, and the exclusive-fullscreen warning.
 - Steam scan against a real library, and installing the hook into a real game.
 - The Ren'Py hook against a real game (speaker names, Ren'Py 7 vs 8).
-- Real ElevenLabs and Gemini calls, including the model IDs.
+- Real ElevenLabs and Grok calls, including the model IDs.
 - The Windows installer (`npm run dist`).
 
 ## Known limitation
@@ -94,7 +94,7 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 ## Acting (0.1.4)
 - Every line goes to ElevenLabs with the line before and after it (`previous_text`/`next_text`), so
   delivery follows the conversation. UNVERIFIED against the live API.
-- Ren'Py hook v7 sends the next lines of the script with each line. Gemini marks each one with an
+- Ren'Py hook v7 sends the next lines of the script with each line. Grok marks each one with an
   emotion and intensity ahead of time, in batches of up to 20; a line's mood shifts the character's
   stability/style/speed for that line only. Settings > "Act out scenes" (on by default) turns it off.
   The first line after a choice has no mood yet and uses the base voice. Godot games get only the
@@ -104,9 +104,9 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 - Optional xAI key in Settings. Once per game, Grok searches the web for the main characters (names,
   aliases, gender, age, personality, how they sound); saved in `userData/cast.json`.
 - Speaker names resolve to the cast ("MARK", "Mark Borja", Godot's "MarkSprite" -> Mark), so one
-  character never gets several voices. Gemini gets the notes and the game's name when casting;
-  unlocked voices are recast once when the lookup arrives. Without a Grok key, Gemini still gets the
-  game's name. UNVERIFIED: xAI's API (model `grok-4.7`, override with GROK_MODEL) not called live.
+  character never gets several voices. Grok gets the notes and the game's name when casting;
+  unlocked voices are recast once when the lookup arrives. Grok is required now (it casts and directs); it always gets the
+  game's name. xAI API: request/response shape, `web_search` tool and research model `grok-4.7` (GROK_MODEL) confirmed from docs.x.ai; casting/acting model is `grok-4.20-0309-non-reasoning` (GROK_FAST_MODEL; `grok-4-fast-non-reasoning` is no longer listed). UNVERIFIED: not called live, and the docs don't say the non-reasoning model accepts /v1/responses. A SuperGrok subscription is billed separately from API credits (console.x.ai).
 
 ## RPG Maker MV (OMORI)
 - RPG Maker MV games are now `support: "full"`: the Voices switch copies `mod/rpgmaker/dubgame.js` to
@@ -130,3 +130,9 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 [2]` -> AUBREY). Tested only with stand-ins (`test/rpgmaker.test.js`).
   Also untested: other MV games (without YEP_MessageCore every line is "Narrator"), OneLoader mods,
   macOS app bundles, MV games listed from Steam need a story tag from SteamSpy like other engines.
+
+## Voice catalog (24 entries)
+- Added 12 premade voices. UNVERIFIED: IDs came from a third-party list (wavespeed.ai/docs-api/elevenlabs/elevenlabs-voice-id,
+  taken from ElevenLabs preview URLs), not a live `GET /v1/voices`. Accent/age labels for the added voices are
+  from memory of ElevenLabs' labels, not checked. All are English with no Asian/Indian/Irish accents.
+  Check with the API; real accent variety needs the Voice Library.

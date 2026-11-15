@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { tmpDir } = require('./helpers');
-const { createMoods, applyMood, buildRequest, EMOTIONS } = require('../main/moods');
+const { createMoods, applyMood, buildPrompt, EMOTIONS, SHIFT, MOOD_STRENGTH, MAX_SHIFT } = require('../main/moods');
 const { createVoiceStore } = require('../main/voices');
 const { createCache } = require('../main/cache');
 const { createPipeline } = require('../main/pipeline');
@@ -27,26 +27,48 @@ test('applyMood: shifts the voice a little per line, stays in range, never touch
   assert.equal(applyMood(base, { emotion: 'made-up', intensity: 1 }), base);
 });
 
-test('moods: one Gemini call directs the coming lines; no call while enough are ready', async () => {
+test('applyMood: strength is halved and max intensity stays within the bounds of the players values', () => {
+  assert.equal(MOOD_STRENGTH, 0.5);
+  const scared = applyMood(base, { emotion: 'scared', intensity: 1 });
+  assert.equal(scared.stability, 0.35, '-0.3 halved is -0.15');
+  assert.equal(scared.speed, 1.04, '+0.08 halved is +0.04');
+  for (const stability of [0.2, 0.5, 0.8]) for (const speed of [0.8, 1, 1.15]) {
+    const user = { ...base, stability, style: 0.4, speed, volume: 0.85 };
+    for (const emotion of EMOTIONS) {
+      const o = applyMood(user, { emotion, intensity: 1 });
+      assert.ok(Math.abs(o.stability - stability) <= MAX_SHIFT.stability + 0.011, emotion);
+      assert.ok(Math.abs(o.style - 0.4) <= MAX_SHIFT.style + 0.011, emotion);
+      assert.ok(Math.abs(o.speed - speed) <= speed * MAX_SHIFT.speedRel + 0.011, emotion);
+      assert.equal(o.volume, 0.85, 'moods never touch volume');
+    }
+  }
+  assert.ok(Object.keys(SHIFT).length === EMOTIONS.length);
+});
+
+test('moods: prompt asks Grok to be restrained', () => {
+  assert.match(buildPrompt([{ speaker: 'A', text: 'hi' }], []), /restrained/);
+});
+
+test('moods: one Grok call directs the coming lines; no call while enough are ready', async () => {
   const calls = [];
   const settings = { getKey: () => 'k', acting: () => true };
-  const usage = { n: 0, recordGemini() { this.n++; } };
-  const moods = createMoods({ settings, usage, callGemini: async (req) => {
+  const usage = { n: 0, recordAI() { this.n++; } };
+  const moods = createMoods({ settings, usage, callGrok: async (req) => {
     calls.push(req);
-    const n = (req.body.contents[0].parts[0].text.match(/^\d+\. /gm) || []).length;
+    const n = (req.input.match(/^\d+\. /gm) || []).length;
     return { lines: Array.from({ length: n }, (_, i) => ({ i, emotion: i % 2 ? 'sad' : 'happy', intensity: 2 })) };
   } });
   const lines = Array.from({ length: 25 }, (_, i) => ({ speaker: 'Mark', text: 'Line ' + i }));
   await moods.prepare('g', lines.slice(0, 20), [{ speaker: 'Cathy', text: 'Hi.' }]);
   assert.equal(calls.length, 1);
-  assert.match(calls[0].body.contents[0].parts[0].text, /Cathy: Hi\./, 'the scene so far is sent as context');
+  assert.match(calls[0].input, /Cathy: Hi\./, 'the scene so far is sent as context');
   assert.deepEqual(moods.get('g', 'Mark', 'Line 1'), { emotion: 'sad', intensity: 1 }, 'intensity is clamped');
   await moods.prepare('g', lines.slice(1, 21), []);
   assert.equal(calls.length, 1, 'the next 5 lines are ready: no call');
   await moods.prepare('g', lines.slice(18, 25), []);
   assert.equal(calls.length, 2, 'running low: one more call');
-  assert.equal((calls[1].body.contents[0].parts[0].text.match(/^\d+\. /gm) || []).length, 5, 'only the missing lines are asked for');
-  assert.equal(usage.n, 2, 'Gemini calls are counted');
+  assert.equal((calls[1].input.match(/^\d+\. /gm) || []).length, 5, 'only the missing lines are asked for');
+  assert.equal(usage.n, 2, 'Grok calls are counted');
   assert.equal(moods.get('other', 'Mark', 'Line 1'), null, 'moods are per game');
 });
 
@@ -55,7 +77,7 @@ test('moods: off without a key or when acting is switched off; errors are report
   const on = { v: true };
   const statuses = [];
   const moods = createMoods({ settings: { getKey: () => 'k', acting: () => on.v }, emitStatus: (m) => statuses.push(m),
-    callGemini: async () => { calls++; throw new Error('Gemini 429'); } });
+    callGrok: async () => { calls++; throw new Error('Grok 429'); } });
   on.v = false;
   await moods.prepare('g', [{ speaker: 'A', text: 'x' }], []);
   assert.equal(calls, 0);
@@ -63,16 +85,16 @@ test('moods: off without a key or when acting is switched off; errors are report
   await moods.prepare('g', [{ speaker: 'A', text: 'x' }], []);
   assert.equal(calls, 1);
   assert.match(statuses[0], /429/);
-  const noKey = createMoods({ settings: { getKey: () => '', acting: () => true }, callGemini: async () => { calls++; } });
+  const noKey = createMoods({ settings: { getKey: () => '', acting: () => true }, callGrok: async () => { calls++; } });
   await noKey.prepare('g', [{ speaker: 'A', text: 'y' }], []);
   assert.equal(calls, 1);
 });
 
-test('moods: request asks for JSON with the emotion list', () => {
-  const req = buildRequest([{ speaker: 'Mark', text: 'Run!' }], []);
-  const item = req.body.generationConfig.responseSchema.properties.lines.items;
-  assert.deepEqual(item.properties.emotion.enum, EMOTIONS);
-  assert.match(req.body.contents[0].parts[0].text, /0\. Mark: Run!/);
+test('moods: prompt asks for JSON with the emotion list', () => {
+  const p = buildPrompt([{ speaker: 'Mark', text: 'Run!' }], []);
+  for (const e of EMOTIONS) assert.ok(p.includes(e));
+  assert.match(p, /JSON only/);
+  assert.match(p, /0\. Mark: Run!/);
 });
 
 test('tts: surrounding lines go to ElevenLabs as previous_text/next_text, trimmed', () => {
@@ -84,7 +106,7 @@ test('tts: surrounding lines go to ElevenLabs as previous_text/next_text, trimme
   assert.ok(!('previous_text' in plain) && !('next_text' in plain));
 });
 
-test('pipeline: a directed line is spoken with its mood and the lines around it; Gemini is never waited on', async () => {
+test('pipeline: a directed line is spoken with its mood and the lines around it; Grok is never waited on', async () => {
   const dir = tmpDir();
   const store = createVoiceStore({ file: path.join(dir, 'voices.json') });
   store.forGame('g').setAuto({ ...base, locked: false });

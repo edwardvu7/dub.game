@@ -13,6 +13,7 @@ const { createUsage } = require('./usage');
 const { createOverlayPosition, constrainToGame } = require('./overlay-position');
 const { createPipeline } = require('./pipeline');
 const { createMoods } = require('./moods');
+const { createVoiceDesigner } = require('./voice-design');
 const castLookup = require('./cast');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
@@ -244,12 +245,13 @@ async function start() {
     file: path.join(userData, 'settings.json'),
     safeStorage,
     env: process.env,
-    testers: { elevenlabs: (key) => tts.testKey(key), gemini: (key) => profiler.testKey(key),
+    testers: { elevenlabs: (key) => tts.testKey(key),
       grok: (key) => castLookup.testKey(key) },
   });
   const voices = createVoiceStore({
     file: path.join(userData, 'voices.json'),
     catalogIds: catalog.map((v) => v.voice_id),
+    catalog,
   });
   voices.onChange((all) => emit('voices:changed', all));
   const usage = createUsage({ file: path.join(userData, 'usage.json') });
@@ -271,7 +273,8 @@ async function start() {
   let pipeline = null;
   const cast = castLookup.createCastBook({ file: path.join(userData, 'cast.json'), settings, log,
     onReady: (game) => { if (pipeline) pipeline.recast(game).catch(() => {}); } });
-  pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName, moods, cast });
+  pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName, moods, cast,
+    designer: createVoiceDesigner({ settings, log }) });
 
   gameTracker = createGameWindowTracker({
     onFrame: (frame) => {

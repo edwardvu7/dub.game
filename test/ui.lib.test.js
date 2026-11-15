@@ -19,7 +19,7 @@ test('formatSlider: percent for stability and style, multiplier for speed, clamp
 
 test('slider ranges match what main/voices.js accepts', () => {
   const byKey = Object.fromEntries(L.SLIDERS.map((s) => [s.key, [s.min, s.max]]));
-  assert.deepEqual(byKey, { stability: [0, 1], style: [0, 1], speed: [0.7, 1.2] });
+  assert.deepEqual(byKey, { stability: [0, 1], style: [0, 1], speed: [0.7, 1.2], volume: [0, 1] });
 });
 
 test('supportBadge and gameStatus', () => {
@@ -78,8 +78,8 @@ test('initials, voiceLabel, keyState, needsSetup', () => {
   assert.equal(L.voiceLabel({ name: 'Sarah', description: 'warm' }), 'Sarah (warm)');
   assert.equal(L.voiceLabel(null), 'Unknown voice');
   assert.equal(L.keyState(true).tone, 'ok');
-  assert.equal(L.needsSetup({ hasElevenLabsKey: true, hasGeminiKey: false }), true);
-  assert.equal(L.needsSetup({ hasElevenLabsKey: true, hasGeminiKey: true }), false);
+  assert.equal(L.needsSetup({ hasElevenLabsKey: true, hasGrokKey: false }), true);
+  assert.equal(L.needsSetup({ hasElevenLabsKey: true, hasGrokKey: true }), false);
   assert.equal(L.needsSetup(null), true);
 });
 
@@ -165,4 +165,10 @@ test('usage: counts and the ElevenLabs plan line', () => {
   assert.equal(L.formatCount(12345.4), '12,345');
   assert.match(L.planSummary({ ok: true, used: 2500, limit: 10000 }), /^Used 2,500 of 10,000 characters \(25%\)\.$/);
   assert.equal(L.planSummary({ ok: false, error: 'No key.' }), 'No key.');
+});
+
+test('customVoiceLabel names the designed voice, with a fallback', () => {
+  assert.equal(L.customVoiceLabel({ voice_id: 'x', name: 'Sylvie (dub)' }), 'Custom: Sylvie (dub)');
+  assert.equal(L.customVoiceLabel({}), 'Custom: designed voice');
+  assert.equal(L.customVoiceLabel(null), 'Custom: designed voice');
 });

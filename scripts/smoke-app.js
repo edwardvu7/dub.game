@@ -1,5 +1,5 @@
 // npm run smoke. Boots the real main/index.js with a stand-in for Electron, a fake Steam library,
-// and fake ElevenLabs/Gemini, then plays the part of a game and of the UI.
+// and fake ElevenLabs/Grok, then plays the part of a game and of the UI.
 'use strict';
 const Module = require('node:module');
 const path = require('node:path');
@@ -35,10 +35,9 @@ for (const [id, name, tags] of [['515151', 'Story Unity', { 'Story Rich': 40, Ad
 }
 process.env.DUBGAME_STEAM_PATH = steam;
 process.env.ELEVENLABS_API_KEY = 'test-eleven';
-process.env.GEMINI_API_KEY = 'test-gemini';
 process.env.XAI_API_KEY = 'test-xai';
 
-// ---- fake network: ElevenLabs returns bytes, Gemini returns a profile ----
+// ---- fake network: ElevenLabs returns bytes, Grok returns a profile ----
 const calls = [];
 const bodies = []; // [url, parsed body] of POSTs
 globalThis.fetch = async (url, init = {}) => {
@@ -47,28 +46,25 @@ globalThis.fetch = async (url, init = {}) => {
   const ok = (body, type) => new Response(body, { status: 200, headers: { 'content-type': type } });
   if (url.includes('api.elevenlabs.io/v1/text-to-speech')) return ok(Buffer.from('ID3fakeaudio'), 'audio/mpeg');
   if (url.includes('api.elevenlabs.io/v1/user')) return ok('{}', 'application/json');
-  if (url === 'https://api.x.ai/v1/responses') { // Grok's cast lookup for the demo game
-    const cast = { characters: [{ name: 'Sylvie', aliases: ['Sylvie Ray'], gender: 'female', age_range: 'young_adult',
-      personality: 'Shy artist.', voice: 'Soft.' }] };
-    return ok(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(cast) }] }] }), 'application/json');
-  }
-  if (url.includes('generativelanguage') && init.method === 'POST') {
+  if (url === 'https://api.x.ai/v1/models') return ok('{}', 'application/json');
+  if (url === 'https://api.x.ai/v1/responses') {
     const req = JSON.parse(init.body);
-    const prompt = req.contents[0].parts[0].text;
+    const reply = (obj) => ok(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(obj) }] }] }), 'application/json');
+    if (req.tools) { // the cast lookup for the demo game (web_search)
+      return reply({ characters: [{ name: 'Sylvie', aliases: ['Sylvie Ray'], gender: 'female', age_range: 'young_adult',
+        personality: 'Shy artist.', voice: 'Soft.' }] });
+    }
+    const prompt = req.input[0].content;
     if (/directing voice actors/.test(prompt)) { // acting: direct every numbered line as scared
       const n = (prompt.match(/^\d+\. /gm) || []).length;
-      const lines = Array.from({ length: n }, (_, i) => ({ i, emotion: 'scared', intensity: 1 }));
-      return ok(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines }) }] } }] }), 'application/json');
+      return reply({ lines: Array.from({ length: n }, (_, i) => ({ i, emotion: 'scared', intensity: 1 })) });
     }
     const cat = require(path.join(REPO, 'voices_catalog.json'));
     const names = ['Sylvie', 'Marcus'].filter((n) => prompt.includes(n));
     const one = (n) => ({ speaker: n, gender: 'female', age_range: 'young_adult', personality: n + ' is kind.',
       voice_id: cat[1].voice_id, stability: 0.4, style: 0.3, speed: 1.05, reason: 'Fits.' });
-    const body = names.length > 1 || /profiles/.test(JSON.stringify(req.generationConfig.responseSchema))
-      ? { profiles: names.map(one) } : one(names[0] || 'Sylvie');
-    return ok(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }] }), 'application/json');
+    return reply(names.length > 1 || /"profiles":\[/.test(prompt) ? { profiles: names.map(one) } : one(names[0] || 'Sylvie'));
   }
-  if (url.includes('generativelanguage')) return ok('{}', 'application/json');
   if (url.includes('steamspy.com/api.php')) {
     const id = new URL(url).searchParams.get('appid');
     return ok(JSON.stringify(globalThis.__spyTags[id] || {}), 'application/json');
@@ -118,6 +114,7 @@ const electron = {
   dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }), showErrorBox: (t, m) => problems.push('ERROR BOX ' + m) },
   safeStorage: { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from('enc:' + s), decryptString: (b) => b.toString().slice(4) },
   screen: {
+    screenToDipRect: (_w, r) => r,
     getPrimaryDisplay: () => displays[0],
     getCursorScreenPoint: () => cursor,
     getDisplayNearestPoint: (p) => displays.find((d) => p.x >= d.workArea.x && p.x < d.workArea.x + d.workArea.width) || displays[0],
@@ -223,9 +220,9 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
 
   // 4. Settings: env keys count, no key ever leaves main
   const s = await invoke('settings:get');
-  check(s.hasElevenLabsKey && s.hasGeminiKey && !JSON.stringify(s).includes('test-'), 'settings:get reports keys without exposing them');
+  check(s.hasElevenLabsKey && s.hasGrokKey && !JSON.stringify(s).includes('test-'), 'settings:get reports keys without exposing them');
   check((await invoke('settings:test', { provider: 'elevenlabs' })).ok, 'ElevenLabs key test works');
-  check((await invoke('settings:test', { provider: 'gemini' })).ok, 'Gemini key test works');
+  check((await invoke('settings:test', { provider: 'grok' })).ok, 'Grok key test works');
 
   // 5. Steam scan finds the fake Ren'Py game; switching it on installs the hook
   const games = await invoke('games:list');
@@ -258,7 +255,7 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   check(play[0] && Buffer.from(play[0][2].data, 'base64').toString() === 'ID3fakeaudio' && play[0][2].mime, 'audio payload is the ElevenLabs bytes as base64 with a mime type');
   const store = await invoke('voices:get');
   const voices = (store.games[GAME] || {}).voices || {};
-  check(voices.Sylvie && voices.Sylvie.source === 'gemini', 'Sylvie was cast by Gemini: ' + (voices.Sylvie && voices.Sylvie.voice_id));
+  check(voices.Sylvie && voices.Sylvie.source === 'grok', 'Sylvie was cast by Grok: ' + (voices.Sylvie && voices.Sylvie.voice_id));
   check(store.current === GAME && store.games[GAME].name === 'Demo Visual Novel', 'voices are saved under the game, named from the Steam scan: ' + (store.games[GAME] || {}).name);
   let usage = await invoke('usage:get');
   check(usage.session.chars === 'Hey, you made it!'.length && usage.byGame[GAME] === usage.session.chars, 'ElevenLabs characters are counted per game: ' + usage.session.chars);
@@ -272,22 +269,22 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
 
   // 7. Cast lookup: one Grok search for the game; a full name the game shows maps to the same Sylvie
   await wait(200);
-  check(calls.filter((u) => u === 'https://api.x.ai/v1/responses').length === 1, 'Grok looks up the game\'s cast once');
+  check(bodies.filter(([u, b]) => u === 'https://api.x.ai/v1/responses' && b.tools).length === 1, 'Grok looks up the game\'s cast once');
   const castFile = path.join(tmp, 'userData', 'cast.json');
   check(fs.existsSync(castFile) && JSON.parse(fs.readFileSync(castFile, 'utf8'))[GAME].characters[0].name === 'Sylvie', 'the cast is saved to userData/cast.json');
-  const geminiPrompts = bodies.filter(([u]) => u.includes('generativelanguage')).map(([, b]) => b.contents[0].parts[0].text);
-  check(geminiPrompts.some((t) => /Known about them: female; young adult; Shy artist/.test(t) && /from the game "Demo Visual Novel"/.test(t)),
-    'Gemini recasts with the game name and the looked-up notes');
+  const grokPrompts = bodies.filter(([u, b]) => u === 'https://api.x.ai/v1/responses' && !b.tools).map(([, b]) => b.input[0].content);
+  check(grokPrompts.some((t) => /Known about them: female; young adult; Shy artist/.test(t) && /from the game "Demo Visual Novel"/.test(t)),
+    'Grok recasts with the game name and the looked-up notes');
   await post('/line', { speaker: 'Sylvie Ray', text: 'It is me, Sylvie.', engine: 'renpy', game: GAME }); await wait(300);
   const castStore = await invoke('voices:get');
   check(!castStore.games[GAME].voices['Sylvie Ray'], 'a full name from the game resolves to the same Sylvie');
 
-  // 7a. Acting: the hook sends the next lines; Gemini directs them ahead; the line is then acted
-  const geminiBefore = bodies.filter(([u]) => u.includes('generativelanguage')).length;
+  // 7a. Acting: the hook sends the next lines; Grok directs them ahead; the line is then acted
+  const grokBefore = bodies.filter(([u, b]) => u === 'https://api.x.ai/v1/responses' && !b.tools).length;
   await post('/line', { speaker: 'Sylvie', text: 'Did you hear that?', engine: 'renpy', game: GAME,
     upcoming: [{ speaker: 'Marcus', text: 'Get behind me.' }] });
   await wait(400);
-  check(bodies.filter(([u]) => u.includes('generativelanguage')).length === geminiBefore + 1, 'one Gemini call directs the coming lines ahead of time');
+  check(bodies.filter(([u, b]) => u === 'https://api.x.ai/v1/responses' && !b.tools).length === grokBefore + 1, 'one Grok call directs the coming lines ahead of time');
   const asked = bodies.filter(([u]) => u.includes('text-to-speech')).pop()[1];
   check(asked.previous_text === 'It is me, Sylvie.' && asked.next_text === 'Get behind me.', 'ElevenLabs gets the lines around this one');
   await post('/line', { speaker: 'Marcus', text: 'Get behind me.', engine: 'renpy', game: GAME, upcoming: [] });

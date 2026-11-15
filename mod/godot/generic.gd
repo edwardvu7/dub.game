@@ -140,6 +140,7 @@ const GENERIC := ["bubble", "balloon", "speech", "dialog", "text", "label", "pan
 	"ui", "hud", "canvas", "layer", "control", "root", "main", "world", "level", "scene", "stage", "node",
 	"anchor", "pivot", "offset", "marker", "position", "head", "body", "sprite", "visual", "model", "mesh",
 	"viewport", "character", "characters", "actor", "actors", "npc", "npcs", "entity", "entities", "player",
+	"students", "crowd", "everyone", "customers", "voices", "villagers", "townspeople", "classmates", "audience",
 	"overlay", "popup", "window", "hint", "margin", "vbox", "hbox", "center", "background", "bg"]
 
 # A node name that could be a character: not a layout word like "Bubble" or "VBoxContainer".
@@ -247,7 +248,7 @@ func _process(delta: float) -> void:
 		_enqueue("/stop", {"engine": "godot", "seq": _seq})
 		set_process(false)
 		return
-	# One request per scene load, 12 names at most (one Gemini call in the app).
+	# One request per scene load, 12 names at most (one Grok call in the app).
 	if not _cast_new.is_empty() and not _pending.any(func(item: Dictionary) -> bool: return item.endpoint == "/characters"):
 		_enqueue("/characters", {"engine": "godot", "characters": _cast_new.slice(0, 12)})
 		_cast_new = _cast_new.slice(12)

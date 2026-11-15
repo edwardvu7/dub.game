@@ -13,8 +13,8 @@ You own the Electron main process: the localhost server, the voice pipeline, key
    model (`eleven_flash_v2_5`). Send `audio:play` to the renderer. Newest line wins. (hour 1–3)
 3. **Voice catalog** — `voices_catalog.json`: ~12 ElevenLabs premade voices with one-line descriptions
    spanning gender/age/accent (starter included — verify IDs with the API or ElevenLabs MCP). (hour 1–3)
-4. **Gemini profiling** — `main/profiler.js`: `profileCharacter({speaker, samples}, catalog, key)` calls
-   `gemini-3.8-flash` (2.5 Flash was retired for new keys) `generateContent` with `responseMimeType:"application/json"` + `responseSchema`
+4. **Grok profiling** — `main/profiler.js`: `profileCharacter({speaker, samples}, catalog, key)` calls
+   a fast non-reasoning Grok model via `main/xai.js` (Responses API); JSON is requested in the prompt and `sanitizeProfile` validates
    (schema in ROADMAP appendix), constrains `voice_id` to catalog IDs, saves to `voices.json`
    (`main/voices.js`). Once per character; `/characters` profiles everyone up front. Never overwrite
    `locked` profiles. Narrator: one calm voice, or skipped when narration is off. (hour 3–5)

@@ -12,7 +12,7 @@ Instead of relying on screen capture or OCR, **dub.game** reads exact dialogue s
 
 1. **Steam Library Scan:** Parses local Steam manifests (`libraryfolders.vdf` and `appmanifest_*.acf`) to detect compatible visual novels and toggle engine hooks on or off cleanly.
 2. **Engine Callback Hook:** Injects a lightweight callback script (such as `game/dubgame.rpy` via `config.all_character_callbacks`) that strips text tags and dispatches `{ speaker, text }` payloads to `POST http://127.0.0.1:8000/line`.
-3. **One-Time Character Profiling:** New speakers are profiled once using Gemini structured outputs (via Mastra) against `voices_catalog.json` to assign gender, age range, personality, and voice parameters, then cached locally in `voices.json`.
+3. **One-Time Character Profiling:** New speakers are profiled once using xAI Grok (JSON requested in the prompt, validated in code) against `voices_catalog.json` to assign gender, age range, personality, and voice parameters, then cached locally in `voices.json`.
 4. **ElevenLabs Streaming & Live Overlay:** Streams dialogue audio in real time and provides an always-on-top Electron overlay (`Shift + F2`) to swap voices, adjust stability/style/speed sliders mid-scene, or re-roll casting.
 
 ---
@@ -32,7 +32,7 @@ Instead of relying on screen capture or OCR, **dub.game** reads exact dialogue s
 
 ### Prerequisites
 - **Node.js `>= 22.12.0`** (required by Electron `v45+`)
-- An **ElevenLabs API key** and a **Gemini API key** (stored encrypted in the Electron main process via `safeStorage`, or configured via `.env` for local development)
+- An **ElevenLabs API key** and an **xAI (Grok) API key** (stored encrypted in the Electron main process via `safeStorage`, or configured via `.env` for local development)
 
 ### Local Development
 

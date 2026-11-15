@@ -2,7 +2,7 @@
 
 AI voice-over for visual novels. An Electron desktop app scans the Steam library, installs a tiny
 hook script into compatible games, receives every line of dialogue over localhost, casts a voice
-per character with Gemini, and speaks each line with ElevenLabs. A see-through overlay (Shift+F2)
+per character with Grok, and speaks each line with ElevenLabs. A see-through overlay (Shift+F2)
 lets players retune voices while playing. Full plan: `docs/ROADMAP.md`.
 
 ## Ownership (one folder per person, so work never collides)
@@ -34,7 +34,7 @@ code against the contracts below (or fake data), never edit their folder.
   clipboard mode: `"clipboard"`). Voices are saved per game. Optional for old hooks: a line without
   it goes to the game that spoke last. `/characters` and `/stop` carry the same field.
 - `upcoming` (optional, Ren'Py hook v7+): `[{speaker, text}]`, the next lines of the script up to the
-  next choice or jump (max 20). The app has Gemini direct them ahead of time (`main/moods.js`): one
+  next choice or jump (max 20). The app has Grok direct them ahead of time (`main/moods.js`): one
   call per ~15 lines, never waited on. Each line's mood shifts stability/style/speed for that line
   only. The previous and next line also go to ElevenLabs as `previous_text`/`next_text`.
 - `speaker` is `"Narrator"` when Ren'Py gives no name, `"unknown"` when the engine can't tell.
@@ -64,8 +64,8 @@ About 12 entries.
         "Sylvie": {
           "speaker": "Sylvie", "gender": "female", "age_range": "young_adult",
           "personality": "Gentle and shy childhood friend.",
-          "voice_id": "EXAVITQu4vr4xnSDxMaL", "stability": 0.5, "style": 0.3, "speed": 1.0,
-          "reason": "Soft, warm voice fits her personality.", "locked": false, "muted": false
+          "voice_id": "EXAVITQu4vr4xnSDxMaL", "stability": 0.5, "style": 0.3, "speed": 1.0, "volume": 1.0,
+          "reason": "Soft, warm voice fits her personality.", "locked": false, "muted": false, "spoken": true
         }
       }
     }
@@ -73,21 +73,56 @@ About 12 entries.
 }
 ```
 One cast per game. `current` is the game that sent the last line (what the overlay shows); `name`
-comes from the Steam scan. `locked: true` means the player set it; Gemini must never overwrite a
+comes from the Steam scan. `locked: true` means the player set it; Grok must never overwrite a
 locked profile. `muted: true` skips the character (nothing is sent to ElevenLabs); muting does not
-lock. A version 1 file (speaker to profile) is moved to the first game voiced after the upgrade.
+lock. `volume` (0 to 1, default 1) is playback-only: applied by the renderer to the playing clip, not in the audio cache key, never locks. A version 1 file (speaker to profile) is moved to the first game voiced after the upgrade.
+`spoken: true` is set by main when a line from that character is voiced (never patchable); the UI lists only
+characters that have spoken (or are locked/muted) and counts the rest. Names of one person (`Mark`, `MarkBorja`,
+`MarkSprite`, `Sylvie_Happy`) share one entry, keyed by the short name (`main/speaker-names.js`); a one-time
+migration (`migrated: true` at the top of the file, not returned by `voices:get`) merged old duplicates, marked
+existing entries `spoken` and dropped unlocked crowd/UI-label Godot entries. A Godot `/line` whose speaker is a
+crowd/UI label (`main/godot-names.js`) and matches no known character is dropped.
 `voices:get` and `voices:changed` return `{current, games}` (the file without `version`).
+Optional `custom_voice: {voice_id, name, description}` is set by the backend when a designed voice was created (`voices:customize`): `voice_id` becomes that voice and the profile becomes `locked: true`. It is not in the catalog, so the UI adds it to the dropdown as "Custom: <name>".
+
+### Two voice sets per character (Custom voices setting)
+A profile keeps its preset voice (`voice_id` + sliders, cast by Gemini/Grok or picked by the player) and, optionally,
+a designed one: `custom_voice: {voice_id, name, description}` (ElevenLabs Voice Design). Designing never touches
+`voice_id` or `locked`. The voice that speaks (and is previewed and cache-keyed) is `effectiveVoiceId(profile, customVoices)`
+in `main/voices.js`: `custom_voice.voice_id` when `settings.customVoices` is on, the profile has one and `use_preset` is not
+true; otherwise `voice_id`. Flipping the setting switches every character at once and loses nothing. `use_preset: true`
+(patchable through `voices:update`, never locks) means the player picked a preset for that character while custom was on;
+`use_preset: false` returns to the designed voice; a fresh design clears it. Sliders, mute, volume and lock are shared by both sets.
+With the setting on, the card's Voice list starts with "Custom: <name>"; picking a catalog voice there sends
+`{voice_id, use_preset: true}`. With it off, the list edits the preset.
+Profiles from the first version (voice_id overwritten by the designed id) are repaired on load: the preset becomes the
+catalog voice closest in gender/age, `locked` is released and `source` is `fallback`, so Grok recasts it once.
+When the setting is on, characters that speak and have no `custom_voice` are designed automatically in one serialized
+background queue (`pipeline.js`): current speaker first, then most lines this session; at most `MAX_CUSTOM_PER_GAME` (8) per game;
+muted, Narrator and unknown skipped; needs an ElevenLabs key. Lines never wait: they speak with the preset until the
+custom voice exists. Hard failures (401/402/403/429, quota/slot/plan) stop the queue for the session and send one
+`app:status` `error` notice; transient errors retry 3 times with backoff. Turning the setting off clears the queue; turning it on
+resets the stop. The manual "Custom voice" button (`voices:customize`) still redoes one character and clears a stop on success.
+`settings:setCustomVoices` also calls `pipeline.customVoicesChanged(on)`.
 
 ### `cast.json` (in `userData`, main/cast.js)
-Optional, needs an xAI key. The first time a game is voiced, Grok searches the web (xAI Responses API,
-`web_search` tool) for its main characters: `{ [game]: {name, at, characters: [{name, aliases, gender,
-age_range, personality, voice}]} }`. Used to resolve speaker names (case, full names, aliases, a
-Godot node like "MarkSprite") to one character, and as notes for Gemini's casting. When it arrives,
-unlocked voices picked without it are recast once (profiles get `cast: true`). Gemini is always told
+Needs an xAI key (the same Grok key that casts and directs). The first time a game is voiced, Grok searches the web (xAI Responses API,
+`web_search` tool) for its setting and main characters: `{ [game]: {name, at, setting: {country, region,
+language, era, notes}, characters: [{name, aliases, gender, age_range, personality, voice, origin, speech}]} }`
+(`origin` = nationality/background, `speech` = how they talk; all optional strings, trimmed and capped). The file
+persists across restarts and a game is researched once; a failed lookup retries after an hour. Entries saved before
+`setting` existed are researched once more (the lookup always writes `setting`, `{}` fields empty if unknown; saved
+characters are kept if the refresh finds none). Setting and origin/speech go into every casting prompt, which tells
+Grok to match the voice to the setting and not default to British/Australian voices. Used to resolve speaker names (case, full names, aliases, a
+Godot node like "MarkSprite") to one character, and as notes for Grok's casting. When it arrives,
+unlocked voices picked without it are recast once (profiles get `cast: true`; `researched: true` once cast with the
+setting, so a setting arriving later recasts them once more). Cast voices also copy the researched `origin`/`speech`
+(short strings, from the research, never patchable) into their voices.json profile; the expanded card shows them as a
+read-only "Notes" line. Grok is always told
 the game's name. Grok never picks voices or touches ElevenLabs.
 
 ### `usage.json` (in `userData`, main/usage.js)
-Characters sent to ElevenLabs this session, this month (per game too) and in total; Gemini calls;
+Characters sent to ElevenLabs this session, this month (per game too) and in total; Grok calls (`monthAI`, `session.ai`; old `monthGemini` is still read);
 and an optional monthly character limit. Cache hits are free and not counted. Over the limit, new
 lines are not sent (cached lines still play).
 
@@ -119,19 +154,21 @@ list, main sends `games:changed` with the new list.
 | `games:godotConfig` | invoke | `{appid, textPath, speakerPath}` → updated Godot game |
 | `voices:get` | invoke | → `{current, games}` (see voices.json) |
 | `voices:catalog` | invoke | → catalog array |
-| `voices:update` | invoke | `{game?, speaker, patch}` → profile (sound changes set `locked: true`; `muted` does not) |
-| `voices:reroll` | invoke | `{game?, speaker}` → new profile from Gemini |
+| `voices:update` | invoke | `{game?, speaker, patch}` → profile (sound changes set `locked: true`; `muted` and `volume` do not) |
+| `voices:reroll` | invoke | `{game?, speaker}` → new profile from Grok |
+| `voices:customize` | invoke | `{game?, speaker}` → profile. Experimental: Grok writes a description, ElevenLabs Voice Design makes a voice (costs credits and a voice slot, max 8 per game). Refuses with a readable error when `customVoices` is off, a key is missing, the plan/quota/slots fail, or the cap is reached |
 | `voices:preview` | invoke | `{game?, speaker, text?}` → plays a sample |
 | `voices:clearGame` | invoke | `{game}` → `true`; forgets that game's voices |
-| `usage:get` | invoke | → `{session, month, monthChars, monthGemini, totalChars, limit, byGame, overLimit}` |
+| `usage:get` | invoke | → `{session, month, monthChars, monthAI, totalChars, limit, byGame, overLimit}` |
 | `usage:setLimit` | invoke | `number` (0 = none) → same as get |
 | `usage:plan` | invoke | → `{ok, used, limit, resetAt?}` from ElevenLabs, or `{ok:false, error}` |
-| `settings:get` | invoke | → `{hasElevenLabsKey, hasGeminiKey, hasGrokKey, narration, clipboardMode, acting}` (never the keys) |
-| `settings:setKeys` | invoke | `{elevenlabs?, gemini?, grok?}` → same shape as get |
+| `settings:get` | invoke | → `{hasElevenLabsKey, hasGrokKey, narration, clipboardMode, acting, customVoices}` (never the keys) |
+| `settings:setKeys` | invoke | `{elevenlabs?, grok?}` → same shape as get |
 | `settings:test` | invoke | `{provider}` → `{ok, error?}` |
 | `settings:setNarration` | invoke | `boolean` |
-| `settings:setActing` | invoke | `boolean`: Gemini directs each line ahead of time (default on) |
-| `audio:play` | main → renderer event | `{speaker, text, mime, data /* base64 */}` |
+| `settings:setActing` | invoke | `boolean`: Grok directs each line ahead of time (default on) |
+| `settings:setCustomVoices` | invoke | `boolean` (anything else is an error): Experimental custom ElevenLabs voices (default off) |
+| `audio:play` | main → renderer event | `{speaker, text, mime, data /* base64 */, volume /* 0..1, that character's own */}` |
 | `line:received` | main → renderer event | `{speaker, text, engine}` |
 | `voices:changed` | main → renderer event | `{current, games}` |
 | `usage:changed` | main → renderer event | same as `usage:get` |
@@ -142,7 +179,7 @@ Audio plays in a hidden renderer (or the main window); a new clip always stops t
 
 ## Rules
 - **API keys stay in the main process.** Never in renderer code, never in git. Dev keys come from
-  `.env` (`ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, optional `XAI_API_KEY`); player keys are stored with `safeStorage`.
+  `.env` (`ELEVENLABS_API_KEY`, `XAI_API_KEY`); player keys are stored with `safeStorage`.
 - Renderer windows use `contextIsolation: true`, `nodeIntegration: false`, and talk only via `window.dub`.
 - Hooks must never crash or freeze the game: background thread, short timeout, swallow errors.
 - Plan first, then build. Commit every time something works.

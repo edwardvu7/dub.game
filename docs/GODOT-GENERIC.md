@@ -63,8 +63,9 @@ An identical line can play again after hiding/clearing or a new typewriter revea
 Voices ahead of time (hook v8): when a node enters the scene under a parent named `Characters`
 (Until Then: `/root/Root/Skits/<Skit>/Characters/<Name>`), its name is sent once in
 `POST /characters`, so the app picks the voice while the scene loads instead of on the character's
-first line. At most 12 names per request and 60 per run; a character who never speaks still gets a
-voice card. Checked by `npm run smoke:godot-bubbles`. UNVERIFIED on the real game: that the cast
+first line. At most 12 names per request and 60 per run. The hook filters crowd words, and the app
+only remembers a Godot cast announcement's samples: no voices.json entry (and no Grok call) is made
+until that character actually speaks a line. Checked by `npm run smoke:godot-bubbles`. UNVERIFIED on the real game: that the cast
 nodes exist well before the first line and that every child of `Characters` is a person.
 
 HTTP requests go only to 127.0.0.1:8000, asynchronously, with a one-second timeout.
@@ -134,7 +135,7 @@ names containing "link" or "dialog" (LinkButton, FileDialog), which is harmless 
 | Launcher/API wiring | Tests cover enable/disable, token validation, connection vs installation, bounded diagnostics and IPC allowlists |
 | Packaging | npm ci and Linux unpacked Electron build passed; packaged archive contains the installer and unpacked Godot hook |
 | Existing app | 109-test unit suite and mock Electron smoke checks include upstream per-game voices, usage and overlay behavior |
-| Not validated here | Until Then; native Windows runtime/installer; commercial export templates; paid live Gemini/ElevenLabs audio; performance on large commercial scenes |
+| Not validated here | Until Then; native Windows runtime/installer; commercial export templates; paid live Grok/ElevenLabs audio; performance on large commercial scenes |
 
 **Release decision:** ready for a local compatibility trial, not a claim that
 Until Then or all Godot games are supported. Acceptance on your PC is: hook

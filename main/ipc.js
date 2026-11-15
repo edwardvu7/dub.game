@@ -4,10 +4,10 @@
 
 const INVOKE_CHANNELS = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
-  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
+  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
-  'settings:setClipboardMode', 'settings:setActing',
+  'settings:setClipboardMode', 'settings:setActing', 'settings:setCustomVoices',
 ];
 const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'games:changed',
   'usage:changed', 'overlay:toggle', 'app:status'];
@@ -35,6 +35,12 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'voices:catalog': () => catalog,
     'voices:update': (arg) => voices.forGame(gameArg(arg)).update(String(need(arg, 'speaker').speaker), arg.patch || {}),
     'voices:reroll': (arg) => pipeline.reroll({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) }),
+    'voices:customize': async (arg) => {
+      if (!settings.customVoices()) throw new Error('Custom voices are off. Turn them on in Settings, under Experimental.');
+      if (!settings.getKey('elevenlabs') || !settings.getKey('grok')) throw new Error('Custom voices need both an ElevenLabs key and a Grok key. Add them in Settings.');
+      if (!pipeline || typeof pipeline.customizeVoice !== 'function') throw new Error('Custom voices are not available in this build.');
+      return pipeline.customizeVoice({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });
+    },
     'voices:preview': (arg) => pipeline.preview({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), text: arg.text }),
     'voices:clearGame': (arg) => voices.clearGame(String(need(arg, 'game').game)),
 
@@ -50,6 +56,11 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'settings:test': (arg) => settings.test(arg),
     'settings:setNarration': (arg) => settings.setNarration(arg === true),
     'settings:setActing': (arg) => settings.setActing(arg === true),
+    'settings:setCustomVoices': (arg) => {
+      const out = settings.setCustomVoices(arg);
+      if (pipeline && typeof pipeline.customVoicesChanged === 'function') pipeline.customVoicesChanged(out.customVoices);
+      return out;
+    },
     'settings:setClipboardMode': (arg) => {
       const out = settings.setClipboardMode(arg === true);
       if (onClipboardMode) onClipboardMode(out.clipboardMode);

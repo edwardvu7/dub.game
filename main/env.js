@@ -1,5 +1,5 @@
 'use strict';
-// Tiny .env reader for development keys (ELEVENLABS_API_KEY, GEMINI_API_KEY). No dependency.
+// Tiny .env reader for development keys (ELEVENLABS_API_KEY, XAI_API_KEY). No dependency.
 const fs = require('node:fs');
 
 function parseEnv(text) {

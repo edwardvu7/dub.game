@@ -39,6 +39,10 @@ async function errorText(res) {
       detail = (d && (d.message || d.status)) || (typeof d === 'string' ? d : '') || j.message || '';
     } catch { detail = raw.slice(0, 200); }
   } catch { /* no body */ }
+  // UNVERIFIED: a restricted key can be refused (403) for a designed voice it cannot read.
+  if (res.status === 403) {
+    return `ElevenLabs refused the request (403)${detail ? ': ' + detail : ''}. Your API key may be restricted: enable Text to Speech and Voices (read) on elevenlabs.io > Developers > API keys, or create an unrestricted key.`;
+  }
   return `ElevenLabs ${res.status}${detail ? ': ' + detail : ''}`;
 }
 

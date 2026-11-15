@@ -14,6 +14,8 @@
       hint: "How strongly the voice's own character comes through." },
     { key: 'speed', label: 'Speed', min: 0.7, max: 1.2, step: 0.05,
       hint: 'How fast the line is spoken.' },
+    { key: 'volume', label: 'Volume', min: 0, max: 1, step: 0.05,
+      hint: 'How loud this character is. Does not change the voice.' },
   ];
 
   function clamp(n, lo, hi) {
@@ -96,6 +98,11 @@
     return entry.description ? entry.name + ' (' + entry.description + ')' : entry.name;
   }
 
+  /** Dropdown label for a voice that is not in the catalog but was designed for this character. */
+  function customVoiceLabel(custom) {
+    return 'Custom: ' + String((custom && custom.name) || 'designed voice');
+  }
+
   /** Electron wraps handler errors as "Error invoking remote method 'x': Error: real message". */
   function errorText(err) {
     const raw = err && err.message !== undefined ? String(err.message) : String(err || '');
@@ -123,7 +130,7 @@
 
   /** True when the app cannot speak yet, so Settings should open first. */
   function needsSetup(settings) {
-    return !settings || !settings.hasElevenLabsKey || !settings.hasGeminiKey;
+    return !settings || !settings.hasElevenLabsKey || !settings.hasGrokKey;
   }
 
   /** One sentence under the Games heading. */
@@ -212,6 +219,6 @@
   }
 
   return { SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
-    sortSpeakers, initials, voiceLabel, errorText, base64ToBytes, keyState, needsSetup,
+    sortSpeakers, initials, voiceLabel, customVoiceLabel, errorText, base64ToBytes, keyState, needsSetup,
     gamesSummary, gameHint, engineName, gameLabel, gameIds, voicesFor, savedGameId, formatCount, planSummary };
 });

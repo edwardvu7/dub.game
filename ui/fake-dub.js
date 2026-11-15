@@ -31,23 +31,23 @@
     { voice_id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'warm older man, British' },
   ];
   const cast = {
-    Sylvie: { speaker: 'Sylvie', gender: 'female', age_range: 'young_adult', personality: 'Gentle and shy childhood friend.',
+    Sylvie: { speaker: 'Sylvie', spoken: true, gender: 'female', age_range: 'young_adult', personality: 'Gentle and shy childhood friend.',
       voice_id: 'EXAVITQu4vr4xnSDxMaL', stability: 0.5, style: 0.3, speed: 1.0, reason: 'Soft, warm voice fits her.', locked: false },
-    Marcus: { speaker: 'Marcus', gender: 'male', age_range: 'adult', personality: 'Dry, tired detective who has seen it all.',
+    Marcus: { speaker: 'Marcus', spoken: true, gender: 'male', age_range: 'adult', personality: 'Dry, tired detective who has seen it all.',
       voice_id: 'pNInz6obpgDQGcFmaJgB', stability: 0.7, style: 0.15, speed: 0.95, reason: 'Low and steady.', locked: true },
-    Narrator: { speaker: 'Narrator', gender: 'neutral', age_range: 'adult', personality: '',
+    Narrator: { speaker: 'Narrator', spoken: true, gender: 'neutral', age_range: 'adult', personality: '',
       voice_id: 'JBFqnCBsd6RMkjVDRZzb', stability: 0.6, style: 0.1, speed: 1.0, reason: 'One calm voice for narration.', locked: false },
   };
   const store = { current: 'renpy:The Question', games: {
     'renpy:The Question': { name: 'The Question', voices: cast },
     'renpy:DDLC': { name: 'Doki Doki Literature Club', voices: {
-      Sayori: { speaker: 'Sayori', gender: 'female', age_range: 'teen', personality: 'Cheerful and clumsy.',
+      Sayori: { speaker: 'Sayori', spoken: true, gender: 'female', age_range: 'teen', personality: 'Cheerful and clumsy.',
         voice_id: '21m00Tcm4TlvDq8ikWAM', stability: 0.4, style: 0.5, speed: 1.05, reason: 'Bright and quick.', locked: false } } },
   } };
   const voicesOf = (a) => store.games[(a && a.game) || store.current].voices;
-  const usage = { session: { chars: 1840, gemini: 2, lines: 31, cached: 6 }, month: '2026-11', monthChars: 12650,
-    monthGemini: 9, totalChars: 40210, limit: 0, byGame: {}, overLimit: false };
-  let settings = { hasElevenLabsKey: false, hasGeminiKey: false, hasGrokKey: false, narration: true, clipboardMode: false, acting: true };
+  const usage = { session: { chars: 1840, ai: 2, lines: 31, cached: 6 }, month: '2026-11', monthChars: 12650,
+    monthAI: 9, totalChars: 40210, limit: 0, byGame: {}, overLimit: false };
+  let settings = { hasElevenLabsKey: false, hasGrokKey: false, narration: true, clipboardMode: false, acting: true, customVoices: false };
   const game = (a) => {
     const g = games.find((x) => x.appid === String(a.appid));
     if (!g) throw new Error('Unknown game: ' + a.appid);
@@ -71,7 +71,7 @@
     'voices:catalog': () => copy(catalog),
     'voices:update': (a) => {
       const voices = voicesOf(a);
-      const locks = Object.keys(a.patch || {}).some((k) => k !== 'muted');
+      const locks = Object.keys(a.patch || {}).some((k) => k !== 'muted' && k !== 'volume');
       voices[a.speaker] = { ...voices[a.speaker], ...a.patch, locked: voices[a.speaker].locked || locks };
       emit('voices:changed', copy(store));
       return copy(voices[a.speaker]);
@@ -81,6 +81,16 @@
       const pick = catalog[Math.floor(Math.random() * catalog.length)];
       const voices = voicesOf(a);
       voices[a.speaker] = { ...voices[a.speaker], voice_id: pick.voice_id, locked: false, reason: 'Re-rolled.' };
+      emit('voices:changed', copy(store));
+      return copy(voices[a.speaker]);
+    },
+    'voices:customize': async (a) => {
+      if (!settings.customVoices) throw new Error('Custom voices are off. Turn them on in Settings, under Experimental.');
+      await wait(1200);
+      const voices = voicesOf(a);
+      // The preset (voice_id) and the lock stay; the designed voice is the second set (see effective voice rule in CLAUDE.md).
+      voices[a.speaker] = { ...voices[a.speaker], use_preset: undefined,
+        custom_voice: { voice_id: 'custom-' + a.speaker, name: a.speaker + ' (designed)', description: 'A designed voice.' } };
       emit('voices:changed', copy(store));
       return copy(voices[a.speaker]);
     },
@@ -97,17 +107,17 @@
     'settings:get': () => copy(settings),
     'settings:setKeys': (a) => {
       if (typeof a.elevenlabs === 'string') settings.hasElevenLabsKey = !!a.elevenlabs.trim();
-      if (typeof a.gemini === 'string') settings.hasGeminiKey = !!a.gemini.trim();
       if (typeof a.grok === 'string') settings.hasGrokKey = !!a.grok.trim();
       return copy(settings);
     },
     'settings:test': async (a) => {
       await wait(500);
-      const has = a.provider === 'elevenlabs' ? settings.hasElevenLabsKey : settings.hasGeminiKey;
+      const has = a.provider === 'elevenlabs' ? settings.hasElevenLabsKey : settings.hasGrokKey;
       return has ? { ok: true } : { ok: false, error: 'No key saved yet.' };
     },
     'settings:setNarration': (a) => { settings.narration = a === true; return copy(settings); },
     'settings:setClipboardMode': (a) => { settings.clipboardMode = a === true; return copy(settings); },
+    'settings:setCustomVoices': (a) => { settings.customVoices = a === true; return copy(settings); },
     'settings:setActing': (a) => { settings.acting = a === true; return copy(settings); },
   };
 

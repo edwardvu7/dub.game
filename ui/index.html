@@ -28,7 +28,7 @@
           <p class="lede" id="games-summary">Looking through your Steam library.</p>
         </div>
         <div class="view-tools">
-          <input class="search" id="games-search" type="search" placeholder="Filter games" aria-label="Filter games" hidden>
+          <input class="search" id="games-search" type="search" placeholder="Search games" aria-label="Search games" hidden>
           <button class="btn btn-quiet" id="games-add" type="button">Add game folder</button>
           <button class="btn" id="games-rescan" type="button">Rescan</button>
         </div>
@@ -61,12 +61,12 @@
       <header class="view-head">
         <div>
           <h1 id="settings-title">Settings</h1>
-          <p class="lede">dub.game speaks with your own ElevenLabs and Gemini accounts. Keys are encrypted on this computer and never leave it.</p>
+          <p class="lede">dub.game speaks with your own ElevenLabs and xAI (Grok) accounts. Keys are encrypted on this computer and never leave it.</p>
         </div>
       </header>
 
       <ol class="guide">
-        <li>Click <b>Get a key</b> and create a key on each site. Both have a free plan.</li>
+        <li>Click <b>Get a key</b> and create a key on each site. ElevenLabs has a free plan; xAI bills by use.</li>
         <li>Paste each key here and click <b>Save</b>.</li>
         <li>Click <b>Test</b>. A green check means that service is ready.</li>
       </ol>
@@ -87,28 +87,12 @@
         <p class="keyrow-result" data-role="result" role="status"></p>
       </form>
 
-      <form class="keyrow" data-provider="gemini" autocomplete="off">
-        <div class="keyrow-head">
-          <h2>Gemini</h2>
-          <span class="tag" data-role="state"></span>
-        </div>
-        <p class="keyrow-what">Picks a voice for each character and directs how lines are said. Keys come from Google AI Studio.</p>
-        <div class="keyrow-controls">
-          <input class="input" type="password" name="key" aria-label="Gemini API key" spellcheck="false" autocomplete="off">
-          <button class="btn btn-primary" type="submit">Save</button>
-          <button class="btn" type="button" data-role="test">Test</button>
-          <a class="btn btn-quiet" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a key</a>
-          <button class="btn btn-quiet" type="button" data-role="remove" hidden>Remove</button>
-        </div>
-        <p class="keyrow-result" data-role="result" role="status"></p>
-      </form>
-
       <form class="keyrow" data-provider="grok" autocomplete="off">
         <div class="keyrow-head">
-          <h2>Grok <span class="keyrow-optional">optional</span></h2>
+          <h2>Grok</h2>
           <span class="tag" data-role="state"></span>
         </div>
-        <p class="keyrow-what">Looks up each game's characters online, once per game, so dub.game knows who is who and Gemini casts them true to the story. Keys come from the xAI console.</p>
+        <p class="keyrow-what">Looks up each game's characters online, casts a voice for each one and directs how lines are said. Required. Keys come from the xAI console.</p>
         <div class="keyrow-controls">
           <input class="input" type="password" name="key" aria-label="Grok (xAI) API key" spellcheck="false" autocomplete="off">
           <button class="btn btn-primary" type="submit">Save</button>
@@ -151,7 +135,7 @@
         <label class="switch">
           <input type="checkbox" id="opt-acting">
           <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-text"><b>Act out scenes</b><small>Gemini reads a few lines ahead and tunes each one to the moment: excited, scared, whispered. Ren'Py games only. Uses about one Gemini request per 15 lines.</small></span>
+          <span class="switch-text"><b>Act out scenes</b><small>Grok reads a few lines ahead and tunes each one to the moment: excited, scared, whispered. Ren'Py games only. Uses about one Grok request per 15 lines.</small></span>
         </label>
         <label class="switch">
           <input type="checkbox" id="opt-clipboard">
@@ -159,6 +143,15 @@
           <span class="switch-text"><b>Read lines from the clipboard</b><small>For games without a dub.game hook. Use Textractor with its copy-to-clipboard extension. Speakers are guessed.</small></span>
         </label>
       </div>
+
+      <section class="switches" aria-labelledby="experimental-title">
+        <h3 id="experimental-title">Experimental</h3>
+        <label class="switch">
+          <input type="checkbox" id="opt-custom">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-text"><b>Custom voices</b><small>Turn this on and dub.game designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (at most 8 characters per game) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
+        </label>
+      </section>
     </section>
   </main>
 
