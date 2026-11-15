@@ -639,6 +639,14 @@ function createPipeline(deps) {
       return voices.setAuto(profile);
     },
 
+    /** The description Grok (or the profile, offline) would use for this character; nothing is made or saved. */
+    async describeVoice({ game, speaker } = {}) {
+      const g = gameOf({ game });
+      const existing = store.forGame(g).get(speaker);
+      checkCanDesign(store.forGame(g), speaker, existing);
+      return voicePrompt(g, speaker, existing);
+    },
+
     /**
      * Manual design, step 1: ElevenLabs makes up to 3 versions of the character's voice for the player
      * to audition. Nothing is saved and no voice slot is used until pickPreview.

@@ -6,7 +6,7 @@ const { normalizeQuality } = require('./tts');
 
 const INVOKE_CHANNELS = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
-  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:designPreviews', 'voices:pickPreview', 'voices:preview', 'voices:clearGame',
+  'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:describe', 'voices:designPreviews', 'voices:pickPreview', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
   'settings:setClipboardMode', 'settings:setActing', 'settings:setCustomVoices', 'settings:setQuality',
@@ -47,6 +47,11 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
       return pipeline.customizeVoice({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });
     },
     // Manual design: audition up to 3 versions ({id, mime, data}), then keep one.
+    // The draft voice description Grok writes, so the player can edit it before the 3 versions are made.
+    'voices:describe': async (arg) => {
+      canCustomize('describeVoice');
+      return pipeline.describeVoice({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker) });
+    },
     'voices:designPreviews': async (arg) => {
       canCustomize('designPreviews');
       return pipeline.designPreviews({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), description: typeof arg.description === 'string' ? arg.description : '' });

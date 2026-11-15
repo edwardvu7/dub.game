@@ -166,6 +166,7 @@ list, main sends `games:changed` with the new list.
 | `voices:update` | invoke | `{game?, speaker, patch}` → profile (sound changes set `locked: true`; `muted` and `volume` do not) |
 | `voices:reroll` | invoke | `{game?, speaker}` → new profile from Grok |
 | `voices:customize` | invoke | `{game?, speaker}` → profile. Experimental: Grok writes a description, ElevenLabs Voice Design makes a voice (costs credits and a voice slot, max 8 per game). Refuses with a readable error when `customVoices` is off, a key is missing, the plan/quota/slots fail, or the cap is reached |
+| `voices:describe` | invoke | `{game?, speaker}` → string: the voice description Grok writes (profile-based offline) so the player can edit it before `voices:designPreviews`. Nothing is made or saved. Same refusals as `voices:customize` |
 | `voices:designPreviews` | invoke | `{game?, speaker, description?}` (`description`: the player's own words for the voice, max 400 chars; blank = Grok writes it) → `[{id, mime, data /* base64 */}]`, up to 3 versions of a designed voice to audition. Nothing is saved, no voice slot used. Same refusals as `voices:customize` |
 | `voices:pickPreview` | invoke | `{game?, speaker, id}` → profile with that version saved as `custom_voice` (one voice slot). Previews expire after 30 min |
 | `voices:preview` | invoke | `{game?, speaker, text?}` → plays a sample |

@@ -158,10 +158,24 @@
       text.maxLength = 400;
       text.placeholder = 'e.g. a warm, slightly husky young woman who speaks softly and hesitates when nervous';
       label.append(text);
-      const hint = el('p', 'card-brief-hint', 'Optional. Leave it blank and Grok writes it from the game and the character.');
-      const go = el('button', 'btn', 'Make 3 versions');
+      const hint = el('p', 'card-brief-hint', 'Optional. Leave it blank and Grok writes a draft here for you to edit first.');
+      const go = el('button', 'btn', 'Generate');
+      const relabel = () => { go.textContent = text.value.trim() ? 'Make 3 versions' : 'Generate'; };
+      text.addEventListener('input', relabel);
       go.type = 'button';
-      go.addEventListener('click', () => generate(text.value.trim(), close));
+      go.addEventListener('click', async () => {
+        if (text.value.trim()) { generate(text.value.trim(), close); return; }
+        // Blank: show Grok's draft so the player can change it before anything is generated.
+        go.disabled = text.disabled = true;
+        go.textContent = 'Writing…';
+        try {
+          text.value = await dub.invoke('voices:describe', target(speaker));
+          hint.textContent = "Grok's draft. Edit it any way you like, then press Make 3 versions.";
+        } catch (e) { onError(errorText(e)); }
+        go.disabled = text.disabled = false;
+        relabel();
+        text.focus();
+      });
       const cancel = el('button', 'btn btn-quiet', 'Cancel');
       cancel.type = 'button';
       cancel.addEventListener('click', close);

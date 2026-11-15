@@ -84,6 +84,10 @@
       emit('voices:changed', copy(store));
       return copy(voices[a.speaker]);
     },
+    'voices:describe': async (a) => {
+      await wait(500);
+      return 'A warm, clear young voice with a gentle, slightly hesitant delivery.';
+    },
     'voices:designPreviews': async () => {
       if (!settings.customVoices) throw new Error('Custom voices are off. Turn them on in Settings.');
       await wait(800);

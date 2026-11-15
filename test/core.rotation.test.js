@@ -320,3 +320,14 @@ test('designPreviews uses the description the player typed, and falls back to Gr
   await r.pipeline.designPreviews({ game: 'g', speaker: 'Nicole', description: '' });
   assert.ok(seen[1] && seen[1] !== 'a gruff old fisherman', 'blank falls back to a generated description');
 });
+
+test('describeVoice returns the draft description without making or saving anything', async () => {
+  let made = 0;
+  const designer = () => ({ design: async () => { made++; return { voice_id: 'X', name: 'n' }; }, remove: async () => true, previews: async () => { made++; return { description: 'd', previews: [] }; } });
+  const r = rig({ designer });
+  await r.line('Nicole'); await r.pipeline.designIdle(); // the automatic queue may design her; only count what describeVoice does
+  made = 0;
+  const draft = await r.pipeline.describeVoice({ game: 'g', speaker: 'Nicole' });
+  assert.ok(typeof draft === 'string' && draft.length > 10);
+  assert.equal(made, 0);
+});
