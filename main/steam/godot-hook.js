@@ -6,6 +6,8 @@ const crypto = require('node:crypto');
 const SCRIPT = '_dubgame_generic.gd';
 const CONFIG = '_dubgame_generic.json';
 const RECORD = '_dubgame_generic.install.json';
+// Written by the running hook (generic.gd _inspect). Not part of the "owned files match" checks.
+const INSPECT = '_dubgame_generic.inspect.json';
 const MARKER = '; DUBGAME_GENERIC_V1';
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const target = (game, name) => path.join(game.installDir, name);
@@ -107,12 +109,12 @@ function install(game, opts = {}) {
 function uninstall(game) {
   const r = record(game);
   if (!r) return true;
-  [SCRIPT, CONFIG, RECORD, 'override.cfg'].forEach(n => safeFile(target(game, n)));
+  [SCRIPT, CONFIG, RECORD, INSPECT, 'override.cfg'].forEach(n => safeFile(target(game, n)));
   const current = read(target(game, 'override.cfg'));
   if (!current || hash(current) !== r.overrideHash) throw new Error('override.cfg changed after installation. Refusing to discard those changes; restore or manually remove the hook entry first.');
   if (r.originalOverride === null) fs.unlinkSync(target(game, 'override.cfg'));
   else fs.writeFileSync(target(game, 'override.cfg'), Buffer.from(r.originalOverride, 'base64'));
-  for (const n of [SCRIPT, CONFIG, RECORD]) if (fs.existsSync(target(game, n))) fs.unlinkSync(target(game, n));
+  for (const n of [SCRIPT, CONFIG, RECORD, INSPECT]) if (fs.existsSync(target(game, n))) fs.unlinkSync(target(game, n));
   return true;
 }
 function configure(game, patch) {
@@ -131,4 +133,4 @@ function configure(game, patch) {
   return { textPath: c.textPath, speakerPath: c.speakerPath };
 }
 module.exports = { install, uninstall, isInstalled, isOutdated, config, configure, verifyVersion, packMajor,
-  SCRIPT, CONFIG, RECORD, MARKER };
+  SCRIPT, CONFIG, RECORD, INSPECT, MARKER };

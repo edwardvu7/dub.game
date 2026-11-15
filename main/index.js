@@ -41,7 +41,8 @@ loadEnv(path.join(process.cwd(), '.env'));
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 function log(message) {
-  console.log(`[dub.game] ${message}`);
+  // Timed (UTC): "line" to "audio" is the wait before a voice; a line with no "audio" was never played.
+  console.log(`[dub.game ${new Date().toISOString().slice(11, 23)}] ${message}`);
 }
 
 function send(win, channel, payload) {
@@ -54,6 +55,7 @@ function emit(channel, payload) {
     pendingStatus.push(payload);
     return;
   }
+  if (channel === 'audio:play') log(`audio ${payload.speaker}: ${payload.text}`);
   send(mainWindow, channel, payload);
   if (channel !== 'audio:play' && channel !== 'audio:stop') send(overlayWindow, channel, payload);
 }
@@ -88,9 +90,9 @@ function createMainWindow() {
     backgroundColor: '#0b0d10', title: 'dub.game', show: false,
     icon: APP_ICON, // taskbar; the installed .exe gets build/icon.png
     // No title bar: the app fills the window. Windows keeps its own minimise/maximise/close
-    // buttons in the top-right corner; ui/index.html makes the top strip draggable.
+    // buttons on the right end of the app's own title bar (.titlebar in ui/index.html).
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#0b0d10', symbolColor: '#99a0ab', height: 34 },
+    titleBarOverlay: { color: '#13171c', symbolColor: '#99a0ab', height: 33 }, // same colour as .titlebar (ui/styles.css); 33 leaves its 1px bottom line showing
     webPreferences: webPreferences(),
   });
   lockDown(mainWindow);

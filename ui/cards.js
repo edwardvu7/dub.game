@@ -1,7 +1,8 @@
 // Character cards: one per speaker of one game in voices.json. Shared by the overlay and the main
 // window's Voices tab. Cards are keyed by speaker and patched in place, so a voices:changed event
 // never rebuilds a card the player is in the middle of adjusting. Voices are saved per game: the
-// cards show the game that is playing, unless the host picks another one with setGame().
+// cards show the game that is playing (follow: true, the overlay) or only the game the host picks
+// with setGame() (follow: false, the main window's Voices tab).
 (function () {
   'use strict';
   const { SLIDERS, formatSlider, sortSpeakers, voiceLabel, errorText, voicesFor } = window.DubLib;
@@ -14,7 +15,9 @@
   }
 
   /**
-   * mount(container, { dub, onError, emptyText, onStore }) -> { refresh, setCurrent, setGame, game, destroy }
+   * mount(container, { dub, onError, emptyText, pickText?, follow?, onStore }) -> { refresh, setCurrent, setGame, game, destroy }
+   * follow (default true): with no game picked, show the game that spoke last. pickText: shown
+   * instead of emptyText while no game is picked.
    * dub: window.dub. onError(message): how the host window shows a failure.
    * onStore(store): called with every new {current, games} snapshot (for a game picker).
    */
@@ -25,15 +28,16 @@
     const cards = new Map(); // speaker -> { root, controls... }
     let catalog = [];
     let store = { current: null, games: {} };
-    let pinned = null; // a game the host picked; null follows the game that is playing
+    const follow = opts.follow !== false;
+    let pinned = null; // a game the host picked; null follows the game that is playing (if follow)
     let voices = {};
-    const gameId = () => pinned || store.current;
+    const gameId = () => pinned || (follow ? store.current : null);
     const target = (speaker) => ({ game: gameId(), speaker });
     let current = null; // speaker of the line being spoken
     let destroyed = false;
 
-    const empty = el('p', 'cards-empty', opts.emptyText ||
-      'No characters yet. Voices appear here as soon as a game sends its first line.');
+    const emptyText = opts.emptyText || 'No characters yet. Voices appear here as soon as a game sends its first line.';
+    const empty = el('p', 'cards-empty', emptyText);
     const list = el('div', 'cards');
     container.replaceChildren(empty, list);
 
@@ -70,12 +74,13 @@
     }
 
     function build(speaker) {
-      const root = el('article', 'card');
+      const root = el('article', 'card enter');
+      root.addEventListener('animationend', () => root.classList.remove('enter'), { once: true });
       root.dataset.speaker = speaker;
 
       const head = el('header', 'card-head');
       const name = el('h3', 'card-name', speaker);
-      const badge = el('span', 'tag');
+      const badge = el('span', 'pick');
       head.append(name, badge);
 
       const about = el('p', 'card-about');
@@ -127,10 +132,11 @@
       preview.type = 'button';
       preview.addEventListener('click', () => run(card, preview, () =>
         dub.invoke('voices:preview', target(speaker))));
-      const reroll = el('button', 'btn btn-quiet', 'Re-roll with AI');
-      reroll.type = 'button';
-      reroll.title = 'Ask Gemini for a different voice. This replaces your own settings.';
-      reroll.addEventListener('click', () => run(card, reroll, () =>
+      // Reset: drop the player's changes and let Gemini cast this character again.
+      const reset = el('button', 'btn btn-quiet', 'Reset');
+      reset.type = 'button';
+      reset.title = 'Undo your changes and let AI choose this voice again.';
+      reset.addEventListener('click', () => run(card, reset, () =>
         dub.invoke('voices:reroll', target(speaker))));
       // Muted characters are skipped: nothing is sent to ElevenLabs for them.
       const mute = el('button', 'btn btn-quiet card-mute', 'Mute');
@@ -138,7 +144,7 @@
       mute.addEventListener('click', () => run(card, mute, () =>
         dub.invoke('voices:update', { ...target(speaker), patch: { muted: !(voices[speaker] && voices[speaker].muted) } })));
       card.mute = mute;
-      actions.append(preview, reroll, mute);
+      actions.append(preview, reset, mute);
 
       root.append(head, about, voiceRow, faders, actions);
       return card;
@@ -147,8 +153,8 @@
     function patch(speaker, profile) {
       const card = cards.get(speaker);
       if (!card) return;
-      card.badge.textContent = profile.muted ? 'Muted' : (profile.locked ? 'Your pick' : 'AI pick');
-      card.badge.className = 'tag ' + (profile.muted ? 'tag-muted' : (profile.locked ? 'tag-yours' : 'tag-ai'));
+      card.badge.textContent = profile.muted ? 'Muted' : (profile.locked ? 'Custom' : 'Auto');
+      card.badge.className = 'pick ' + (profile.muted ? 'pick-muted' : (profile.locked ? 'pick-custom' : 'pick-auto'));
       card.root.classList.toggle('is-muted', !!profile.muted);
       card.mute.textContent = profile.muted ? 'Unmute' : 'Mute';
       card.mute.setAttribute('aria-pressed', profile.muted ? 'true' : 'false');
@@ -185,6 +191,7 @@
         // Reorder only when needed, so focus and open dropdowns survive.
         if (list.children[index] !== card.root) list.insertBefore(card.root, list.children[index] || null);
       });
+      empty.textContent = !gameId() && opts.pickText ? opts.pickText : emptyText;
       empty.hidden = order.length > 0;
     }
 

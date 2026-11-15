@@ -118,12 +118,19 @@ function sanitizeProfile(raw, speaker, catalog) {
 
 async function callGemini(request, key, doFetch) {
   if (!key) throw new Error('No Gemini API key. Add one in Settings.');
-  const res = await doFetch(request.url, {
-    method: 'POST',
-    headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify(request.body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  let res;
+  try {
+    res = await doFetch(request.url, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify(request.body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    // fetch's own words ("fetch failed", "The operation was aborted due to timeout") reach the player's screen.
+    throw new Error(e && e.name === 'TimeoutError' ? `Gemini did not answer within ${TIMEOUT_MS / 1000} seconds.`
+      : 'Could not reach Gemini: ' + (e && e.message));
+  }
   if (!res.ok) {
     let detail = '';
     try { const j = await res.json(); detail = (j.error && j.error.message) || ''; } catch { /* no body */ }

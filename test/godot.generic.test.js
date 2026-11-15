@@ -48,6 +48,18 @@ test('installer refuses unknown sidecars, source integration, legacy hook, chang
   assert.throws(() => hook.install(g), /Godot 4/);
 });
 
+test('inspection report never blocks install or repair, and uninstall deletes it', () => {
+  const g = game(), report = path.join(g.installDir, hook.INSPECT);
+  write(report, '{}'); // left over from an earlier install
+  hook.install(g);
+  assert.ok(hook.isInstalled(g));
+  assert.equal(hook.isOutdated(g), false);
+  hook.install(g);
+  assert.ok(fs.existsSync(report));
+  hook.uninstall(g);
+  assert.ok(!fs.existsSync(report));
+});
+
 test('pack header gate rejects Godot 3 and unknown packs', () => {
   const g = game(); fs.unlinkSync(path.join(g.installDir, 'project.godot'));
   const header = Buffer.alloc(16); header.write('GDPC'); header.writeUInt32LE(3, 8);

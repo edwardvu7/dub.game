@@ -9,6 +9,7 @@ const NARRATOR = 'Narrator';
 const UNKNOWN = 'unknown';
 const RESTART_GAP_MS = 3000; // a game restart takes longer than this
 const SETTLE_MS = 150; // a line the player skips faster than this is never paid for
+const CAST_WAIT_MS = 2000; // a line waits this long for Gemini's casting, then speaks in a placeholder voice
 
 /**
  * createPipeline({voices, settings, catalog, cache, emit, usage?, gameName?, speak?,
@@ -22,6 +23,7 @@ function createPipeline(deps) {
   const { voices: store, settings, catalog, cache, emit } = deps;
   const usage = deps.usage || null;
   const settleMs = deps.settleMs === undefined ? SETTLE_MS : deps.settleMs;
+  const castWaitMs = deps.castWaitMs === undefined ? CAST_WAIT_MS : deps.castWaitMs;
   const speaking = new Map(); // cache key -> Promise<audio>: the same line is never bought twice at once
   const gameName = deps.gameName || (() => null);
   const moods = deps.moods || null; // Gemini's per-line direction, prepared ahead (main/moods.js)
@@ -189,7 +191,15 @@ function createPipeline(deps) {
       }
       remember(game, speaker, text);
       try {
-        const base = await ensureProfile(voices, speaker, samplesOf(game, speaker));
+        const casting = needsProfile(voices, speaker);
+        const profiled = ensureProfile(voices, speaker, samplesOf(game, speaker));
+        // Slow casting must not silence a character (Gemini may take 20 s to fail): the placeholder
+        // is saved, so her next lines speak at once, and Gemini's answer replaces it when it lands.
+        const base = await (!casting ? profiled : Promise.race([profiled, new Promise((resolve) => {
+          const timer = setTimeout(() => resolve(voices.get(speaker) ||
+            voices.setAuto(profiler.fallbackProfile(speaker, catalog, 'Gemini is slow'))), castWaitMs);
+          if (timer.unref) timer.unref();
+        })]));
         if (base && base.muted) { emit('audio:stop'); return; } // muted in the overlay: free
         const profile = moods ? applyMood(base, moods.get(game, speaker, text)) : base;
         // Lines already on disk play at once. A new line waits a moment: if the player has
@@ -285,7 +295,8 @@ function createPipeline(deps) {
       if (!key) throw new Error('Re-roll needs a Gemini key. Add one in Settings.');
       if (usage) usage.recordGemini();
       const profile = await profileOne(describe(g, { speaker, samples: samplesOf(g, speaker) }), catalog, key,
-        { avoidVoiceId: existing.voice_id });
+        { avoidVoiceId: existing.voice_id })
+        .catch((e) => { throw new Error(`No new voice was picked; ${speaker} keeps the current one. ${e.message}`); });
       attempted.add(keyOf(g, speaker));
       voices.unlock(speaker);
       return voices.setAuto(profile);

@@ -1,4 +1,4 @@
-// Main window: Games, Voices and Settings tabs, the audio player and the now-playing bar.
+// Main window: Games, Voices and Settings tabs, and the audio player.
 // Talks to the main process only through window.dub (see CLAUDE.md).
 (function () {
   'use strict';
@@ -64,7 +64,8 @@
   let games = [];
 
   function buildTile(appid) {
-    const root = el('article', 'game');
+    const root = el('article', 'game enter');
+    root.addEventListener('animationend', () => root.classList.remove('enter'), { once: true });
     const art = el('div', 'game-art');
     const img = document.createElement('img');
     img.alt = '';
@@ -91,34 +92,26 @@
     const launch = el('button', 'btn btn-primary', 'Launch');
     launch.type = 'button';
     launch.title = 'Turns voices on for this game and starts it in a window, so the overlay can show.';
-    row.append(toggle, repair, launch);
-    const diagnostic = document.createElement('details');
-    diagnostic.className = 'godot-diagnostics';
-    diagnostic.append(el('summary', '', 'Choose dialogue text'));
-    const explanation = el('p', '', 'Auto selects likely dialogue. If it misses text, keep that text visible in the game, then choose its node. No images are captured.');
-    const textNode = document.createElement('select');
-    const speakerNode = document.createElement('select');
-    textNode.setAttribute('aria-label', 'Dialogue node');
-    speakerNode.setAttribute('aria-label', 'Speaker node');
-    const save = el('button', 'btn btn-quiet', 'Save selection');
-    save.type = 'button';
-    const nodeCount = el('p', '');
-    diagnostic.append(explanation, el('label', '', 'Dialogue'), textNode,
-      el('label', '', 'Speaker (optional)'), speakerNode, save, nodeCount);
-    body.append(name, hint, row, diagnostic);
+    const reset = el('button', 'btn btn-quiet', 'Reset voices');
+    reset.type = 'button';
+    reset.title = 'Forget the saved voices for this game. Its characters are cast again when they next speak.';
+    row.append(toggle, reset, repair, launch);
+    body.append(name, hint, row);
     root.append(art, body);
 
-    const tile = { root, img, fallback, badge, name, hint, box, repair, launch, diagnostic, textNode, speakerNode, nodeCount, dirty: false, busy: false };
-    textNode.onchange = speakerNode.onchange = () => { tile.dirty = true; };
-    save.onclick = async () => {
+    const tile = { root, img, fallback, badge, name, hint, box, reset, repair, launch, busy: false };
+
+    reset.addEventListener('click', async () => {
+      const id = L.savedGameId(lastStore, games.find((g) => g.appid === appid));
+      if (!id || !confirm('Forget the saved voices for ' + name.textContent +
+        '? Every voice you changed is lost, and its characters are cast again when they next speak.')) return;
       try {
-        const updated = await dub.invoke('games:godotConfig', { appid, textPath: textNode.value, speakerPath: speakerNode.value });
-        tile.dirty = false;
-        games = games.map(g => g.appid === appid ? updated : g);
-        renderGames();
-        toast('Saved. The running hook refreshes within a second.', 'note');
-      } catch (e) { fail(e); }
-    };
+        await dub.invoke('voices:clearGame', { game: id });
+        toast('Voices for ' + name.textContent + ' were reset.', 'note');
+      } catch (e) {
+        fail(e);
+      }
+    });
 
     async function setEnabled(enabled) {
       if (tile.busy) return;
@@ -146,7 +139,11 @@
         // first. It is also what starts the game in borderless fullscreen so the overlay can show.
         const game = games.find((g) => g.appid === appid);
         if (game && game.support === 'soon' && game.engine !== 'godot') return;
-        if (game && game.engine !== 'godot' && L.gameStatus(game) !== 'on') {
+        // Godot games with the generic hook get it installed here too, so the player never has to.
+        const needsHook = game && (game.voiceMode === 'generic'
+          ? !game.enabled || !game.hookInstalled
+          : game.engine !== 'godot' && L.gameStatus(game) !== 'on');
+        if (needsHook) {
           const updated = await dub.invoke('games:setEnabled', { appid, enabled: true });
           games = games.map((g) => (g.appid === appid ? updated : g));
           renderGames();
@@ -182,28 +179,15 @@
     tile.hint.dataset.tone = hint.tone;
     if (!tile.busy) tile.box.checked = !!game.enabled;
     tile.box.setAttribute('aria-label', 'Voices for ' + game.name);
+    tile.reset.hidden = status === 'soon';
+    tile.reset.disabled = !L.savedGameId(lastStore, game);
+    tile.reset.setAttribute('aria-label', 'Reset voices for ' + game.name);
     tile.repair.hidden = status !== 'missing';
     // Coming-soon engines are listed so players see them, but nothing can be switched on yet.
     tile.box.closest('.switch').hidden = status === 'soon';
     tile.repair.hidden = status !== 'missing';
-    tile.launch.title = game.engine === 'godot' ? 'Launch Godot. Enable Voices first to install the generic hook.' : 'Launch with voices';
+    tile.launch.title = 'Launch with voices';
     tile.launch.hidden = status === 'soon' && game.engine !== 'godot';
-    tile.diagnostic.hidden = game.voiceMode !== 'generic' || !game.enabled;
-    if (game.voiceMode === 'generic' && !tile.dirty) {
-      const config = game.godotConfig || {};
-      for (const [select, key] of [[tile.textNode, 'textPath'], [tile.speakerNode, 'speakerPath']]) {
-        if (document.activeElement === select) continue;
-        select.replaceChildren();
-        select.append(new Option('Automatic', ''));
-        const labels = game.labels || [];
-        for (const item of labels) select.append(new Option(item.path + ' : ' + item.text, item.path));
-        if (config[key] && !labels.some(item => item.path === config[key]))
-          select.append(new Option(config[key] + ' (not visible now)', config[key]));
-        select.value = config[key] || '';
-      }
-      tile.nodeCount.textContent = (game.labels || []).length + ' visible text nodes reported.' +
-        (game.limitReached ? ' Scan limit reached; some nodes may be omitted.' : '');
-    }
   }
 
   function renderGames() {
@@ -277,68 +261,65 @@
   let cards = null;
   let currentSpeaker = null;
   const gamePick = $('voices-game');
-  const resetButton = $('voices-reset');
-  const FOLLOW = ''; // picker value: follow the game that is playing
+  // Which game the tab shows. Nothing by default: the saved "current" game may have closed long ago.
+  // A game counts as playing while its lines keep arriving (line:received carries the game id);
+  // it is shown automatically unless the player picked a game themselves.
+  const LIVE_MS = 5 * 60 * 1000;
+  let liveGame = null;
+  let liveTimer = null;
+  let chosenGame = null;   // the player's pick in the dropdown, or null
+  let lastStore = { current: null, games: {} };
+
+  const shownGame = () => chosenGame || liveGame;
 
   function paintGamePicker(store) {
-    const ids = L.gameIds(store);
-    const games = store.games || {};
-    const chosen = gamePick.value;
+    if (store) lastStore = store;
+    const ids = L.gameIds(lastStore);
+    const games = lastStore.games || {};
     const options = [];
-    const now = document.createElement('option');
-    now.value = FOLLOW;
-    now.textContent = store.current ? 'Playing now: ' + L.gameLabel(store.current, games[store.current]) : 'Playing now';
-    options.push(now);
+    const placeholder = new Option(ids.length || liveGame ? 'Choose a game' : 'No voiced games yet', '');
+    placeholder.disabled = true;
+    options.push(placeholder);
+    if (liveGame) options.push(new Option('Playing now: ' + L.gameLabel(liveGame, games[liveGame]), liveGame));
     for (const id of ids) {
-      const opt = document.createElement('option');
-      opt.value = id;
-      const count = Object.keys(L.voicesFor(store, id)).length;
-      opt.textContent = L.gameLabel(id, games[id]) + ' (' + count + (count === 1 ? ' voice)' : ' voices)');
-      options.push(opt);
+      if (id === liveGame) continue;
+      const count = Object.keys(L.voicesFor(lastStore, id)).length;
+      options.push(new Option(L.gameLabel(id, games[id]) + ' (' + count + (count === 1 ? ' voice)' : ' voices)'), id));
     }
     if (document.activeElement !== gamePick) {
       gamePick.replaceChildren(...options);
-      gamePick.value = ids.includes(chosen) ? chosen : FOLLOW;
+      gamePick.value = shownGame() || '';
     }
-    gamePick.disabled = ids.length === 0;
-    resetButton.hidden = !(cards && cards.game());
+    gamePick.disabled = ids.length === 0 && !liveGame;
+  }
+
+  function showGame() {
+    if (cards && cards.game() !== shownGame()) cards.setGame(shownGame());
+    paintGamePicker();
   }
 
   gamePick.addEventListener('change', () => {
-    if (cards) cards.setGame(gamePick.value || null);
-    disarmReset();
+    chosenGame = gamePick.value || null;
+    showGame();
   });
 
-  // Reset needs a second click within a few seconds: it forgets every voice of the game.
-  let resetTimer = null;
-  function disarmReset() {
-    clearTimeout(resetTimer);
-    resetButton.dataset.armed = '';
-    resetButton.textContent = 'Reset voices';
+  function noteLiveGame(game) {
+    if (!game || game === 'unknown') return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => { liveGame = null; showGame(); }, LIVE_MS);
+    if (game === liveGame) return;
+    liveGame = game;
+    if (chosenGame === game) chosenGame = null; // it is playing now: follow it
+    showGame();
   }
-  resetButton.addEventListener('click', async () => {
-    const game = cards && cards.game();
-    if (!game) return;
-    if (!resetButton.dataset.armed) {
-      resetButton.dataset.armed = '1';
-      resetButton.textContent = 'Click again to reset';
-      resetTimer = setTimeout(disarmReset, 4000);
-      return;
-    }
-    disarmReset();
-    try {
-      await dub.invoke('voices:clearGame', { game });
-      gamePick.value = FOLLOW;
-      cards.setGame(null);
-      toast('Voices reset. The next line from that game picks them again.', 'note');
-    } catch (e) { fail(e); }
-  });
 
   openers.voices = () => {
     cards = window.DubCards.mount($('cards-host'), {
-      dub, onError: (m) => toast(m, 'error'), onStore: paintGamePicker,
+      dub, onError: (m) => toast(m, 'error'), onStore: paintGamePicker, follow: false,
+      pickText: 'Pick a game to see its voices, or start one and they show up here.',
       emptyText: 'No characters for this game yet. Voices appear here as soon as it sends its first line.',
     });
+    cards.setGame(shownGame());
     cards.setCurrent(currentSpeaker);
   };
 
@@ -487,9 +468,7 @@
   bindSwitch('opt-clipboard', 'settings:setClipboardMode');
   bindSwitch('opt-acting', 'settings:setActing');
 
-  // ---------- Audio and the now-playing bar ----------
-  const now = $('now');
-  const stopButton = $('now-stop');
+  // ---------- Audio (volume lives in Settings) ----------
   const volume = $('volume');
   const audio = new Audio();
   let clipUrl = null;
@@ -511,25 +490,18 @@
     try { localStorage.setItem('dub.volume', volume.value); } catch { /* ignore */ }
   });
 
-  function setPlaying(on) {
-    now.classList.toggle('is-playing', on);
-    stopButton.hidden = !on;
-  }
   function stopAudio() {
     audio.pause();
     audio.removeAttribute('src');
     if (clipUrl) { URL.revokeObjectURL(clipUrl); clipUrl = null; }
-    setPlaying(false);
   }
   audio.addEventListener('ended', stopAudio);
   audio.addEventListener('error', () => { if (clipUrl) stopAudio(); });
-  stopButton.addEventListener('click', stopAudio);
 
   function showLine(line) {
     if (!line) return;
     currentSpeaker = line.speaker || null;
-    $('now-speaker').textContent = line.speaker || 'Unknown';
-    $('now-line').textContent = line.text || '';
+    if (line.game) noteLiveGame(line.game);
     if (cards) cards.setCurrent(currentSpeaker);
   }
 
@@ -544,7 +516,6 @@
     }
     showLine(clip);
     audio.src = clipUrl;
-    setPlaying(true);
     const mine = clipUrl;
     audio.play().catch((e) => {
       // AbortError just means a newer line replaced this one.
@@ -558,6 +529,8 @@
     games = list;
     renderGames();
   });
+  // The Games page needs the saved voices too: Reset voices is only offered where there are some.
+  dub.on('voices:changed', (store) => { lastStore = store; renderGames(); });
   dub.on('line:received', showLine);
   dub.on('app:status', (s) => {
     if (s && s.message) toast(s.message, s.level === 'error' ? 'error' : 'note');
@@ -568,6 +541,7 @@
     try {
       paintSettings(await dub.invoke('settings:get'));
       paintUsage(await dub.invoke('usage:get'));
+      lastStore = await dub.invoke('voices:get');
     } catch (e) {
       fail(e);
     }

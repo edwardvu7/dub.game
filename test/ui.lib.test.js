@@ -42,15 +42,15 @@ test('gameHint tells the player what to do next', () => {
   assert.match(L.gameHint({ support: 'soon', engine: 'godot' }).text, /Godot games aren't available yet/);
 });
 
-test('filterGames and sortGames do not mutate, voiced games come first', () => {
+test('filterGames and sortGames do not mutate, games group by engine then name', () => {
   const games = [
     { appid: '1', name: 'zeta', engine: 'renpy', enabled: false },
     { appid: '2', name: 'Alpha', engine: 'godot', enabled: false },
     { appid: '3', name: 'Mid', engine: 'renpy', enabled: true },
   ];
-  assert.deepEqual(L.sortGames(games).map((g) => g.appid), ['3', '2', '1']);
-  assert.deepEqual(L.sortGames([{ appid: 's', name: 'A', support: 'soon' }, { appid: 'r', name: 'Z', enabled: false }])
-    .map((g) => g.appid), ['r', 's'], 'coming-soon games go last');
+  assert.deepEqual(L.sortGames(games).map((g) => g.appid), ['2', '3', '1'], 'Godot first, then Ren-Py A to Z');
+  assert.deepEqual(L.sortGames([{ appid: 'u', name: 'A', engine: 'unity' }, { appid: 'm', name: 'B', engine: 'rpgmaker-mv' },
+    { appid: 'r', name: 'Z', engine: 'renpy' }]).map((g) => g.appid), ['r', 'm', 'u']);
   assert.equal(games[0].appid, '1');
   assert.deepEqual(L.filterGames(games, ' GODOT ').map((g) => g.appid), ['2']);
   assert.equal(L.filterGames(games, '').length, 3);
@@ -59,12 +59,9 @@ test('filterGames and sortGames do not mutate, voiced games come first', () => {
 
 test('gamesSummary', () => {
   assert.match(L.gamesSummary([]), /No supported games/);
-  assert.equal(L.gamesSummary([{ enabled: false }]), '1 game ready for voices. Switch one on or click Launch.');
-  assert.equal(L.gamesSummary([{ enabled: true }, { enabled: false }]), '2 games ready for voices, 1 voiced.');
-  assert.equal(L.gamesSummary([{ support: 'soon' }, { support: 'soon' }]),
-    "No Ren'Py games yet. 2 more games use an engine that is coming soon.");
-  assert.equal(L.gamesSummary([{ enabled: true }, { support: 'soon' }]),
-    '1 game ready for voices, 1 voiced. 1 more game uses an engine that is coming soon.');
+  assert.equal(L.gamesSummary([{ enabled: false }]), '1 game found.');
+  assert.equal(L.gamesSummary([{ enabled: true }, { support: 'soon' }]), '2 games found.');
+  assert.equal(L.gamesSummary([{ support: 'soon' }, { support: 'soon' }]), '2 games found.');
 });
 
 test('sortSpeakers: current speaker first, Narrator last', () => {
@@ -152,6 +149,16 @@ test('voices per game: labels, picker order and lookup', () => {
   assert.deepEqual(Object.keys(L.voicesFor(store, 'renpy:B')), ['Y', 'Z']);
   assert.deepEqual(L.voicesFor(store, 'nope'), {});
   assert.deepEqual(L.voicesFor(null, 'x'), {});
+});
+
+test('savedGameId: a scanned game to its voices id (engine + install folder name)', () => {
+  const store = { games: { 'renpy:The Question': {}, 'godot:Until Then': {}, 'rpgmaker-mv:OMORI': {}, clipboard: {} } };
+  assert.equal(L.savedGameId(store, { engine: 'renpy', installDir: 'C:\\Games\\the question\\' }), 'renpy:The Question');
+  assert.equal(L.savedGameId(store, { engine: 'godot', installDir: '/steam/common/Until Then' }), 'godot:Until Then');
+  assert.equal(L.savedGameId(store, { engine: 'rpgmaker-mv', installDir: 'C:/Steam/common/OMORI' }), 'rpgmaker-mv:OMORI');
+  assert.equal(L.savedGameId(store, { engine: 'unity', installDir: 'C:/Steam/common/OMORI' }), null, 'other engine');
+  assert.equal(L.savedGameId(store, { engine: 'renpy', installDir: 'C:/Steam/common/Tiny Bunny' }), null, 'no saved voices');
+  assert.equal(L.savedGameId(null, { engine: 'renpy' }), null);
 });
 
 test('usage: counts and the ElevenLabs plan line', () => {

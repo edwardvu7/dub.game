@@ -69,11 +69,11 @@
   }
 
   /** Voiced games first, then other playable games, coming-soon engines last; then by name. */
+  /** Grouped by engine (A to Z by its shown name: Godot, Ren'Py, RPG Maker, Unity), then by game name. */
   function sortGames(games) {
-    const rank = (g) => (g.support === 'soon' ? 2 : g.enabled ? 0 : 1);
+    const az = (x, y) => String(x || '').localeCompare(String(y || ''), undefined, { sensitivity: 'base' });
     return (Array.isArray(games) ? games.slice() : []).sort((a, b) =>
-      rank(a) - rank(b) ||
-      String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
+      az(engineName(a.engine), engineName(b.engine)) || az(a.name, b.name));
   }
 
   /** Speakers in a stable order: whoever is talking first, Narrator last, the rest A to Z. */
@@ -128,29 +128,20 @@
 
   /** One sentence under the Games heading. */
   function gamesSummary(games) {
-    const all = Array.isArray(games) ? games : [];
-    if (all.some((g) => g.voiceMode === 'generic')) return all.length + ' games found. Enable the Godot hook before launching; check its connection below.';
-    if (all.some((g) => g.voiceMode)) return all.length + ' games found. Launch a game; Godot voices require an integration.';
-    const list = all.filter((g) => g.support !== 'soon');
-    const soon = all.length - list.length;
-    const later = soon ? ' ' + (soon === 1 ? '1 more game uses' : soon + ' more games use') +
-      ' an engine that is coming soon.' : '';
-    if (!list.length) return (soon ? "No Ren'Py games yet." : 'No supported games found yet.') + later;
-    const voiced = list.filter((g) => g.enabled).length;
-    const found = list.length === 1 ? '1 game ready for voices' : list.length + ' games ready for voices';
-    if (!voiced) return found + '. Switch one on or click Launch.' + later;
-    return found + ', ' + voiced + ' voiced.' + later;
+    const n = Array.isArray(games) ? games.length : 0;
+    if (!n) return 'No supported games found yet.';
+    return n === 1 ? '1 game found.' : n + ' games found.';
   }
 
   /** The line under a game's name: what the player should know or do next. */
   function gameHint(game, justEnabled) {
     const status = gameStatus(game);
     if (game && game.voiceMode === 'generic') {
-      if (!game.enabled) return { tone: 'off', text: 'Generic hook off. Enable before launching (Godot 4 only).' };
+      if (!game.enabled) return { tone: 'off', text: 'Voices turn on when you launch. Godot 4 games only.' };
       if (!game.hookInstalled) return { tone: 'warn', text: 'Hook files are missing or changed. Reinstall with the game closed.' };
       const messages = {
         connected: 'Connected. Dialogue node detected. Narration must be enabled for unnamed text.',
-        'no-dialogue': 'Connected, but no dialogue candidate. Open text in the game, then choose a node below.',
+        'no-dialogue': 'Connected. Waiting for dialogue to show up in the game.',
         waiting: 'Waiting for the game hook to connect…',
         disconnected: 'Installed; no live connection. Start or restart the game. If this persists, this build may not support the hook.',
       };
@@ -193,6 +184,19 @@
     return (g && g.voices) || {};
   }
 
+  /**
+   * The voices id of a scanned game, or null when it has no saved voices. Hooks send
+   * "<engine>:<install folder name>"; matched the way gameName() in main/index.js does.
+   */
+  function savedGameId(store, game) {
+    const folder = String((game && game.installDir) || '').split(/[\\/]/).filter(Boolean).pop();
+    if (!folder) return null;
+    return Object.keys((store && store.games) || {}).find((id) => {
+      const [engine, ...rest] = id.split(':');
+      return rest.join(':').toLowerCase() === folder.toLowerCase() && String(game.engine).startsWith(engine);
+    }) || null;
+  }
+
   /** 12345 -> "12,345" */
   function formatCount(n) {
     return Math.round(Number(n) || 0).toLocaleString('en-US');
@@ -209,5 +213,5 @@
 
   return { SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
     sortSpeakers, initials, voiceLabel, errorText, base64ToBytes, keyState, needsSetup,
-    gamesSummary, gameHint, engineName, gameLabel, gameIds, voicesFor, formatCount, planSummary };
+    gamesSummary, gameHint, engineName, gameLabel, gameIds, voicesFor, savedGameId, formatCount, planSummary };
 });

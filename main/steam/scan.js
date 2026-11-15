@@ -118,7 +118,7 @@ function readManifests(library) {
   return out;
 }
 
-// Ren'Py works. Godot, RPG Maker and Unity are listed as "soon" so players see them, but voices
+// Ren'Py and RPG Maker MV work. Godot, RPG Maker MZ and Unity are listed as "soon" so players see them, but voices
 // can't be switched on yet. Godot's untested adapter is offered as "beta" only when asked for.
 function listing(detected, includeBeta) {
   if (!detected) return null;
@@ -131,7 +131,7 @@ function listing(detected, includeBeta) {
 
 /**
  * scanLibrary({steamPath?, includeBeta?, platform?, env?, home?, exec?}) -> Promise<Game[]>
- * Returns Ren'Py games plus Godot/RPG Maker/Unity games marked "soon" (contract shape minus enabled/hookInstalled, which state.js adds).
+ * Returns Ren'Py games and RPG Maker MV games, plus Godot/RPG Maker MZ/Unity games marked "soon" (contract shape minus enabled/hookInstalled, which state.js adds).
  * includeBeta lists engines whose adapter exists but is untested (Godot). Off by default.
  */
 async function scanLibrary(opts = {}) {

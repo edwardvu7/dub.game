@@ -59,7 +59,7 @@ test('user-added Godot project is launchable without claiming automatic voices',
   assert.equal(game.voiceMode, 'generic');
   assert.equal(game.enabled, false);
   assert.equal(L.gameStatus(game), 'off');
-  assert.match(L.gameHint(game).text, /Enable before launching/);
+  assert.match(L.gameHint(game).text, /Voices turn on when you launch/);
   await assert.rejects(games.launch({ appid: game.appid }), /Select the Godot 4 executable/);
 });
 

@@ -4,20 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.cloudflare.steamstatic.com https://cdn.akamai.steamstatic.com https://shared.cloudflare.steamstatic.com; media-src blob:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://cdn.cloudflare.steamstatic.com https://cdn.akamai.steamstatic.com https://shared.cloudflare.steamstatic.com; media-src blob:; base-uri 'none'; form-action 'none'">
   <title>dub.game</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="app">
-  <div class="drag-strip" aria-hidden="true"></div>
+  <div class="titlebar" aria-hidden="true"></div>
   <nav class="rail" aria-label="Sections">
-    <div class="wordmark"><img class="wordmark-logo" src="logo.png" alt="dub.game" width="40" height="40"></div>
+    <div class="wordmark"><img class="wordmark-logo" src="logo.png" alt="dub.game" width="36" height="36"></div>
     <div class="tabs" role="tablist" aria-orientation="vertical">
       <button class="tab" role="tab" id="tab-games" aria-controls="view-games" aria-selected="true" data-view="games">Games</button>
       <button class="tab" role="tab" id="tab-voices" aria-controls="view-voices" aria-selected="false" data-view="voices" tabindex="-1">Voices</button>
       <button class="tab" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" data-view="settings" tabindex="-1">Settings<span class="tab-flag" id="settings-flag" hidden>Needs keys</span></button>
     </div>
-    <p class="rail-note">Launch a game from here and it opens in a window. Press <kbd>Shift</kbd> + <kbd>F2</kbd> in the game to change voices.</p>
+    <p class="rail-note"><span class="rail-keys"><kbd>Shift</kbd><kbd>F2</kbd></span>Change voices in game</p>
   </nav>
 
   <main class="stage">
@@ -36,7 +36,7 @@
       <div class="games" id="games" aria-live="polite"></div>
       <div class="blank" id="games-empty" hidden>
         <h2>No supported games found</h2>
-        <p>dub.game checks your Steam library by itself and lists Ren'Py games, plus Godot, RPG Maker and Unity games that Steam tags as visual novels or story-rich. Voices work in Ren'Py games today. If a game is installed outside Steam, or from itch.io, point to its folder.</p>
+        <p>dub.game checks your Steam library by itself and lists Ren'Py games, plus Godot, RPG Maker and Unity games that Steam tags as visual novels or story-rich. Voices work in Ren'Py and RPG Maker MV games today. If a game is installed outside Steam, or from itch.io, point to its folder.</p>
         <button class="btn btn-primary" id="games-add-empty" type="button">Add game folder</button>
       </div>
     </section>
@@ -52,7 +52,6 @@
             <span class="field-label">Game</span>
             <select class="select" id="voices-game" aria-label="Game"></select>
           </label>
-          <button class="btn btn-quiet" id="voices-reset" type="button" hidden>Reset voices</button>
         </div>
       </header>
       <div id="cards-host"></div>
@@ -140,6 +139,10 @@
       </section>
 
       <div class="switches">
+        <label class="volume-row" for="volume">
+          <span class="switch-text"><b>Voice volume</b><small>How loud lines play from this app.</small></span>
+          <input type="range" id="volume" min="0" max="1" step="0.05" value="1" aria-label="Voice volume">
+        </label>
         <label class="switch">
           <input type="checkbox" id="opt-narration">
           <span class="switch-track" aria-hidden="true"></span>
@@ -158,19 +161,6 @@
       </div>
     </section>
   </main>
-
-  <footer class="now" id="now" aria-live="off">
-    <div class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <div class="now-text">
-      <span class="now-speaker" id="now-speaker">Nothing playing</span>
-      <span class="now-line" id="now-line">Launch a voiced game and lines show up here as they are spoken.</span>
-    </div>
-    <button class="btn btn-quiet" id="now-stop" type="button" hidden>Stop</button>
-    <label class="volume" title="Volume">
-      <span class="field-label">Volume</span>
-      <input type="range" id="volume" min="0" max="1" step="0.05" value="1" aria-label="Volume">
-    </label>
-  </footer>
 
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 

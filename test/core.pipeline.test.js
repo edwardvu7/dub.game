@@ -22,7 +22,7 @@ function rig(over = {}) {
   const voices = store.forGame('unknown'); // lines without a game land here
   const cache = createCache({ dir: path.join(dir, 'cache') });
   const pipeline = createPipeline({
-    voices: store, cache, catalog, usage: over.usage, settleMs: over.settleMs || 0,
+    voices: store, cache, catalog, usage: over.usage, settleMs: over.settleMs || 0, castWaitMs: over.castWaitMs,
     settings: { getKey: (p) => keys[p], narration: () => state.narration },
     emit: (channel, payload) => events.push({ channel, payload }),
     speak: over.speak || (async (params, key) => { calls.speak.push({ params, key }); return Buffer.from('mp3:' + params.text); }),
@@ -170,6 +170,24 @@ test('pipeline: preview and re-roll', async () => {
   await assert.rejects(() => r.pipeline.reroll({ speaker: 'Sylvie' }), /Gemini key/);
 });
 
+test('pipeline: a re-roll Gemini cannot answer says so in plain words and keeps the voice', async () => {
+  const { profileCharacter } = require('../main/profiler');
+  const failures = [
+    [async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); }, /keeps the current one\. Gemini did not answer within 20 seconds\.$/],
+    [async () => { throw new TypeError('fetch failed'); }, /keeps the current one\. Could not reach Gemini: fetch failed$/],
+    [async () => ({ ok: false, status: 429, json: async () => ({ error: { message: 'Quota exceeded.' } }) }), /keeps the current one\. Gemini 429: Quota exceeded\.$/],
+  ];
+  for (const [fetch, message] of failures) {
+    const r = rig({ profileCharacter: (c, cat, key, opts) => profileCharacter(c, cat, key, { ...opts, fetch }) });
+    r.voices.setAuto(profileFor('@Node3D', 2));
+    await assert.rejects(() => r.pipeline.reroll({ speaker: '@Node3D' }), message);
+    assert.equal(r.voices.get('@Node3D').voice_id, catalog[2].voice_id);
+  }
+  // After "Reset voices" the card on screen can be stale: the character is gone.
+  const r = rig();
+  await assert.rejects(() => r.pipeline.reroll({ game: 'godot:Until Then', speaker: '@Node3D' }), /Unknown character: @Node3D/);
+});
+
 test('pipeline: a line that arrives after a newer one is dropped; a restarted game is not', async () => {
   let t = 1000;
   const r = rig({ now: () => t });
@@ -183,6 +201,50 @@ test('pipeline: a line that arrives after a newer one is dropped; a restarted ga
   assert.equal(r.of('audio:play').pop().text, 'Hello again.');
   await r.pipeline.handleLine({ speaker: 'Sylvie', text: 'No seq.', engine: 'clipboard' });
   assert.equal(r.of('audio:play').pop().text, 'No seq.', 'sources without seq are unaffected');
+});
+
+// OMORI's first run: Gemini did not answer, and every line of a new character stayed silent
+// until it gave up (20 seconds).
+test('pipeline: slow casting does not silence a new character', async () => {
+  let answer;
+  let asked = 0;
+  const r = rig({ castWaitMs: 20, profileCharacter: (c) => new Promise((resolve) => {
+    asked++;
+    answer = () => resolve(profileFor(c.speaker, 1));
+  }) });
+  const game = 'rpgmaker-mv:OMORI';
+  const mari = () => r.store.forGame(game).get('MARI');
+  const stuck = Symbol('stuck');
+  const first = r.pipeline.handleLine({ speaker: 'MARI', text: 'Hi, OMORI!', engine: 'rpgmaker-mv', game, seq: 1 });
+  assert.notEqual(await Promise.race([first, new Promise((res) => setTimeout(() => res(stuck), 500))]), stuck,
+    'the line is spoken without waiting for Gemini');
+  assert.deepEqual(r.of('audio:play').map((a) => a.text), ['Hi, OMORI!']);
+  assert.equal(mari().source, 'fallback', 'placeholder voice until Gemini answers');
+  const t = Date.now();
+  await r.pipeline.handleLine({ speaker: 'MARI', text: 'Cheer up!', engine: 'rpgmaker-mv', game, seq: 2 });
+  assert.ok(Date.now() - t < 15, 'her next lines do not wait at all');
+  assert.equal(r.of('audio:play').length, 2);
+  answer();
+  await new Promise((res) => setTimeout(res, 5));
+  assert.equal(mari().source, 'gemini', 'Gemini\'s late answer replaces the placeholder');
+  assert.equal(asked, 1);
+});
+
+test('pipeline: a game whose line count restarts at 1 is heard from its first line', async () => {
+  let t = 1000;
+  const r = rig({ now: () => t });
+  const omori = (text, seq) => r.pipeline.handleLine({ speaker: 'Narrator', text, engine: 'rpgmaker-mv', game: 'rpgmaker-mv:OMORI', seq });
+  // The Godot hook counts from the clock, so the app has seen a huge seq before OMORI starts at 1.
+  await r.pipeline.handleLine({ speaker: 'Narrator', text: 'Godot.', engine: 'godot', game: 'godot:Until Then', seq: 1794680000000 });
+  t += 60000;
+  await omori('First launch, line 1.', 1);
+  await omori('First launch, line 2.', 2);
+  r.pipeline.handleStop({ seq: 2 });
+  assert.equal(r.of('audio:stop').length, 1, 'its stop is not taken for a stale one');
+  t += 60000; // OMORI is closed and started again
+  await omori('Second launch, line 1.', 1);
+  assert.deepEqual(r.of('audio:play').map((a) => a.text),
+    ['Godot.', 'First launch, line 1.', 'First launch, line 2.', 'Second launch, line 1.']);
 });
 
 test('per game: two games keep separate voices for the same speaker name', async () => {

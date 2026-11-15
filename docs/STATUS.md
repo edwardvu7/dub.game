@@ -40,8 +40,8 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 - The overlay can be dragged by the strip along its top. It reopens where it was last dragged on that
   screen (saved in `userData/overlay-position.json`, pulled back on screen if the resolution shrank);
   on a screen it was never dragged on, it starts at the left edge.
-- Godot, RPG Maker and Unity games are listed as "Coming soon" (engine name on the badge, no voices
-  switch or Launch). Only Ren'Py games can be voiced.
+- Godot, RPG Maker MZ and Unity games are listed as "Coming soon" (engine name on the badge, no voices
+  switch or Launch). Ren'Py and RPG Maker MV games can be voiced.
 - Those Godot/RPG Maker/Unity Steam games are listed only when Steam tags them as story-driven
   (Visual Novel, Story Rich, ...), checked with SteamSpy and cached. UNVERIFIED: SteamSpy has not
   been called live yet; the reply format comes from its documentation.
@@ -81,6 +81,8 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 - Fixed: text boxes named Bubble/Balloon/TextBox are found automatically, and a node the player picks
   once keeps matching when the game re-creates it under an engine-numbered name (`@VBoxContainer@5`).
   `npm run smoke:godot-generic` (needs `GODOT_BIN`) covers both.
+- Inspection report (`_dubgame_generic.inspect.json`, see `docs/GODOT-GENERIC.md`): run on Windows with
+  Godot 4.1.4, all three Godot smoke tests pass. UNVERIFIED: a real game and writing inside Program Files.
 - UNVERIFIED on Until Then itself: its node names are unknown, and text drawn without Label/RichTextLabel
   nodes cannot be read. Games with the pack embedded in the .exe are now detected (UNVERIFIED on a real one).
 
@@ -105,3 +107,26 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
   character never gets several voices. Gemini gets the notes and the game's name when casting;
   unlocked voices are recast once when the lookup arrives. Without a Grok key, Gemini still gets the
   game's name. UNVERIFIED: xAI's API (model `grok-4.7`, override with GROK_MODEL) not called live.
+
+## RPG Maker MV (OMORI)
+- RPG Maker MV games are now `support: "full"`: the Voices switch copies `mod/rpgmaker/dubgame.js` to
+  `www/js/dubgame.js` and adds one script tag at the end of `www/index.html`. Switching off removes
+  the tag (the file is byte-for-byte what it was) and the script. If Steam restores `index.html`, the
+  game shows "script is missing, Reinstall". Checked on a copy of OMORI's real `index.html`.
+- Read from the OMORI install: plugins, data and text are encrypted (key comes from Steam's launch
+  arguments), the engine files and `plugins.js` are plain. `plugins.js` shows YEP_MessageCore 1.19 and
+  message macros that expand to name-box codes (`aub` -> `
+<
+[2]>`, `mar` -> `
+<MARI>`). So the
+  hook wraps the plain `Window_Message.startMessage`/`terminateMessage` after all plugins loaded, and
+  records the name YEP hands to `Window_NameBox.refresh`. No name box = "Narrator".
+- Not sent: choices, battle log, menus, scrolling text (other windows). No `/characters` at launch and
+  no `upcoming` lines, so no ahead-of-time moods. The hook does not switch the game to fullscreen.
+- UNVERIFIED, nothing was run inside OMORI: that `require('http')` works from the page, that OMORI's
+  encrypted plugins leave the name box on `Window_NameBox.refresh(text)` and the text in
+  `_textState.text`, that no custom escape code leaks into spoken text, and that names inside the
+  name box arrive already resolved (`
+[2]` -> AUBREY). Tested only with stand-ins (`test/rpgmaker.test.js`).
+  Also untested: other MV games (without YEP_MessageCore every line is "Narrator"), OneLoader mods,
+  macOS app bundles, MV games listed from Steam need a story tag from SteamSpy like other engines.

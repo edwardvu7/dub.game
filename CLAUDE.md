@@ -30,7 +30,7 @@ code against the contracts below (or fake data), never edit their folder.
 ```json
 { "speaker": "Sylvie", "text": "Hi!", "engine": "renpy", "game": "renpy:The Question", "source": "optional node path" }
 ```
-- `game` is `<engine>:<game folder name>` (Ren'Py: `config.basedir`; Godot: the .exe's folder;
+- `game` is `<engine>:<game folder name>` (Ren'Py: `config.basedir`; Godot: the .exe's folder; RPG Maker MV: the folder above `www/`;
   clipboard mode: `"clipboard"`). Voices are saved per game. Optional for old hooks: a line without
   it goes to the game that spoke last. `/characters` and `/stop` carry the same field.
 - `upcoming` (optional, Ren'Py hook v7+): `[{speaker, text}]`, the next lines of the script up to the
@@ -97,8 +97,8 @@ lines are not sent (cached lines still play).
    "engine": "renpy", "support": "full", "enabled": true, "hookInstalled": true,
    "coverUrl": "https://cdn.cloudflare.steamstatic.com/steam/apps/1234/header.jpg" }]
 ```
-`support` is `"full"` (Ren'Py), `"beta"` (Godot adapter, only with `DUBGAME_BETA=1`) or `"soon"`
-(Godot, RPG Maker MV/MZ, Unity: listed so players see them, but voices can't be switched on and
+`support` is `"full"` (Ren'Py, RPG Maker MV), `"beta"` (Godot adapter, only with `DUBGAME_BETA=1`) or `"soon"`
+(Godot, RPG Maker MZ, Unity: listed so players see them, but voices can't be switched on and
 `games:setEnabled` refuses them). Other engines are never returned.
 Steam games on Godot, RPG Maker and Unity are listed only when their Steam community tags include
 Visual Novel, Story Rich, Interactive Fiction, Choose Your Own Adventure, Dating Sim or Otome
@@ -164,3 +164,12 @@ explicitly enabled without DUBGAME_BETA. Launch does not enable a disabled Godot
 `POST /godot/hook` carries appid, install token, version, visible labels and selectedPath.
 Only the main process validates the token; it is omitted from renderer game objects.
 See `docs/GODOT-GENERIC.md` for coverage and limitations.
+
+## RPG Maker MV hook
+
+`engine: "rpgmaker-mv"`, `support: "full"`. Installing copies `mod/rpgmaker/dubgame.js` to
+`<game>/www/js/dubgame.js` and adds one `<script>` tag before `</body>` in `www/index.html`;
+uninstalling removes exactly that tag and the file. `hookInstalled` needs both. The hook wraps
+`Window_Message` (start = `/line`, terminate = `/stop`), takes the speaker from the
+YEP_MessageCore name box (none = "Narrator") and posts with Node's `http` (no Origin header).
+It sends no `/characters` and no `upcoming`. Written against OMORI; see `docs/STATUS.md`.

@@ -10,7 +10,14 @@ const DEFAULT_MOD_DIR = path.join(__dirname, '..', '..', 'mod');
 // Files per engine: [source inside mod/, file name in the game].
 const HOOK_FILES = {
   renpy: [['renpy/dubgame.rpy', 'dubgame.rpy']],
+  'rpgmaker-mv': [['rpgmaker/dubgame.js', 'js/dubgame.js']],
 };
+// RPG Maker MV loads only the scripts index.html names, so the hook also needs one tag there.
+// Removing this exact text restores the file byte for byte, so no backup copy can go stale.
+const HTML_TAG = { 'rpgmaker-mv': '<script type="text/javascript" src="js/dubgame.js"></script>' };
+// latin1 keeps every byte of the game's file as it is.
+const readHtml = (dir) => fs.readFileSync(path.join(dir, 'index.html'), 'latin1');
+const writeHtml = (dir, html) => fs.writeFileSync(path.join(dir, 'index.html'), html, 'latin1');
 // Compiled leftovers Ren'Py writes next to the hook.
 const EXTRA_REMOVE = { renpy: ['dubgame.rpyc', 'dubgame.rpyb'] };
 
@@ -43,7 +50,10 @@ function isHookInstalled(game) {
   const files = HOOK_FILES[game.engine];
   if (!files) return false;
   const dir = hookDirFor(game);
-  return files.every(([, name]) => fs.existsSync(path.join(dir, name)));
+  if (!files.every(([, name]) => fs.existsSync(path.join(dir, name)))) return false;
+  const tag = HTML_TAG[game.engine];
+  // A Steam update or "Verify integrity" restores index.html without the tag: not installed.
+  try { return !tag || readHtml(dir).includes(tag); } catch { return false; }
 }
 
 /** True when the installed hook differs from the one shipped with this build. */
@@ -66,10 +76,16 @@ function installHook(game, opts = {}) {
   const modDir = opts.modDir || DEFAULT_MOD_DIR;
   const dir = hookDirFor(game);
   try {
+    const tag = HTML_TAG[game.engine];
+    const html = tag ? readHtml(dir) : '';
+    const at = html.toLowerCase().lastIndexOf('</body>');
+    if (tag && at < 0) throw new Error(`Could not find </body> in:
+${path.join(dir, 'index.html')}`);
     for (const [src, name] of files) {
       // read + write (not copyFile) so it also works from inside a packaged app.asar
       fs.writeFileSync(path.join(dir, name), fs.readFileSync(path.join(modDir, src)));
     }
+    if (tag && !html.includes(tag)) writeHtml(dir, html.slice(0, at) + tag + html.slice(at));
   } catch (err) {
     throw friendly(err, dir, 'installing');
   }
@@ -82,6 +98,12 @@ function uninstallHook(game) {
   if (!files) return true;
   const dir = hookDirFor(game);
   try {
+    const tag = HTML_TAG[game.engine];
+    if (tag) {
+      let html = '';
+      try { html = readHtml(dir); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      if (html.includes(tag)) writeHtml(dir, html.split(tag).join(''));
+    }
     for (const [, name] of files) {
       const target = path.join(dir, name);
       if (!fs.existsSync(target)) continue;

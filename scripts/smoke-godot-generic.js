@@ -113,7 +113,8 @@ func _initialize() -> void:
   await run(['--path', source, '--script', 'res://pack.gd']);
   const engine = process.env.GODOT_BIN || execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', ['godot'], { encoding: 'utf8' }).trim().split(/\r?\n/)[0];
   const packedBinary = path.join(packed, process.platform === 'win32' ? 'Story.exe' : 'Story.x86_64');
-  fs.copyFileSync(engine, packedBinary);
+  // Windows: GODOT_BIN may be the small "_console.exe" wrapper, which cannot run under another name.
+  fs.copyFileSync(engine.replace(/_console\.exe$/i, '.exe'), packedBinary);
   fs.chmodSync(packedBinary, 0o755);
   const packBefore = fs.readFileSync(path.join(packed, 'Story.pck'));
   await server.listen();

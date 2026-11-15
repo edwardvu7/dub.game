@@ -34,7 +34,11 @@ func run() -> void:
     bridge.say("Rowan", "Latest line")
     await create_timer(0.2).timeout
     bridge.stop()
-    await create_timer(0.2).timeout
+    # Offline, Windows refuses a local connection slowly, so each request runs to its 1 s timeout.
+    for i in range(40):
+        if bridge._pending.size() == 0 and not bridge._busy:
+            break
+        await create_timer(0.1).timeout
     if bridge._pending.size() != 0 or bridge._busy or delivered == 0:
         push_error("Adapter did not drain requests")
         quit(1)

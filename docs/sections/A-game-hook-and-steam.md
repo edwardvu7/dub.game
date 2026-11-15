@@ -29,7 +29,8 @@ You own everything that touches the game: the injected scripts and finding/insta
 |---|---|---|
 | Ren'Py | `renpy/` + `game/` with `.rpy`/`.rpyc`/`.rpa` | full |
 | Godot | `.pck` beside the exe | beta once adapter works, else hidden |
-| RPG Maker MV/MZ | `www/js/rpg_core.js` / `js/rmmz_core.js` | hidden |
+| RPG Maker MV | `www/js/rpg_core.js` | full (hook: `mod/rpgmaker/dubgame.js`) |
+| RPG Maker MZ | `js/rmmz_core.js` | soon |
 | Unity | `UnityPlayer.dll` + `<Game>_Data/` | hidden |
 | anything else | — | hidden |
 

@@ -3,8 +3,17 @@
 extends Node
 
 const BASE_URL := "http://127.0.0.1:8000"
-const VERSION := 5
+const VERSION := 8
 const MAX_LABELS := 512
+const TYPES := {TYPE_NIL: "null", TYPE_BOOL: "bool", TYPE_INT: "int", TYPE_FLOAT: "float", TYPE_STRING: "String",
+	TYPE_STRING_NAME: "StringName", TYPE_NODE_PATH: "NodePath", TYPE_OBJECT: "Object", TYPE_CALLABLE: "Callable",
+	TYPE_SIGNAL: "Signal", TYPE_DICTIONARY: "Dictionary", TYPE_ARRAY: "Array", TYPE_VECTOR2: "Vector2", TYPE_COLOR: "Color"}
+var _inspect_path := ""
+var _inspect_seen := {}      # stable label paths already snapshotted in this run
+var _inspect_left := 5       # label snapshots still allowed in this run
+var _inspect_idle := true    # no label selected yet, and no no-label snapshot written
+var _started := 0
+var _report: Dictionary = {}
 var _labels: Array[WeakRef] = []
 var _config: Dictionary = {}
 var _http: HTTPRequest
@@ -21,10 +30,13 @@ var _done_once := false # the current line was fully shown at least once
 var _inline_name := RegEx.create_from_string("^([^\\s:][^:\\n]{0,23}):\\s+(.+)$") # "Cathy: Not yet."
 var _seq := 0
 var _selected := ""
+var _cast_seen := {}      # character names already announced in this run (at most 60)
+var _cast_new: Array = [] # names waiting for the next /characters
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_seq = int(Time.get_unix_time_from_system() * 1000.0)
+	_started = Time.get_ticks_msec()
 	if not _load_config():
 		queue_free()
 		return
@@ -42,6 +54,7 @@ func _load_config() -> bool:
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(file))
 	if parsed is Dictionary:
 		_config = parsed
+		_inspect_path = file.get_basename() + ".inspect.json"
 		return true
 	return false
 
@@ -51,6 +64,15 @@ func _scan(node: Node) -> void:
 		_scan(child)
 
 func _added(node: Node) -> void:
+	# A scene keeps its cast under a node named "Characters" (Until Then:
+	# /root/Root/Skits/<Skit>/Characters/<Name>). Announcing them while the scene loads lets the app
+	# pick their voices before anyone speaks. Only "Characters" is seen in a real game.
+	var parent := node.get_parent()
+	if parent != null and str(parent.name).to_lower() == "characters" and _cast_seen.size() < 60:
+		var who := _person(str(node.name))
+		if not who.is_empty() and not _cast_seen.has(who):
+			_cast_seen[who] = true
+			_cast_new.append({"speaker": who})
 	if node is Label or node is RichTextLabel:
 		_labels = _labels.filter(func(ref: WeakRef) -> bool: return is_instance_valid(ref.get_ref()))
 		if _labels.size() < MAX_LABELS:
@@ -124,7 +146,8 @@ const GENERIC := ["bubble", "balloon", "speech", "dialog", "text", "label", "pan
 func _person(name: String) -> String:
 	var clean := _stable(name).replace("_", " ").strip_edges()
 	var lower := clean.to_lower().replace(" ", "")
-	if clean.length() < 2 or clean.length() > 40:
+	# "@Node3D@948" is a name the engine made up for an unnamed node, never a character.
+	if clean.length() < 2 or clean.length() > 40 or clean.begins_with("@"):
 		return ""
 	for word in GENERIC:
 		if lower == word or lower.begins_with(word) or lower.ends_with(word):
@@ -186,6 +209,15 @@ func _speaker(node: Node, labels: Array) -> String:
 			best_distance = d
 	if best != null:
 		return _text(best).left(100)
+	# The bubble's own script often holds its character in a variable (Until Then: SpeechBubble.gd
+	# `alias = "MarkBorja"`). Only `alias` is seen in a real game; the other names are guesses.
+	var up := node.get_parent()
+	while up != null and up != get_tree().root:
+		for key in ["alias", "speaker", "speaker_name", "character_name"]:
+			var value = up.get(key)
+			if (value is String or value is StringName) and _looks_like_name(str(value)):
+				return str(value).left(100)
+		up = up.get_parent()
 	# A name plate: a short name-like label just above or to the left of the line on screen,
 	# whatever the game called the node.
 	var plate := _name_plate(node, labels)
@@ -193,7 +225,7 @@ func _speaker(node: Node, labels: Array) -> String:
 		return plate
 	# No name label: a bubble that floats over a character usually sits inside that character's
 	# node (/root/World/Cathy/Bubble/Text), so the nearest world node with a real name is the speaker.
-	var up := node.get_parent()
+	up = node.get_parent()
 	while up != null and up != get_tree().root:
 		if up is Node2D or up is Node3D:
 			var who := _person(str(up.name))
@@ -215,6 +247,10 @@ func _process(delta: float) -> void:
 		_enqueue("/stop", {"engine": "godot", "seq": _seq})
 		set_process(false)
 		return
+	# One request per scene load, 12 names at most (one Gemini call in the app).
+	if not _cast_new.is_empty() and not _pending.any(func(item: Dictionary) -> bool: return item.endpoint == "/characters"):
+		_enqueue("/characters", {"engine": "godot", "characters": _cast_new.slice(0, 12)})
+		_cast_new = _cast_new.slice(12)
 	var visible: Array = []
 	var diagnostics: Array = []
 	var best: Node = null
@@ -237,6 +273,15 @@ func _process(delta: float) -> void:
 			best_score = score
 			best = node
 	_selected = str(best.get_path()) if best != null else ""
+	if best != null:
+		_inspect_idle = false
+		if _inspect_left > 0 and not _inspect_seen.has(_stable(_selected)):
+			_inspect_seen[_stable(_selected)] = true
+			_inspect_left -= 1
+			_inspect(best)
+	elif _inspect_idle and Time.get_ticks_msec() - _started >= 10000:
+		_inspect_idle = false
+		_inspect(null)
 	var next_key := ""
 	var text := ""
 	var speaker := "Narrator"
@@ -268,7 +313,7 @@ func _process(delta: float) -> void:
 		_sent = false
 		_seq += 1
 		# Cancel unsent old lines during rapid skipping. Queue stays bounded offline.
-		_pending = _pending.filter(func(item: Dictionary) -> bool: return item.endpoint == "/godot/hook")
+		_pending = _pending.filter(func(item: Dictionary) -> bool: return item.endpoint == "/godot/hook" or item.endpoint == "/characters")
 		_enqueue("/stop", {"engine": "godot", "seq": _seq})
 	# Speak while the text is still appearing. A typewriter that reveals hidden letters already holds
 	# the whole line, so a short pause is enough. Text that grows letter by letter is only final once
@@ -281,6 +326,148 @@ func _process(delta: float) -> void:
 		_heartbeat = 0.0
 		_enqueue("/godot/hook", {"appid": str(_config.get("appid", "")), "token": str(_config.get("token", "")),
 			"version": VERSION, "labels": diagnostics, "selectedPath": _selected, "limitReached": _labels.size() >= MAX_LABELS})
+
+# --- Inspection report: what the game's own nodes look like, written to a local file, never sent.
+# Reads properties only; never calls the game's methods. Checked in Godot 4.1.4 by smoke:godot-bubbles.
+# UNVERIFIED: a real game, writing inside Program Files, GDExtension classes in ClassDB, the 64 KB trim.
+
+func _short(value) -> String:
+	if typeof(value) == TYPE_OBJECT:
+		if not is_instance_valid(value):
+			return "<freed>"
+		if value is Node:
+			return str(value.get_path()).left(60) if value.is_inside_tree() else "<" + str(value.name).left(50) + ">"
+		if value is Resource:
+			var out := str(value.resource_path)
+			for key in ["name", "display_name", "character_name"]:
+				var extra = value.get(key)
+				if typeof(extra) != TYPE_NIL:
+					out += " " + str(key) + "=" + str(extra).left(30)
+			return out.left(60)
+		return "<object>"
+	if typeof(value) == TYPE_DICTIONARY or typeof(value) >= TYPE_ARRAY:
+		return "size " + str(value.size())
+	return str(value).left(60)
+
+func _node_info(node: Node) -> Dictionary:
+	var groups: Array = []
+	for group in node.get_groups():
+		if not str(group).begins_with("_"): # "_..." groups are the engine's own
+			groups.append(str(group))
+	var fields: Array = []
+	var sigs: Array = []
+	var info := {"name": str(node.name), "class": node.get_class(), "script": "", "groups": groups, "vars": fields, "signals": sigs}
+	var scr = node.get_script()
+	if not scr is Script:
+		return info
+	info["script"] = str(scr.resource_path)
+	for p in scr.get_script_property_list():
+		if fields.size() >= 40:
+			break
+		if (int(p.usage) & (PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP)) != 0:
+			continue
+		var value = node.get(p.name)
+		var kind := str(TYPES.get(typeof(value), typeof(value)))
+		if typeof(value) == TYPE_OBJECT and is_instance_valid(value):
+			kind = str(value.get_class())
+		elif typeof(value) == TYPE_NIL and not str(p.get("class_name", "")).is_empty():
+			kind = str(p.get("class_name", ""))
+		fields.append({"name": str(p.name), "type": kind, "value": _short(value)})
+	for s in scr.get_script_signal_list():
+		if sigs.size() >= 40:
+			break
+		var args := PackedStringArray()
+		for a in s.args:
+			args.append(str(a.name))
+		sigs.append(str(s.name) + "(" + ", ".join(args) + ")")
+	return info
+
+func _autoloads() -> Array:
+	var out: Array = []
+	for child in get_tree().root.get_children():
+		if child != self and child != get_tree().current_scene and out.size() < 40:
+			out.append(child)
+	return out
+
+func _string_vars(node: Node, out: Array) -> bool:
+	var scr = node.get_script()
+	if not scr is Script:
+		return false
+	for p in scr.get_script_property_list():
+		var value = node.get(p.name)
+		if value is String and value.length() > 10 and out.size() < 200:
+			out.append({"node": str(node.get_path()), "var": str(p.name), "text": value.left(60)})
+	return true
+
+# For games that draw text without Label nodes: where long strings sit in script variables.
+func _strings() -> Array:
+	var out: Array = []
+	for auto in _autoloads():
+		_string_vars(auto, out)
+	var stack: Array = []
+	if get_tree().current_scene != null:
+		stack.append(get_tree().current_scene)
+	var scripted := 0
+	var seen := 0
+	while not stack.is_empty() and scripted < 300 and seen < 20000:
+		var node = stack.pop_back()
+		seen += 1
+		if not is_instance_valid(node):
+			continue
+		stack.append_array(node.get_children())
+		if _string_vars(node, out):
+			scripted += 1
+	return out
+
+func _inspect(label: Node) -> void:
+	if _inspect_path.is_empty():
+		return
+	if _report.is_empty():
+		var classes: Array = []
+		for c in ClassDB.get_class_list():
+			var lower: String = str(c).to_lower()
+			if "ink" in lower or "dialog" in lower or "story" in lower:
+				var methods: Array = []
+				for m in ClassDB.class_get_method_list(c, true):
+					if methods.size() < 60:
+						methods.append(str(m.name))
+				classes.append({"class": str(c), "methods": methods})
+		var loads: Array = []
+		for node in _autoloads():
+			loads.append(_node_info(node))
+		_report = {"hook": VERSION, "godot": str(Engine.get_version_info().get("string", "")),
+			"game": str(_config.get("game", "")), "autoloads": loads, "classes": classes, "snapshots": []}
+	var snap := {"time": Time.get_datetime_string_from_system(), "label": "", "text": ""}
+	if label != null:
+		snap["label"] = str(label.get_path())
+		snap["text"] = _text(label).left(60)
+		var chain: Array = []
+		var up: Node = label
+		while up != null and chain.size() < 16:
+			chain.append(_node_info(up))
+			up = up.get_parent()
+		snap["chain"] = chain
+	else:
+		snap["strings"] = _strings()
+	var snapshots: Array = _report["snapshots"]
+	var autoloads: Array = _report["autoloads"]
+	var classes_kept: Array = _report["classes"]
+	snapshots.append(snap)
+	var text := JSON.stringify(_report)
+	# 64 KB cap: oldest snapshots go first, then autoloads and classes from the end.
+	while text.to_utf8_buffer().size() > 65536:
+		if snapshots.size() > 1:
+			snapshots.pop_front()
+		elif not autoloads.is_empty():
+			autoloads.pop_back()
+		elif not classes_kept.is_empty():
+			classes_kept.pop_back()
+		else:
+			return
+		text = JSON.stringify(_report)
+	var out := FileAccess.open(_inspect_path, FileAccess.WRITE)
+	if out != null:
+		out.store_string(text)
 
 func _enqueue(endpoint: String, payload: Dictionary) -> void:
 	payload["game"] = str(_config.get("game", "godot:unknown"))

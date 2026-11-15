@@ -36,7 +36,7 @@ function findRenpyRoot(installDir) {
 
 /**
  * detectEngine(installDir) -> { engine, support, hookDir } | null
- * support: "full" (Ren'Py), "beta" (adapter exists, untested), "soon" (listed, voices not built
+ * support: "full" (Ren'Py, RPG Maker MV), "beta" (adapter exists, untested), "soon" (listed, voices not built
  * yet), "hidden" (recognised, not listed).
  * hookDir: the folder the hook files are copied into.
  */
@@ -59,9 +59,9 @@ function detectEngine(installDir) {
       packMajor(path.join(installDir, n)) !== null)) {
     return { engine: 'godot', support: 'beta', hookDir: installDir };
   }
-  if (isFile(path.join(installDir, 'www', 'js', 'rpg_core.js')) ||
-      isFile(path.join(installDir, 'js', 'rpg_core.js'))) {
-    return { engine: 'rpgmaker-mv', support: 'soon', hookDir: null };
+  // hookDir is the folder with index.html and js/ (www/ in a deployed game).
+  for (const dir of [path.join(installDir, 'www'), installDir]) {
+    if (isFile(path.join(dir, 'js', 'rpg_core.js'))) return { engine: 'rpgmaker-mv', support: 'full', hookDir: dir };
   }
   if (isFile(path.join(installDir, 'js', 'rmmz_core.js'))) {
     return { engine: 'rpgmaker-mz', support: 'soon', hookDir: null };
