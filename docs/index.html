@@ -878,7 +878,7 @@
             <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="Edward Vu" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Engine Hooks</span>
-              <div class="team-name">Edward Vu</div>
+              <div class="team-name" id="name-edwardvu7">Edward Vu</div>
               <div class="team-handle">@edwardvu7</div>
             </div>
           </a>
@@ -887,17 +887,17 @@
             <img class="team-avatar" src="https://github.com/chadscheeks.png?size=160" onerror="this.src='logo.png'" alt="Alexander Miller" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Core &amp; Voice Pipeline</span>
-              <div class="team-name">Alexander Miller</div>
+              <div class="team-name" id="name-chadscheeks">Alexander Miller</div>
               <div class="team-handle">@chadscheeks</div>
             </div>
           </a>
 
-          <a href="https://github.com/Crazeematt" class="team-card reveal" style="--delay: 140ms;" target="_blank" rel="noopener noreferrer" data-gh-user="Crazeematt">
-            <img class="team-avatar" src="https://github.com/Crazeematt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
+          <a href="https://github.com/Craz33matt" class="team-card reveal" style="--delay: 140ms;" target="_blank" rel="noopener noreferrer" data-gh-user="Craz33matt">
+            <img class="team-avatar" src="https://github.com/Craz33matt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Overlay &amp; UI</span>
-              <div class="team-name" id="name-Crazeematt">Charles</div>
-              <div class="team-handle">@Crazeematt</div>
+              <div class="team-name" id="name-Craz33matt">Matthew</div>
+              <div class="team-handle">@Craz33matt</div>
             </div>
           </a>
         </div>
@@ -973,12 +973,12 @@
       input.addEventListener("input", updateReadouts);
     });
 
-    // Automatically hydrate Crazeematt's full display name from GitHub's public API if set
-    fetch("https://api.github.com/users/Crazeematt")
+    // Hydrate Matthew's full display name from GitHub's public API if configured on his profile
+    fetch("https://api.github.com/users/Craz33matt")
       .then((res) => (res.ok ? res.json() : null))
       .then((user) => {
         if (user && user.name) {
-          const el = document.getElementById("name-Crazeematt");
+          const el = document.getElementById("name-Craz33matt");
           if (el) el.textContent = user.name;
         }
       })
