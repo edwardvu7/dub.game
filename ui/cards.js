@@ -155,7 +155,7 @@
       const label = el('label', 'card-audition-title', 'Describe how this character should sound');
       const text = el('textarea', 'input card-brief-text');
       text.rows = 3;
-      text.maxLength = 400;
+      text.maxLength = 1000; // ElevenLabs' own limit; Grok's draft can be long, and a lower cap left it uneditable except by deleting
       text.placeholder = 'e.g. a warm, slightly husky young woman who speaks softly and hesitates when nervous';
       label.append(text);
       const hint = el('p', 'card-brief-hint', 'Optional. Leave it blank and Grok writes a draft here for you to edit first.');

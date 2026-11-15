@@ -191,7 +191,8 @@ function buildVoiceDescriptionPrompt(profile, notes, setting) {
     p.speech ? `How they speak: ${short(p.speech, 160)}` : '',
     p.personality ? `Personality: ${short(p.personality, 300)}` : '',
     notes ? `Known about them: ${short(notes, 400)}` : '',
-    'Describe age, gender, accent, tone, pitch, pacing, vocabulary register and emotional color in one or two sentences, 150-400 characters.',
+    'Write plainly, like a casting note, in ONE or TWO short sentences of 100-250 characters. Say only: age, gender, accent, pitch, pace, and one or two tone words. Always include that the voice is clear and natural with clean, easy-to-understand diction.',
+    'Keep it restrained: no flowery or poetic wording, no metaphors, no stacked adjectives, no extreme or theatrical traits (raspy, breathy, gravelly, whispery, sing-song), no backstory or plot. A voice designer follows simple descriptions far better than rich ones.',
     'The game text is in a language the voice speaks natively (usually English): a character from a foreign setting still speaks natural, plain English unless their origin says they have an accent. Match the era and social register (formal, slangy, old-fashioned, modern teen).',
     'The accent must fit the character\'s origin and the game\'s setting. Do NOT use a British or Australian accent unless that fits; if unknown, use a neutral American accent.',
     'Never name a real person, actor or celebrity and never ask for a soundalike.',
@@ -211,7 +212,7 @@ function fallbackVoiceDescription(profile) {
   const tone = p.speech ? short(p.speech, 160) : p.personality ? short(p.personality, 160) : 'natural, conversational tone';
   const t = /[.!?]$/.test(tone) ? tone : tone + '.';
   const world = p.setting ? ` Fitting the world of the story: ${short(p.setting, 120).replace(/\.$/, '')}.` : '';
-  return `A ${age} ${g} ${accent}. Tone and manner: ${t} Clear, natural pacing.${world}`.slice(0, VOICE_DESC_MAX);
+  return `A ${age} ${g} ${accent}. Tone and manner: ${t} Clear, natural voice with easy-to-understand diction.${world}`.slice(0, VOICE_DESC_MAX);
 }
 
 /** Parse Grok's reply; null when unusable (not an object, too short or too long to be useful). */

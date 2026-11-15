@@ -721,7 +721,7 @@ function createPipeline(deps) {
       const existing = voices.get(speaker);
       checkCanDesign(voices, speaker, existing);
       // The player's own words win; blank means Grok writes it. (sanitizeDescription pads/cleans it later.)
-      const typed = String(own || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+      const typed = String(own || '').replace(/\s+/g, ' ').trim().slice(0, 1000);
       const description = typed || await voicePrompt(g, speaker, existing);
       const made = await designer.previews({ description, avoid: [speaker, titleOf(g)] });
       auditions.set(keyOf(g, speaker), { description: made.description, ids: made.previews.map((p) => p.id), at: now() });
