@@ -33,6 +33,10 @@ code against the contracts below (or fake data), never edit their folder.
 - `game` is `<engine>:<game folder name>` (Ren'Py: `config.basedir`; Godot: the .exe's folder;
   clipboard mode: `"clipboard"`). Voices are saved per game. Optional for old hooks: a line without
   it goes to the game that spoke last. `/characters` and `/stop` carry the same field.
+- `upcoming` (optional, Ren'Py hook v7+): `[{speaker, text}]`, the next lines of the script up to the
+  next choice or jump (max 20). The app has Gemini direct them ahead of time (`main/moods.js`): one
+  call per ~15 lines, never waited on. Each line's mood shifts stability/style/speed for that line
+  only. The previous and next line also go to ElevenLabs as `previous_text`/`next_text`.
 - `speaker` is `"Narrator"` when Ren'Py gives no name, `"unknown"` when the engine can't tell.
 - `engine` defaults to `"renpy"` if missing. Reply `204` immediately; never make the game wait.
 
@@ -114,10 +118,11 @@ list, main sends `games:changed` with the new list.
 | `usage:get` | invoke | → `{session, month, monthChars, monthGemini, totalChars, limit, byGame, overLimit}` |
 | `usage:setLimit` | invoke | `number` (0 = none) → same as get |
 | `usage:plan` | invoke | → `{ok, used, limit, resetAt?}` from ElevenLabs, or `{ok:false, error}` |
-| `settings:get` | invoke | → `{hasElevenLabsKey, hasGeminiKey, narration}` (never the keys) |
+| `settings:get` | invoke | → `{hasElevenLabsKey, hasGeminiKey, narration, clipboardMode, acting}` (never the keys) |
 | `settings:setKeys` | invoke | `{elevenlabs?, gemini?}` → same shape as get |
 | `settings:test` | invoke | `{provider}` → `{ok, error?}` |
 | `settings:setNarration` | invoke | `boolean` |
+| `settings:setActing` | invoke | `boolean`: Gemini directs each line ahead of time (default on) |
 | `audio:play` | main → renderer event | `{speaker, text, mime, data /* base64 */}` |
 | `line:received` | main → renderer event | `{speaker, text, engine}` |
 | `voices:changed` | main → renderer event | `{current, games}` |

@@ -407,6 +407,7 @@
     }
     $('opt-narration').checked = !!settings.narration;
     $('opt-clipboard').checked = !!settings.clipboardMode;
+    $('opt-acting').checked = settings.acting !== false;
     $('settings-flag').hidden = !L.needsSetup(settings);
     // First launch opens here, so say why: nothing can speak until both keys are in.
     $('settings-title').textContent = L.needsSetup(settings) ? 'Welcome. Add two keys to start' : 'Settings';
@@ -484,6 +485,7 @@
   }
   bindSwitch('opt-narration', 'settings:setNarration');
   bindSwitch('opt-clipboard', 'settings:setClipboardMode');
+  bindSwitch('opt-acting', 'settings:setActing');
 
   // ---------- Audio and the now-playing bar ----------
   const now = $('now');

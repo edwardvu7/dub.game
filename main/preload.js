@@ -9,7 +9,7 @@ const INVOKE = [
   'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
-  'settings:setClipboardMode',
+  'settings:setClipboardMode', 'settings:setActing',
 ];
 const EVENTS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'overlay:toggle', 'games:changed',
   'usage:changed', 'app:status'];

@@ -12,12 +12,13 @@ const ENV_NAMES = { elevenlabs: 'ELEVENLABS_API_KEY', gemini: 'GEMINI_API_KEY' }
  * testers: { elevenlabs(key) -> {ok,error?}, gemini(key) -> {ok,error?} }
  */
 function createSettings({ file, safeStorage, env = process.env, testers = {} }) {
-  let data = { narration: true, clipboardMode: false, keys: {} };
+  let data = { narration: true, clipboardMode: false, acting: true, keys: {} };
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     data = {
       narration: raw.narration !== false,
       clipboardMode: raw.clipboardMode === true,
+      acting: raw.acting !== false,
       keys: raw.keys && typeof raw.keys === 'object' ? raw.keys : {},
     };
   } catch { /* first launch */ }
@@ -51,6 +52,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
       hasGeminiKey: !!getKey('gemini'),
       narration: data.narration,
       clipboardMode: data.clipboardMode,
+      acting: data.acting,
     };
   }
 
@@ -59,6 +61,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
     getPublic,
     narration: () => data.narration,
     clipboardMode: () => data.clipboardMode,
+    acting: () => data.acting,
 
     /** setKeys({elevenlabs?, gemini?}): a non-empty string saves, an empty string removes. */
     setKeys(keys) {
@@ -78,6 +81,7 @@ function createSettings({ file, safeStorage, env = process.env, testers = {} }) 
 
     setNarration(on) { data.narration = !!on; save(); return getPublic(); },
     setClipboardMode(on) { data.clipboardMode = !!on; save(); return getPublic(); },
+    setActing(on) { data.acting = !!on; save(); return getPublic(); },
 
     /** test({provider}) -> {ok, error?}: one tiny call with the saved key. */
     async test(arg) {

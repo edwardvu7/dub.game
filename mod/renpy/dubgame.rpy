@@ -5,7 +5,7 @@
 # it never changes the game's own files, and the game runs normally when the app is closed.
 #
 # Contract (see CLAUDE.md):
-#   POST /line        {speaker, text, engine: "renpy", game, seq}
+#   POST /line        {speaker, text, engine: "renpy", game, seq, upcoming: [{speaker, text}]}
 #   POST /stop        {engine: "renpy", game, seq}      (player clicked past the line)
 #   POST /characters  {engine: "renpy", game, characters: [{speaker, samples}]}   (once, at launch)
 #   game is "renpy:<game folder name>", so each game keeps its own voices in the app.
@@ -19,7 +19,7 @@
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
-# DUBGAME_HOOK_VERSION 6
+# DUBGAME_HOOK_VERSION 7
 
 init -999 python:
     import json as _dubgame_json
@@ -129,7 +129,9 @@ init -999 python:
         return _dubgame_clean(name) or None
 
     def _dubgame_speaker():
-        who = getattr(store, "_last_say_who", None)
+        return _dubgame_name_of(getattr(store, "_last_say_who", None))
+
+    def _dubgame_name_of(who):
         if who is None:
             return u"Narrator"
         char = None
@@ -159,6 +161,32 @@ init -999 python:
         except Exception:
             pass
 
+    _dubgame_STOPS = ("Menu", "Jump", "Call", "Return", "If", "While")
+
+    def _dubgame_upcoming():
+        """The next lines of the script, up to the next choice or jump, for the app to direct ahead."""
+        out = []
+        try:
+            game_mod = _dubgame_sys.modules.get("renpy.game")
+            ast = _dubgame_sys.modules.get("renpy.ast")
+            stops = tuple(t for t in (getattr(ast, n, None) for n in _dubgame_STOPS) if t)
+            # UNVERIFIED: context().current is the say statement being shown, per Ren'Py's source.
+            node = game_mod.script.lookup(game_mod.context().current)
+            node = getattr(node, "next", None)
+            steps = 0
+            while node is not None and len(out) < 20 and steps < 300:
+                steps += 1
+                if stops and isinstance(node, stops):
+                    break  # the story branches here: what follows is not known yet
+                if isinstance(node, ast.Say):
+                    text = _dubgame_clean(getattr(node, "what", u""))[:300]
+                    if text:
+                        out.append({"speaker": _dubgame_name_of(getattr(node, "who", None)), "text": text})
+                node = getattr(node, "next", None)
+        except Exception:
+            pass
+        return out
+
     def _dubgame_callback(event, interact=True, **kwargs):
         try:
             if not interact:
@@ -178,6 +206,7 @@ init -999 python:
                     "engine": "renpy",
                     "game": _dubgame_game,
                     "seq": _dubgame_state["seq"],
+                    "upcoming": _dubgame_upcoming(),
                 })
             elif event == "end":
                 # The player moved on. The app ignores this if a newer line already arrived.

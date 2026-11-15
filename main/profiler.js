@@ -183,4 +183,4 @@ async function testKey(key, deps = {}) {
 }
 
 module.exports = { profileCharacter, profileCharacters, buildRequest, sanitizeProfile, fallbackProfile,
-  profileSchema, testKey, MODEL, ENDPOINT, GENDERS, AGES };
+  profileSchema, testKey, callGemini, MODEL, ENDPOINT, GENDERS, AGES };

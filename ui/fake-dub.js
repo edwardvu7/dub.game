@@ -47,7 +47,7 @@
   const voicesOf = (a) => store.games[(a && a.game) || store.current].voices;
   const usage = { session: { chars: 1840, gemini: 2, lines: 31, cached: 6 }, month: '2026-11', monthChars: 12650,
     monthGemini: 9, totalChars: 40210, limit: 0, byGame: {}, overLimit: false };
-  let settings = { hasElevenLabsKey: false, hasGeminiKey: false, narration: true, clipboardMode: false };
+  let settings = { hasElevenLabsKey: false, hasGeminiKey: false, narration: true, clipboardMode: false, acting: true };
   const game = (a) => {
     const g = games.find((x) => x.appid === String(a.appid));
     if (!g) throw new Error('Unknown game: ' + a.appid);
@@ -107,6 +107,7 @@
     },
     'settings:setNarration': (a) => { settings.narration = a === true; return copy(settings); },
     'settings:setClipboardMode': (a) => { settings.clipboardMode = a === true; return copy(settings); },
+    'settings:setActing': (a) => { settings.acting = a === true; return copy(settings); },
   };
 
   window.dub = {

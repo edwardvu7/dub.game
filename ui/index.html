@@ -93,7 +93,7 @@
           <h2>Gemini</h2>
           <span class="tag" data-role="state"></span>
         </div>
-        <p class="keyrow-what">Picks a voice for each new character, once. Keys come from Google AI Studio.</p>
+        <p class="keyrow-what">Picks a voice for each character and directs how lines are said. Keys come from Google AI Studio.</p>
         <div class="keyrow-controls">
           <input class="input" type="password" name="key" aria-label="Gemini API key" spellcheck="false" autocomplete="off">
           <button class="btn btn-primary" type="submit">Save</button>
@@ -128,6 +128,11 @@
           <input type="checkbox" id="opt-narration">
           <span class="switch-track" aria-hidden="true"></span>
           <span class="switch-text"><b>Read narration aloud</b><small>Lines with no speaker use a narrator voice. Turn this off to save ElevenLabs credits.</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="opt-acting">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span class="switch-text"><b>Act out scenes</b><small>Gemini reads a few lines ahead and tunes each one to the moment: excited, scared, whispered. Ren'Py games only. Uses about one Gemini request per 15 lines.</small></span>
         </label>
         <label class="switch">
           <input type="checkbox" id="opt-clipboard">

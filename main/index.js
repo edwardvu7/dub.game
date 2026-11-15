@@ -12,6 +12,7 @@ const { createSettings } = require('./settings');
 const { createUsage } = require('./usage');
 const { createOverlayPosition, constrainToGame } = require('./overlay-position');
 const { createPipeline } = require('./pipeline');
+const { createMoods } = require('./moods');
 const { createClipboardWatcher } = require('./clipboard');
 const { createHandlers, registerIpc } = require('./ipc');
 const { createGames } = require('./steam');
@@ -262,7 +263,8 @@ async function start() {
       (!engine || g.engine === engine || String(g.engine).startsWith(engine)));
     return hit ? hit.name : null;
   };
-  const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName });
+  const moods = createMoods({ settings, usage, emitStatus: (message) => emit('app:status', { level: 'warn', message }) });
+  const pipeline = createPipeline({ voices, settings, catalog, cache, emit, log, usage, gameName, moods });
 
   gameTracker = createGameWindowTracker({
     onFrame: (frame) => {

@@ -3,6 +3,7 @@
 // Everything it touches is passed in, so it runs under `node --test` without Electron or a network.
 const ttsModule = require('./tts');
 const profiler = require('./profiler');
+const { applyMood } = require('./moods');
 
 const NARRATOR = 'Narrator';
 const UNKNOWN = 'unknown';
@@ -23,6 +24,8 @@ function createPipeline(deps) {
   const settleMs = deps.settleMs === undefined ? SETTLE_MS : deps.settleMs;
   const speaking = new Map(); // cache key -> Promise<audio>: the same line is never bought twice at once
   const gameName = deps.gameName || (() => null);
+  const moods = deps.moods || null; // Gemini's per-line direction, prepared ahead (main/moods.js)
+  const scenes = new Map(); // game -> last few lines, any speaker: context for ElevenLabs and Gemini
   const speak = deps.speak || ttsModule.speak;
   const profileOne = deps.profileCharacter || profiler.profileCharacter;
   const profileMany = deps.profileCharacters || profiler.profileCharacters;
@@ -114,7 +117,9 @@ function createPipeline(deps) {
     speed: profile.speed, model: ttsModule.MODEL,
   });
 
-  async function synthesize(profile, text, game) {
+  // context: {previous_text, next_text}. It shapes delivery but not the cache key: the same line in
+  // the same voice replays from disk.
+  async function synthesize(profile, text, game, context = {}) {
     const params = ttsParams(profile, text);
     const cached = cache.get(params);
     if (cached) { if (usage) usage.recordCached(); return cached; }
@@ -125,7 +130,7 @@ function createPipeline(deps) {
     if (usage && usage.wouldExceed(text.length)) {
       throw new Error('Monthly character limit reached: new lines are not spoken. Raise it in Settings.');
     }
-    const work = speak(params, key).then((audio) => {
+    const work = speak({ ...params, ...context }, key).then((audio) => {
       cache.put(params, audio);
       if (usage) usage.recordSpeech(text.length, game);
       return audio;
@@ -151,21 +156,32 @@ function createPipeline(deps) {
       if (line.seq !== undefined) { lastLineSeq = line.seq; lastLineAt = now(); }
       const voices = activate(game);
       emit('line:received', { speaker, text, engine: line.engine || 'renpy', game });
+      const scene = scenes.get(game) || [];
+      const previous = scene.length ? scene[scene.length - 1].text : '';
+      scene.push({ speaker, text });
+      while (scene.length > 6) scene.shift();
+      scenes.set(game, scene);
+      // Direct the coming lines now, in the background, so they are ready when reached.
+      if (moods && line.upcoming && line.upcoming.length) {
+        moods.prepare(game, line.upcoming, scene.slice()).catch(() => {});
+      }
       if (speaker === NARRATOR && !settings.narration()) {
         emit('audio:stop'); // the previous character must not keep talking over silent narration
         return;
       }
       remember(game, speaker, text);
       try {
-        const profile = await ensureProfile(voices, speaker, samplesOf(game, speaker));
-        if (profile && profile.muted) { emit('audio:stop'); return; } // muted in the overlay: free
+        const base = await ensureProfile(voices, speaker, samplesOf(game, speaker));
+        if (base && base.muted) { emit('audio:stop'); return; } // muted in the overlay: free
+        const profile = moods ? applyMood(base, moods.get(game, speaker, text)) : base;
         // Lines already on disk play at once. A new line waits a moment: if the player has
         // clicked past it by then, it is never sent to ElevenLabs.
         if (settleMs && !cache.get(ttsParams(profile, text))) {
           await new Promise((r) => setTimeout(r, settleMs));
           if (mine !== generation) return;
         }
-        const audio = await synthesize(profile, text, game);
+        const next = line.upcoming && line.upcoming[0] ? line.upcoming[0].text : '';
+        const audio = await synthesize(profile, text, game, { previous_text: previous, next_text: next });
         if (mine === generation) play(speaker, text, audio); // newest line wins
       } catch (e) {
         status('error', e.message);

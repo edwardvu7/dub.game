@@ -1,7 +1,7 @@
 {
   "name": "dub-game",
   "productName": "dub.game",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "AI voice-over for visual novels: Gemini casts a voice per character, ElevenLabs speaks every line.",
   "main": "main/index.js",
   "author": "dub.game team",

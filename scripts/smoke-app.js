@@ -39,14 +39,21 @@ process.env.GEMINI_API_KEY = 'test-gemini';
 
 // ---- fake network: ElevenLabs returns bytes, Gemini returns a profile ----
 const calls = [];
+const bodies = []; // [url, parsed body] of POSTs
 globalThis.fetch = async (url, init = {}) => {
   calls.push(String(url));
+  if (init.body) try { bodies.push([String(url), JSON.parse(init.body)]); } catch { /* not JSON */ }
   const ok = (body, type) => new Response(body, { status: 200, headers: { 'content-type': type } });
   if (url.includes('api.elevenlabs.io/v1/text-to-speech')) return ok(Buffer.from('ID3fakeaudio'), 'audio/mpeg');
   if (url.includes('api.elevenlabs.io/v1/user')) return ok('{}', 'application/json');
   if (url.includes('generativelanguage') && init.method === 'POST') {
     const req = JSON.parse(init.body);
     const prompt = req.contents[0].parts[0].text;
+    if (/directing voice actors/.test(prompt)) { // acting: direct every numbered line as scared
+      const n = (prompt.match(/^\d+\. /gm) || []).length;
+      const lines = Array.from({ length: n }, (_, i) => ({ i, emotion: 'scared', intensity: 1 }));
+      return ok(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines }) }] } }] }), 'application/json');
+    }
     const cat = require(path.join(REPO, 'voices_catalog.json'));
     const names = ['Sylvie', 'Marcus'].filter((n) => prompt.includes(n));
     const one = (n) => ({ speaker: n, gender: 'female', age_range: 'young_adult', personality: n + ' is kind.',
@@ -256,6 +263,19 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   check(calls.filter((c) => c.includes('text-to-speech')).length === ttsBefore, 'a repeated line plays from the cache');
   usage = await invoke('usage:get');
   check(usage.session.cached === 1 && usage.session.chars === 'Hey, you made it!'.length, 'a cached line costs nothing');
+
+  // 7a. Acting: the hook sends the next lines; Gemini directs them ahead; the line is then acted
+  const geminiBefore = bodies.filter(([u]) => u.includes('generativelanguage')).length;
+  await post('/line', { speaker: 'Sylvie', text: 'Did you hear that?', engine: 'renpy', game: GAME,
+    upcoming: [{ speaker: 'Marcus', text: 'Get behind me.' }] });
+  await wait(400);
+  check(bodies.filter(([u]) => u.includes('generativelanguage')).length === geminiBefore + 1, 'one Gemini call directs the coming lines ahead of time');
+  const asked = bodies.filter(([u]) => u.includes('text-to-speech')).pop()[1];
+  check(asked.previous_text === 'Hey, you made it!' && asked.next_text === 'Get behind me.', 'ElevenLabs gets the lines around this one');
+  await post('/line', { speaker: 'Marcus', text: 'Get behind me.', engine: 'renpy', game: GAME, upcoming: [] });
+  await wait(400);
+  const acted = bodies.filter(([u]) => u.includes('text-to-speech')).pop()[1];
+  check(acted.text === 'Get behind me.' && acted.voice_settings.stability < 0.4, 'the directed line is acted (scared: less stable)');
 
   // 7b. A second game with a character of the same name gets its own voice
   await post('/line', { speaker: 'Sylvie', text: 'Different game, same name.', engine: 'renpy', game: 'renpy:Other Game' }); await wait(400);

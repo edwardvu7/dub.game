@@ -20,20 +20,25 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 class ADVCharacter:
     def __init__(self, name, dynamic=False): self.name = name; self.dynamic = dynamic
 class Say:
-    def __init__(self, who, what): self.who = who; self.what = what
+    def __init__(self, who, what): self.who = who; self.what = what; self.next = None
+class Menu:
+    next = None
 store = types.SimpleNamespace()
 store.player_name = "Ana"
 store.s = ADVCharacter("Sylvie")
 store.m = ADVCharacter("Marcus")
 store.p = ADVCharacter("player_name", dynamic=True)
 store.extra = ADVCharacter("Never Speaks")
-ast = types.ModuleType("renpy.ast"); ast.Say = Say
+ast = types.ModuleType("renpy.ast"); ast.Say = Say; ast.Menu = Menu
 def eval_who(who):
     return getattr(store, who) if isinstance(who, str) and hasattr(store, who) else who
 ast.eval_who = eval_who
 character_mod = types.ModuleType("renpy.character"); character_mod.ADVCharacter = ADVCharacter
 game_mod = types.ModuleType("renpy.game")
-game_mod.script = types.SimpleNamespace(namemap={1: Say("s", "Hi {b}there{/b}, [player_name]!"), 2: Say("m", "Hm."), 3: Say("p", "Hello.")})
+namemap = {1: Say("s", "Hi {b}there{/b}, [player_name]!"), 2: Say("m", "Hm."), 3: Say("p", "Hello."), 4: Menu(), 5: Say(None, "After the choice.")}
+for a, b in [(1, 2), (2, 3), (3, 4), (4, 5)]: namemap[a].next = namemap[b]
+game_mod.script = types.SimpleNamespace(namemap=namemap, lookup=lambda name: namemap[name])
+game_mod.context = lambda: types.SimpleNamespace(current=1)  # the player is on line 1 of the script
 for name, mod in [("renpy.ast", ast), ("renpy.character", character_mod), ("renpy.game", game_mod)]:
     sys.modules[name] = mod
 def substitute(t): return re.sub(r"\[(\w+)\]", lambda m: str(getattr(store, m.group(1), m.group(0))), t)
@@ -95,10 +100,12 @@ burst = [b for p, b in got if p == "/line"]
 seqs = [b["seq"] for b in burst]
 check(burst and burst[-1]["text"] == "burst 49", "a burst of 50 clicks always ends on the newest line (%d of 50 sent)" % len(burst))
 check(seqs == sorted(seqs), "lines reach the app in order")
-check(lines[0] == {"speaker": "Sylvie", "text": "Welcome back, Ana. I missed you{really}}.", "engine": "renpy", "game": "renpy:The Question", "seq": 1}, "line 1: " + json.dumps(lines[0]))
+check({k: v for k, v in lines[0].items() if k != "upcoming"} == {"speaker": "Sylvie", "text": "Welcome back, Ana. I missed you{really}}.", "engine": "renpy", "game": "renpy:The Question", "seq": 1}, "line 1: " + json.dumps(lines[0]))
 check(chars and chars[0].get("game") == "renpy:The Question", "the cast is tagged with the game too")
 check(stops and all(b.get("game") == "renpy:The Question" for b in stops), "so is /stop")
 check(lines[1]["speaker"] == "Narrator", "narration is sent as Narrator")
+check(lines[0].get("upcoming") == [{"speaker": "Marcus", "text": "Hm."}, {"speaker": "Ana", "text": "Hello."}],
+      "the next lines are sent ahead, up to the next choice: " + json.dumps(lines[0].get("upcoming")))
 check(len(lines) == 4, "all 4 lines at reading pace arrive: %d" % len(lines))
 check(lines[2]["speaker"] == "Ana", "dynamic player name resolved for a line")
 check(not any(b["text"] in ("skipped line", "no interaction") for b in lines), "skipped and non-interactive lines are not sent")

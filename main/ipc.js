@@ -7,7 +7,7 @@ const INVOKE_CHANNELS = [
   'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:preview', 'voices:clearGame',
   'usage:get', 'usage:setLimit', 'usage:plan',
   'settings:get', 'settings:setKeys', 'settings:test', 'settings:setNarration',
-  'settings:setClipboardMode',
+  'settings:setClipboardMode', 'settings:setActing',
 ];
 const EVENT_CHANNELS = ['audio:play', 'audio:stop', 'line:received', 'voices:changed', 'games:changed',
   'usage:changed', 'overlay:toggle', 'app:status'];
@@ -49,6 +49,7 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'settings:setKeys': (arg) => settings.setKeys(arg || {}),
     'settings:test': (arg) => settings.test(arg),
     'settings:setNarration': (arg) => settings.setNarration(arg === true),
+    'settings:setActing': (arg) => settings.setActing(arg === true),
     'settings:setClipboardMode': (arg) => {
       const out = settings.setClipboardMode(arg === true);
       if (onClipboardMode) onClipboardMode(out.clipboardMode);

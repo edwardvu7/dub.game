@@ -39,6 +39,13 @@ function normalizeLine(body) {
   const game = normalizeGame(body);
   if (game) line.game = game;
   if (Number.isFinite(body.seq)) line.seq = body.seq;
+  // The next lines of the script (Ren'Py only), so Gemini can direct them before they are reached.
+  if (Array.isArray(body.upcoming)) {
+    line.upcoming = body.upcoming.slice(0, 20)
+      .filter((u) => u && typeof u.text === 'string' && u.text.trim())
+      .map((u) => ({ speaker: typeof u.speaker === 'string' && u.speaker.trim() ? u.speaker.trim().slice(0, 100) : 'Narrator',
+        text: u.text.trim().slice(0, 300) }));
+  }
   return line;
 }
 

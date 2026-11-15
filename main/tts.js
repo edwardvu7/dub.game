@@ -7,7 +7,7 @@ const MIME = 'audio/mpeg';
 
 const clamp = (n, lo, hi, dflt) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Number(n))) : dflt);
 
-function buildRequest({ text, voice_id, stability, style, speed }) {
+function buildRequest({ text, voice_id, stability, style, speed, previous_text, next_text }) {
   if (!voice_id || !/^[A-Za-z0-9]+$/.test(voice_id)) throw new Error('tts: bad voice_id');
   return {
     url: `${API}/v1/text-to-speech/${voice_id}?output_format=${OUTPUT_FORMAT}`,
@@ -21,6 +21,10 @@ function buildRequest({ text, voice_id, stability, style, speed }) {
         style: clamp(style, 0, 1, 0),
         speed: clamp(speed, 0.7, 1.2, 1),
       },
+      // The lines around this one, so delivery follows the conversation. They are not spoken.
+      // UNVERIFIED: accepted by flash v2.5 per ElevenLabs' API reference; not supported by eleven_v3.
+      ...(previous_text ? { previous_text: String(previous_text).slice(-500) } : {}),
+      ...(next_text ? { next_text: String(next_text).slice(0, 500) } : {}),
     },
   };
 }

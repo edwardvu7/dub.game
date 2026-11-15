@@ -88,3 +88,12 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 - Audio is 64 kbps. A new line waits 150 ms before ElevenLabs is called, so lines the player skips are
   not paid for; cached lines play at once. The same line requested twice at once is bought once.
 - First launch: Settings opens with a welcome title; when the second key tests OK the app moves to Games.
+
+## Acting (0.1.4)
+- Every line goes to ElevenLabs with the line before and after it (`previous_text`/`next_text`), so
+  delivery follows the conversation. UNVERIFIED against the live API.
+- Ren'Py hook v7 sends the next lines of the script with each line. Gemini marks each one with an
+  emotion and intensity ahead of time, in batches of up to 20; a line's mood shifts the character's
+  stability/style/speed for that line only. Settings > "Act out scenes" (on by default) turns it off.
+  The first line after a choice has no mood yet and uses the base voice. Godot games get only the
+  surrounding-lines context. UNVERIFIED: Ren'Py's context().current and script.lookup() on a real game.
