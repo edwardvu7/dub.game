@@ -1,7 +1,7 @@
 {
   "name": "dub-game",
   "productName": "dub.game",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "AI voice-over for visual novels: Gemini casts a voice per character, ElevenLabs speaks every line.",
   "main": "main/index.js",
   "author": "dub.game team",
@@ -20,7 +20,7 @@
     "smoke:hook": "python scripts/smoke-hook.py",
     "smoke:godot": "node scripts/smoke-godot.js",
     "smoke:godot-generic": "node scripts/smoke-godot-generic.js",
-    "smoke:godot-generic": "node scripts/smoke-godot-generic.js"
+    "smoke:godot-bubbles": "node scripts/smoke-godot-bubbles.js"
   },
   "devDependencies": {
     "electron": "^45.3.2",

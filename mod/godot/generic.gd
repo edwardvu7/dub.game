@@ -3,7 +3,7 @@
 extends Node
 
 const BASE_URL := "http://127.0.0.1:8000"
-const VERSION := 3
+const VERSION := 4
 const MAX_LABELS := 512
 var _labels: Array[WeakRef] = []
 var _config: Dictionary = {}
@@ -15,6 +15,9 @@ var _heartbeat := 0.0
 var _key := ""
 var _stable_since := 0
 var _sent := false
+var _text_now := ""
+var _growing := false   # the text itself grows letter by letter (a string typewriter)
+var _done_once := false # the current line was fully shown at least once
 var _seq := 0
 var _selected := ""
 
@@ -205,17 +208,26 @@ func _process(delta: float) -> void:
 		next_key = _selected + "\n" + speaker + "\n" + text
 		complete = best.visible_characters < 0 or best.visible_ratio >= 1.0
 	# A new reveal of the same full text is also a new utterance.
-	if best != null and _sent and not complete:
+	if best != null and _sent and _done_once and not complete:
 		_key = ""
+	if complete:
+		_done_once = true
 	if next_key != _key:
+		_growing = not _text_now.is_empty() and text.length() > _text_now.length() and text.begins_with(_text_now)
+		_text_now = text
 		_key = next_key
 		_stable_since = Time.get_ticks_msec()
+		_done_once = complete
 		_sent = false
 		_seq += 1
 		# Cancel unsent old lines during rapid skipping. Queue stays bounded offline.
 		_pending = _pending.filter(func(item: Dictionary) -> bool: return item.endpoint == "/godot/hook")
 		_enqueue("/stop", {"engine": "godot", "seq": _seq})
-	if not next_key.is_empty() and complete and not _sent and Time.get_ticks_msec() - _stable_since >= int(_config.get("settleMs", 650)):
+	# Speak while the text is still appearing. A typewriter that reveals hidden letters already holds
+	# the whole line, so a short pause is enough. Text that grows letter by letter is only final once
+	# it stops changing, so it waits the longer settleMs.
+	var settle := int(_config.get("settleMs", 650)) if _growing else 150
+	if not next_key.is_empty() and not _sent and Time.get_ticks_msec() - _stable_since >= settle:
 		_sent = true
 		_enqueue("/line", {"speaker": speaker, "text": text, "engine": "godot", "source": _selected, "seq": _seq})
 	if _heartbeat >= 1.0:

@@ -1,89 +1,148 @@
 'use strict';
-// Runs the generic Godot hook (mod/godot/generic.gd) inside a tiny story game that, like real
-// games, builds a fresh speech bubble per line with engine-numbered node names.
-// Needs Godot 4: GODOT_BIN=/path/to/godot npm run smoke:godot-generic
+// Real engine test, no voice APIs, screen capture, or explicit dialogue bridge calls.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFile } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 const { createServer } = require('../main/server');
 const hook = require('../main/steam/godot-hook');
-
-const GAME = `extends Node
-var lines := [["Mark", "Hey, did you finish the homework?"], ["Cathy", "Not yet. Let's do it together."], ["", "The bell rang."]]
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dub generic ü '));
+const source = path.join(dir, 'source');
+const packed = path.join(dir, 'packed');
+fs.mkdirSync(source); fs.mkdirSync(packed);
+const events = [], reports = [], stops = [];
+let activeGame;
+const server = createServer({
+  onLine: x => events.push(x),
+  onStop: x => stops.push(x),
+  onGodotHook: x => {
+    reports.push(x);
+    if (x.labels.some(l => l.text === 'Unusual node text.'))
+      hook.configure(activeGame, { textPath: '/root/Test/Unusual', speakerPath: '' });
+  },
+});
+const script = `extends Node
+func wait(seconds: float) -> void:
+    await get_tree().create_timer(seconds).timeout
 func _ready() -> void:
-	var layer := CanvasLayer.new(); layer.name = "UI"; add_child(layer)
-	var hud := Label.new(); hud.name = "Clock"; hud.text = "7:45 AM"; layer.add_child(hud)
-	for l in lines:
-		var bubble := PanelContainer.new(); bubble.name = "%s"
-		var who := Label.new(); who.name = "%s"; who.text = l[0]
-		var text := RichTextLabel.new(); text.name = "Text"; text.bbcode_enabled = true
-		text.text = "[b]" + l[1] + "[/b]"; text.visible_characters = 0
-		var box := VBoxContainer.new(); box.add_child(who); box.add_child(text); bubble.add_child(box)
-		layer.add_child(bubble)
-		for i in range(l[1].length() + 1):
-			text.visible_characters = i
-			await get_tree().create_timer(0.02).timeout
-		await get_tree().create_timer(1.2).timeout
-		bubble.queue_free()
-		await get_tree().create_timer(0.3).timeout
-	get_tree().quit()
+    if get_node_or_null("/root/Original") == null:
+        push_error("Original autoload lost")
+        get_tree().quit(2)
+        return
+    var menu := Button.new()
+    menu.name = "Menu"
+    add_child(menu)
+    var menu_label := Label.new()
+    menu_label.text = "Do not speak this menu"
+    menu.add_child(menu_label)
+    var narration := Label.new()
+    narration.name = "CutsceneNarration"
+    narration.text = "The night was quiet."
+    add_child(narration)
+    await wait(1.7)
+    narration.hide()
+    await wait(0.3)
+    narration.show()
+    await wait(1.0)
+    narration.queue_free()
+    await wait(0.3)
+    var dialog := Control.new()
+    dialog.name = "Dialogue"
+    add_child(dialog)
+    var speaker := Label.new()
+    speaker.name = "Speaker"
+    speaker.text = "Mira"
+    dialog.add_child(speaker)
+    var line := RichTextLabel.new()
+    line.name = "Body"
+    line.bbcode_enabled = true
+    line.text = "[b]Hello again.[/b]"
+    line.visible_characters = 0
+    dialog.add_child(line)
+    for i in range(1, 13):
+        line.visible_characters = i
+        await wait(0.12)
+    line.visible_characters = -1
+    await wait(1.0)
+    line.text = ""
+    for ch in "Dynamic text.":
+        line.text += ch
+        await wait(0.1)
+    await wait(1.0)
+    dialog.queue_free()
+    await wait(0.3)
+    var unusual := Label.new()
+    unusual.name = "Unusual"
+    unusual.text = "Unusual node text."
+    add_child(unusual)
+    await wait(3.0)
+    unusual.queue_free()
+    await wait(0.3)
+    get_tree().quit()
 `;
-
-// Bubbles float over characters in the world and have no name label. The previous bubble is still
-// fading out when the next one appears, so two are on screen at once.
-const WORLD = `extends Node
-var lines := [["Mark", "Hey, did you finish the homework?"], ["Cathy", "Not yet. Let's do it together."], ["Mark", "Deal."]]
-func _ready() -> void:
-	var world := Node2D.new(); world.name = "World"; add_child(world)
-	for who in ["Mark", "Cathy"]:
-		var c := Node2D.new(); c.name = who; world.add_child(c)
-	var old: Node = null
-	for l in lines:
-		var bubble := Node2D.new(); bubble.name = "SpeechBubble"
-		var panel := PanelContainer.new(); bubble.add_child(panel)
-		var text := RichTextLabel.new(); text.name = "Text"; text.text = l[1]; text.visible_characters = 0
-		text.custom_minimum_size = Vector2(200, 40); panel.add_child(text)
-		world.get_node(l[0]).add_child(bubble)
-		for i in range(l[1].length() + 1):
-			text.visible_characters = i
-			await get_tree().create_timer(0.02).timeout
-		if old != null: old.queue_free()
-		old = bubble
-		await get_tree().create_timer(1.2).timeout
-	get_tree().quit()
-`;
-
-async function play({ bubble, name, pick, source }) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dub-godot-generic-'));
-  fs.writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n[application]\nrun/main_scene="res://main.tscn"\n');
-  fs.writeFileSync(path.join(dir, 'main.gd'), source || GAME.replace('%s', bubble).replace('%s', name));
-  fs.writeFileSync(path.join(dir, 'main.tscn'),
-    '[gd_scene load_steps=2 format=3]\n[ext_resource type="Script" path="res://main.gd" id="1"]\n[node name="Main" type="Node"]\nscript = ExtResource("1")\n');
-  const game = { appid: 'local:test', installDir: dir, engine: 'godot' };
-  hook.install(game, { modDir: path.join(__dirname, '..', 'mod') });
-  if (pick) hook.configure(game, pick);
-  const lines = [];
-  const server = createServer({ onLine: (l) => lines.push([l.speaker, l.text]) });
-  await server.listen(); // fails if dub.game is running: never talk to a live session
-  try {
-    const out = await new Promise((resolve) => execFile(process.env.GODOT_BIN || 'godot', ['--headless', '--path', dir],
-      { timeout: 40000 }, (_e, stdout, stderr) => resolve(stdout + stderr)));
-    assert.ok(!/SCRIPT ERROR|Parse Error/.test(out), out);
-  } finally { await server.close(); }
-  return lines;
+const project = 'config_version=5\n[application]\nrun/main_scene="res://main.tscn"\n';
+const originalOverride = '[autoload]\nOriginal="*res://original.gd"\n[application]\nconfig/name="Preserved"\n';
+function run(args, timeout = 25000, executable = process.env.GODOT_BIN || 'godot') {
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, ['--headless', ...args]);
+    let output = '';
+    child.stdout.on('data', x => output += x); child.stderr.on('data', x => output += x);
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Engine timed out\n' + output)); }, timeout);
+    child.once('error', e => { clearTimeout(timer); reject(e); });
+    child.once('exit', code => { clearTimeout(timer);
+      if (code || /SCRIPT ERROR|Parse Error|ERROR:/.test(output)) reject(new Error(output)); else resolve(output);
+    });
+  });
 }
-
 (async () => {
-  const want = [['Mark', 'Hey, did you finish the homework?'], ['Cathy', "Not yet. Let's do it together."], ['Narrator', 'The bell rang.']];
-  assert.deepEqual(await play({ bubble: 'Bubble', name: 'NameTag' }), want, 'automatic: speech bubbles are found');
-  // Names the hook cannot guess: the player picks the first bubble's nodes once, and every later
-  // bubble (numbered differently by the engine) must still be voiced.
-  assert.deepEqual(await play({ bubble: 'Thing', name: 'Who', pick: {
-    textPath: '/root/Main/UI/Thing/@VBoxContainer@5/Text', speakerPath: '/root/Main/UI/Thing/@VBoxContainer@5/Who' } }), want,
-  'picked once: later copies of the node are voiced too');
-  assert.deepEqual(await play({ source: WORLD }), [['Mark', 'Hey, did you finish the homework?'],
-    ['Cathy', "Not yet. Let's do it together."], ['Mark', 'Deal.']], 'bubbles over characters: the character is the speaker');
-  console.log('PASS: generic Godot hook: automatic, picked-once, and speakers from the character a bubble floats over.');
-})().catch((e) => { console.error(e); process.exitCode = 1; });
+  fs.writeFileSync(path.join(source, 'project.godot'), project);
+  fs.writeFileSync(path.join(source, 'fixture.gd'), script);
+  fs.writeFileSync(path.join(source, 'original.gd'), 'extends Node\n');
+  fs.writeFileSync(path.join(source, 'main.tscn'), '[gd_scene load_steps=2 format=3]\n[ext_resource type="Script" path="res://fixture.gd" id="1"]\n[node name="Test" type="Node"]\nscript = ExtResource("1")\n');
+  // PCKPacker proves external autoload loading with res:// in a pack, not loose source.
+  fs.writeFileSync(path.join(source, 'pack.gd'), `extends SceneTree
+func _initialize() -> void:
+    var pack := PCKPacker.new()
+    pack.pck_start(${JSON.stringify(path.join(packed, 'Story.pck').replaceAll('\\', '/'))})
+    for file in ["project.godot", "main.tscn", "fixture.gd", "original.gd"]:
+        pack.add_file("res://" + file, "res://" + file)
+    pack.flush()
+    quit()
+`);
+  await run(['--path', source, '--script', 'res://pack.gd']);
+  const engine = process.env.GODOT_BIN || execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', ['godot'], { encoding: 'utf8' }).trim().split(/\r?\n/)[0];
+  const packedBinary = path.join(packed, process.platform === 'win32' ? 'Story.exe' : 'Story.x86_64');
+  fs.copyFileSync(engine, packedBinary);
+  fs.chmodSync(packedBinary, 0o755);
+  const packBefore = fs.readFileSync(path.join(packed, 'Story.pck'));
+  await server.listen();
+  try {
+    for (const folder of [source, packed]) {
+      events.length = 0; reports.length = 0; stops.length = 0;
+      activeGame = { appid: 'test', engine: 'godot', installDir: folder };
+      fs.writeFileSync(path.join(folder, 'override.cfg'), originalOverride);
+      hook.install(activeGame);
+      const args = folder === source ? ['--path', folder] : [];
+      await run(args, 25000, folder === source ? (process.env.GODOT_BIN || 'godot') : packedBinary);
+      assert.deepEqual(events.map(x => [x.speaker, x.text]), [
+        ['Narrator', 'The night was quiet.'], ['Narrator', 'The night was quiet.'],
+        ['Mira', 'Hello again.'], ['Mira', 'Dynamic text.'], ['Narrator', 'Unusual node text.'],
+      ]);
+      assert.ok(stops.length >= events.length, 'changed/hidden text cancels prior audio');
+      assert.ok(stops.at(-1).seq > events.at(-1).seq, 'hiding final dialogue sends a newer stop');
+      assert.ok(events.every(x => x.game === 'godot:' + path.basename(folder)));
+      assert.ok(reports.length > 3 && reports.every(x => x.token === hook.config(activeGame).token));
+      assert.ok(reports.some(x => x.labels.some(l => l.text === 'Do not speak this menu')));
+      hook.uninstall(activeGame);
+      assert.equal(fs.readFileSync(path.join(folder, 'override.cfg'), 'utf8'), originalOverride);
+      console.log('PASS: ' + path.basename(folder) + ' narration, repeat, typewriter, BBCode, speaker, menu exclusion, live calibration, heartbeat, safe restore');
+    }
+    assert.ok(packBefore.equals(fs.readFileSync(path.join(packed, 'Story.pck'))));
+  } finally { await server.close(); }
+  activeGame = { appid: 'test', engine: 'godot', installDir: source };
+  hook.install(activeGame);
+  await run(['--path', source]); // Offline: process still exits normally, without script errors.
+  console.log('PASS: offline game stays responsive; original resource pack unchanged.');
+})().catch(e => { console.error(e); process.exitCode = 1; })
+  .finally(() => fs.rmSync(dir, { recursive: true, force: true }));

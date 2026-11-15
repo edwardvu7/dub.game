@@ -185,7 +185,7 @@ function createOverlayWindow() {
   });
   // The overlay's Hide button calls window.close(): hide instead, so it reopens instantly.
   overlayWindow.on('close', (event) => {
-    if (!quitting) { event.preventDefault(); overlayWanted = false; overlayWindow.hide(); }
+    if (!quitting) { event.preventDefault(); hideOverlay(); }
   });
   // If the overlay page ever crashes, reload it so Shift+F2 keeps working.
   overlayWindow.webContents.on('render-process-gone', () => {
@@ -205,10 +205,19 @@ function warnIfExclusiveFullscreen() {
   });
 }
 
+// Hiding a focused window does not give focus back to the game on Windows, so the game stopped
+// counting as focused and the next Shift+F2 was refused. blur() hands focus to the window behind.
+function hideOverlay() {
+  overlayWanted = false;
+  if (overlayWindow.isFocused && overlayWindow.isFocused()) overlayWindow.blur();
+  overlayWindow.hide();
+}
+
 function toggleOverlay() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (overlayWanted) { overlayWanted = false; overlayWindow.hide(); return; }
-  if (!gameArea() || !gameFrame.focused) {
+  if (overlayWanted) { hideOverlay(); return; }
+  // Shift+F2 is a global hotkey: a running, visible game is enough, whichever window has focus.
+  if (!gameArea()) {
     emit('app:status', { level: 'warn', message: 'Launch a game from dub.game, focus its window, then press Shift+F2. Game-window tracking requires Windows.' });
     return;
   }

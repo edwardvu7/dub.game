@@ -52,8 +52,9 @@ contexts, and chooses one candidate. Automatic speaker detection uses, in order:
 player picked, a name label (Name, Speaker, NameTag, Who) inside the same text box, then the nearest
 world node (Node2D/Node3D) above the text whose name is not a layout word, which is the character a
 speech bubble floats over. Otherwise it uses Narrator. Rich text is
-converted to plain text. A line must stay unchanged for 650 ms, and standard
-visible-character typewriters must finish. Hidden/changed text stops prior audio.
+converted to plain text. A typewriter that reveals hidden letters already holds the whole line, so it is sent after
+150 ms, while the text is still appearing. Text that grows letter by letter is sent once it has
+stopped changing for 650 ms. Hidden/changed text stops prior audio.
 An identical line can play again after hiding/clearing or a new typewriter reveal.
 
 HTTP requests go only to 127.0.0.1:8000, asynchronously, with a one-second timeout.

@@ -81,7 +81,7 @@ class FakeWindow extends EventEmitter {
   show() { this.visible = true; } showInactive() { this.visible = true; } isFocused() { return this.focused; } hide() { this.visible = false; this.focused = false; } isVisible() { return this.visible; }
   isDestroyed() { return false; } isMinimized() { return false; } restore() {}
   setAlwaysOnTop() {} setIgnoreMouseEvents() {} setVisibleOnAllWorkspaces() {}
-  setBounds(b) { this.bounds = b; } getBounds() { return this.bounds; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() { this.focused = true; }
+  blur() { this.focused = false; this.blurred = (this.blurred || 0) + 1; } setBounds(b) { this.bounds = b; } getBounds() { return this.bounds; } reload() { this.reloaded = (this.reloaded || 0) + 1; } focus() { this.focused = true; }
 }
 const displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }, { workArea: { x: 1920, y: 0, width: 2560, height: 1400 } }];
 let cursor = { x: 100, y: 100 };
@@ -188,6 +188,20 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   shortcuts['Shift+F2']();
   trackerCallbacks.onFrame(frame);
   check(!overlay.visible, 'explicit toggle off stays off');
+  // Open and close several times. Windows may not hand focus back to the game after a hide.
+  let opened = 0;
+  for (let i = 0; i < 4; i++) {
+    trackerCallbacks.onFrame({ ...frame, focused: false });
+    shortcuts['Shift+F2']();
+    if (overlay.visible) opened++;
+    shortcuts['Shift+F2']();
+  }
+  check(opened === 4, 'overlay opens every time, even when the game did not get focus back (' + opened + '/4)');
+  check(overlay.blurred > 0, 'hiding the overlay hands focus back (blur)');
+  overlay.focused = true; overlay.emit('close', { preventDefault() {} });
+  shortcuts['Shift+F2']();
+  check(overlay.visible, 'after Esc (close), Shift+F2 opens it again');
+  shortcuts['Shift+F2']();
   trackerCallbacks.onFrame(null);
   check(!overlay.visible, 'game exit hides overlay');
   check(fs.existsSync(path.join(tmp, 'userData', 'overlay-position.json')), 'game-relative drag position is saved');
