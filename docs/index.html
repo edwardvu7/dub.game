@@ -12,7 +12,6 @@
   <link rel="stylesheet" href="https://use.typekit.net/ins2wgm.css" />
   <style>
     :root {
-      /* 9-Stop Swatch Palette — Light-First Architecture */
       --g-100: #c4dacb;
       --g-200: #a4c6b3;
       --g-300: #82b49b;
@@ -23,118 +22,54 @@
       --g-800: #143529;
       --g-900: #071a12;
 
-      /* Solid Architectural Surfaces */
       --card-surface: #d4e6da;
       --card-recessed: #b7d1c0;
       --border-hairline: rgba(7, 26, 18, 0.12);
       --border-strong: rgba(7, 26, 18, 0.26);
 
-      /* Primary Accent: #E0F8C7 */
       --accent: #e0f8c7;
-      --accent-border: rgba(224, 248, 199, 0.45);
-
-      /* Typography & Hierarchy */
       --ink: #071a12;
       --ink-secondary: #143529;
       --ink-muted: #224d3d;
       --ink-on-dark: #f2f9f4;
       --ink-on-dark-muted: #a4c6b3;
 
-      --font-display: "forma-djr-display", "Forma DJR Display", "Forma", "Geist Sans", -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: "forma-djr-display", "Forma DJR Display", "Forma", "Geist Sans", -apple-system, sans-serif;
+      --font-sans: "Geist Sans", -apple-system, sans-serif;
       --font-mono: "Geist Mono", monospace;
 
-      /* 8pt Spatial System */
       --space-2: 8px;
       --space-3: 12px;
       --space-4: 16px;
       --space-5: 20px;
       --space-6: 24px;
-      --space-7: 28px;
       --space-8: 32px;
       --space-10: 40px;
       --space-12: 48px;
       --space-16: 64px;
-      --space-18: 72px;
       --space-24: 96px;
 
-      /* Emil Kowalski Motion Curve */
       --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
-    html {
-      scroll-behavior: smooth;
-      background-color: var(--g-100);
-      color: var(--ink);
-    }
+    html { scroll-behavior: smooth; background-color: var(--g-100); color: var(--ink); }
 
     body {
       font-family: var(--font-sans);
-      background: linear-gradient(
-        180deg,
-        #d4e7da 0%,
-        var(--g-100) 32%,
-        var(--g-200) 70%,
-        var(--g-300) 100%
-      );
+      background: linear-gradient(180deg, #d4e7da 0%, var(--g-100) 35%, var(--g-200) 75%, var(--g-300) 100%);
       background-attachment: fixed;
       color: var(--ink);
       line-height: 1.5;
       min-height: 100vh;
-      overflow-x: hidden;
+      padding-bottom: var(--space-16);
     }
 
-    .container {
-      max-width: 1040px;
-      margin: 0 auto;
-      padding: 0 var(--space-8);
-    }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 var(--space-8); }
 
-    /* Smooth Scroll Reveal */
-    .reveal {
-      opacity: 0;
-      transform: translateY(18px);
-      transition:
-        opacity 640ms var(--ease-out),
-        transform 640ms var(--ease-out);
-      transition-delay: var(--delay, 0ms);
-      will-change: opacity, transform;
-    }
-
-    .reveal.is-visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .reveal {
-        opacity: 1;
-        transform: none;
-        transition: none;
-      }
-    }
-
-    /* Clean, Unboxed Minimalist Header */
-    header {
-      height: var(--space-24);
-      display: flex;
-      align-items: center;
-    }
-
-    .nav-bar {
-      width: 100%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    header { height: var(--space-24); display: flex; align-items: center; }
+    .nav-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 
     .brand {
       display: inline-flex;
@@ -148,199 +83,129 @@
       letter-spacing: -0.03em;
     }
 
-    .brand-logo {
-      width: 44px;
-      height: 44px;
-      border-radius: 11px;
-      flex: none;
-    }
+    .brand-logo { width: 44px; height: 44px; border-radius: 11px; }
 
-    .brand-accent {
-      background: var(--g-900);
-      color: var(--accent);
-      padding: 2px 9px 3px;
-      border-radius: 7px;
-      font-size: 1.35rem;
-      letter-spacing: -0.02em;
-      line-height: 1.1;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: var(--space-10);
-    }
-
+    .nav-links { display: flex; align-items: center; gap: var(--space-8); }
     .nav-link {
       color: var(--ink-secondary);
       text-decoration: none;
       font-size: 0.95rem;
       font-weight: 600;
-      letter-spacing: -0.01em;
       padding: 6px 12px;
       border-radius: 8px;
-      transition:
-        background-color 160ms var(--ease-out),
-        color 160ms var(--ease-out);
+      transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
     }
-
-    .nav-link:hover {
-      background: var(--g-900);
-      color: var(--accent);
-    }
+    .nav-link:hover { background: var(--g-900); color: var(--accent); }
 
     .github-icon-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 38px;
-      height: 38px;
-      border-radius: 9px;
-      color: var(--ink);
-      transition:
-        background-color 160ms var(--ease-out),
-        color 160ms var(--ease-out),
-        transform 160ms var(--ease-out);
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 9px; color: var(--ink);
+      transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--ease-out);
     }
+    .github-icon-link:hover { background: var(--g-900); color: var(--accent); transform: translateY(-1px); }
+    .github-icon-link svg { width: 21px; height: 21px; fill: currentColor; }
 
-    .github-icon-link:hover {
-      background: var(--g-900);
-      color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .github-icon-link svg {
-      width: 21px;
-      height: 21px;
-      fill: currentColor;
-    }
-
-    /* Hero Section */
+    /* Hero Stage */
     .hero {
-      padding: var(--space-18) 0 var(--space-24);
+      padding: var(--space-10) 0 var(--space-16);
       display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      gap: var(--space-16);
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: var(--space-12);
       align-items: center;
-    }
-
-    .hero-copy {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
     }
 
     h1 {
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: clamp(3.1rem, 5.6vw, 4.65rem);
+      font-size: clamp(3rem, 5.2vw, 4.4rem);
       line-height: 1.02;
       letter-spacing: -0.035em;
       margin-bottom: var(--space-6);
-      color: var(--ink);
     }
-
-    h1 span {
-      display: block;
-      color: var(--g-700);
-    }
+    h1 span { display: block; color: var(--g-700); }
 
     .lead {
-      font-size: 1.18rem;
-      line-height: 1.55;
+      font-size: 1.15rem;
       color: var(--ink-muted);
       font-weight: 500;
-      max-width: 380px;
-      margin-bottom: var(--space-10);
-      letter-spacing: -0.01em;
+      max-width: 390px;
+      margin-bottom: var(--space-8);
     }
 
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
-    }
+    .hero-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
     .btn-download {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-3);
-      background: var(--g-900);
-      color: var(--accent);
-      padding: 15px 26px;
-      border-radius: 12px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.96rem;
-      letter-spacing: -0.015em;
+      display: inline-flex; align-items: center; gap: var(--space-3);
+      background: var(--g-900); color: var(--accent);
+      padding: 15px 24px; border-radius: 12px;
+      text-decoration: none; font-weight: 600; font-size: 0.95rem;
       box-shadow: 0 12px 28px -8px rgba(7, 26, 18, 0.3);
-      transition:
-        transform 160ms var(--ease-out),
-        background-color 160ms var(--ease-out),
-        box-shadow 160ms var(--ease-out);
+      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
     }
+    .btn-download:hover { background: var(--g-800); transform: translateY(-2px); }
+    .btn-download svg { width: 18px; height: 18px; stroke: var(--accent); }
 
-    .btn-download:hover {
-      background: var(--g-800);
-      transform: translateY(-2px);
-      box-shadow: 0 16px 32px -8px rgba(7, 26, 18, 0.38);
-    }
-
-    .btn-download:active {
-      transform: scale(0.97);
-    }
-
-    .btn-download svg {
-      width: 18px;
-      height: 18px;
-      stroke: var(--accent);
-    }
-
-    /* Solid Architectural Overlay Card */
-    .panel {
-      background: var(--card-surface);
+    /* Interactive VN Stage */
+    .vn-stage {
+      background: var(--g-900);
+      color: var(--ink-on-dark);
+      border-radius: 18px;
       border: 1px solid var(--border-strong);
-      border-radius: 16px;
-      padding: var(--space-7);
-      box-shadow: 0 20px 44px -16px rgba(7, 26, 18, 0.16);
+      overflow: hidden;
+      box-shadow: 0 24px 56px -16px rgba(7, 26, 18, 0.32);
+      position: relative;
     }
 
-    .panel-bar {
+    .vn-topbar {
+      background: rgba(255, 255, 255, 0.04);
+      padding: 12px 18px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: var(--space-4);
-      margin-bottom: var(--space-5);
-      border-bottom: 1px solid var(--border-hairline);
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      color: var(--ink-muted);
-    }
-
-    kbd {
+      border-bottom: 1px solid rgba(224, 248, 199, 0.12);
       font-family: var(--font-mono);
       font-size: 0.74rem;
-      background: var(--g-900);
-      color: var(--accent);
-      border-radius: 6px;
-      padding: 4px 9px;
-      font-weight: 500;
-      letter-spacing: 0.02em;
     }
 
-    .tabs {
+    .vn-status { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(224, 248, 199, 0.7);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(224, 248, 199, 0.6); }
+      70% { box-shadow: 0 0 0 8px rgba(224, 248, 199, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(224, 248, 199, 0); }
+    }
+
+    .hud-toggle-btn {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: var(--g-800);
+      color: var(--accent);
+      border: 1px solid rgba(224, 248, 199, 0.3);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background-color 150ms var(--ease-out);
+    }
+    .hud-toggle-btn:hover { background: var(--g-700); }
+
+    .vn-scene-body { padding: var(--space-6); }
+
+    .char-selector {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: var(--space-5);
+      gap: 8px;
+      margin-bottom: var(--space-4);
     }
 
-    .tab {
-      background: var(--card-recessed);
-      border: 1px solid var(--border-hairline);
-      color: var(--ink-secondary);
+    .char-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(224, 248, 199, 0.12);
+      color: var(--ink-on-dark-muted);
       padding: 10px 12px;
       border-radius: 10px;
       font-family: var(--font-sans);
@@ -348,119 +213,158 @@
       font-weight: 600;
       text-align: left;
       cursor: pointer;
-      transition:
-        background-color 150ms var(--ease-out),
-        border-color 150ms var(--ease-out),
-        color 150ms var(--ease-out),
-        transform 150ms var(--ease-out);
+      transition: all 150ms var(--ease-out);
     }
-
-    .tab:hover {
-      border-color: var(--border-strong);
-    }
-
-    .tab small {
+    .char-chip small {
       display: block;
       font-family: var(--font-mono);
       font-size: 0.68rem;
-      font-weight: 400;
-      color: var(--ink-muted);
-      margin-top: 3px;
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+    .char-chip.active {
+      background: var(--accent);
+      color: var(--g-900);
+      border-color: var(--accent);
     }
 
-    .tab.active {
-      background: var(--g-900);
-      border-color: var(--g-900);
-      color: var(--ink-on-dark);
-    }
-
-    .tab.active small {
-      color: var(--accent);
-    }
-
-    .quote-box {
-      background: var(--g-900);
-      color: var(--ink-on-dark);
+    /* Waveform Visualizer */
+    .waveform-box {
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid rgba(224, 248, 199, 0.12);
       border-radius: 12px;
-      padding: 16px 18px;
-      margin-bottom: var(--space-5);
+      padding: 16px;
+      margin-bottom: var(--space-4);
     }
 
-    .quote-speaker {
+    .dialogue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .speaker-badge {
       font-family: var(--font-mono);
-      font-size: 0.7rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--accent);
       font-weight: 600;
-      margin-bottom: 6px;
     }
 
-    .quote-line {
-      font-size: 0.98rem;
+    .mood-tag {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--ink-on-dark-muted);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .dialogue-text {
+      font-size: 1.02rem;
+      min-height: 3rem;
       line-height: 1.45;
-      font-weight: 500;
       color: var(--ink-on-dark);
+      margin-bottom: 14px;
     }
 
-    .sliders {
-      display: grid;
-      gap: var(--space-3);
+    .wave-bars {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 28px;
+    }
+    .wave-bar {
+      flex: 1;
+      background: var(--accent);
+      border-radius: 99px;
+      height: 30%;
+      transition: height 180ms var(--ease-out), opacity 180ms var(--ease-out);
+      opacity: 0.75;
+    }
+
+    .vn-controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .btn-next-line {
+      background: var(--g-800);
+      color: var(--accent);
+      border: 1px solid rgba(224, 248, 199, 0.25);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background-color 150ms var(--ease-out), transform 120ms var(--ease-out);
+    }
+    .btn-next-line:hover { background: var(--g-700); }
+    .btn-next-line:active { transform: scale(0.96); }
+
+    .cache-readout {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--ink-on-dark-muted);
+    }
+
+    .hud-drawer {
+      background: var(--card-surface);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 16px;
+      transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out);
+      max-height: 240px;
+      overflow: hidden;
+    }
+    .hud-drawer.collapsed {
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      opacity: 0;
     }
 
     .slider-row {
       display: grid;
-      grid-template-columns: 72px 1fr 48px;
+      grid-template-columns: 76px 1fr 48px;
       align-items: center;
-      gap: var(--space-3);
+      gap: 12px;
       font-size: 0.82rem;
+      margin-bottom: 8px;
     }
-
-    .slider-name {
-      color: var(--ink-secondary);
-      font-weight: 600;
-    }
-
-    .slider-val {
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--ink);
-    }
+    .slider-row:last-child { margin-bottom: 0; }
+    .slider-name { font-weight: 600; color: var(--ink-secondary); }
+    .slider-val { font-family: var(--font-mono); text-align: right; font-weight: 600; font-size: 0.78rem; }
 
     input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 6px;
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 6px;
       background: var(--card-recessed);
-      border: 1px solid var(--border-hairline);
-      border-radius: 999px;
-      outline: none;
+      border-radius: 999px; outline: none;
     }
-
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--accent);
-      border: 2.5px solid var(--g-900);
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent); border: 2.5px solid var(--g-900);
       cursor: pointer;
-      transition: transform 140ms var(--ease-out);
     }
 
-    input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.16);
-    }
-
-    /* Section Architecture */
+    /* Sections */
     .section {
-      padding: var(--space-18) 0;
+      padding: var(--space-16) 0 0;
+      margin-top: var(--space-16);
       border-top: 1px solid var(--border-hairline);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: var(--space-6);
     }
 
     .section-label {
@@ -470,37 +374,37 @@
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: var(--ink-muted);
-      margin-bottom: var(--space-6);
     }
 
+    .section-hint {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ink-muted);
+    }
+
+    /* Interactive Pipeline Grid */
     .steps-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-5);
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
     }
 
     .step-card {
       background: var(--card-surface);
       border: 1px solid var(--border-hairline);
       border-radius: 14px;
-      padding: var(--space-6);
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      transition:
-        transform 200ms var(--ease-out),
-        border-color 200ms var(--ease-out),
-        background-color 200ms var(--ease-out),
-        color 200ms var(--ease-out);
+      padding: var(--space-5);
+      cursor: pointer;
+      text-align: left;
+      transition: all 180ms var(--ease-out);
     }
-
-    .step-card:hover {
-      transform: translateY(-3px);
+    .step-card:hover, .step-card.active {
       background: var(--g-900);
       border-color: var(--g-900);
       color: var(--ink-on-dark);
+      transform: translateY(-2px);
     }
-
     .step-idx {
       display: inline-block;
       font-family: var(--font-mono);
@@ -510,38 +414,30 @@
       color: var(--accent);
       padding: 3px 8px;
       border-radius: 6px;
-      margin-bottom: var(--space-4);
-      transition: background-color 200ms var(--ease-out);
+      margin-bottom: var(--space-3);
+    }
+    .step-card.active .step-idx, .step-card:hover .step-idx { background: var(--g-800); }
+    .step-card h2 { font-family: var(--font-display); font-size: 1.18rem; margin-bottom: 4px; }
+    .step-card p { font-size: 0.86rem; color: var(--ink-muted); }
+    .step-card.active p, .step-card:hover p { color: var(--ink-on-dark-muted); }
+
+    .pipeline-inspector {
+      background: var(--g-900);
+      color: var(--accent);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .step-card:hover .step-idx {
-      background: var(--g-800);
-    }
-
-    .step-card h2 {
-      font-family: var(--font-display);
-      font-size: 1.2rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 6px;
-    }
-
-    .step-card p {
-      font-size: 0.88rem;
-      line-height: 1.5;
-      color: var(--ink-muted);
-      transition: color 200ms var(--ease-out);
-    }
-
-    .step-card:hover p {
-      color: var(--ink-on-dark-muted);
-    }
-
-    /* Engine Strip */
+    /* Engines */
     .engines-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-5);
+      gap: var(--space-4);
     }
 
     .engine-pill {
@@ -554,16 +450,9 @@
       align-items: center;
       font-weight: 600;
       font-size: 0.94rem;
-      color: var(--ink);
-      transition:
-        transform 180ms var(--ease-out),
-        border-color 180ms var(--ease-out);
+      transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out);
     }
-
-    .engine-pill:hover {
-      transform: translateY(-2px);
-      border-color: var(--border-strong);
-    }
+    .engine-pill:hover { transform: translateY(-2px); border-color: var(--border-strong); }
 
     .badge {
       font-family: var(--font-mono);
@@ -575,140 +464,70 @@
       border: 1px solid var(--border-hairline);
       color: var(--ink-secondary);
     }
-
     .badge-full {
       background: var(--g-900);
       border-color: var(--g-900);
       color: var(--accent);
     }
 
-    /* Team / About Us Strip (Real Name First, Then Username) */
+    /* Team Grid */
     .team-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-5);
+      gap: var(--space-4);
     }
 
     .team-card {
       background: var(--card-surface);
       border: 1px solid var(--border-hairline);
       border-radius: 14px;
-      padding: var(--space-6);
+      padding: var(--space-5);
       display: flex;
       align-items: center;
       gap: var(--space-4);
       text-decoration: none;
       color: var(--ink);
-      transition:
-        transform 200ms var(--ease-out),
-        border-color 200ms var(--ease-out),
-        background-color 200ms var(--ease-out),
-        color 200ms var(--ease-out);
+      transition: all 180ms var(--ease-out);
     }
-
     .team-card:hover {
       transform: translateY(-3px);
       background: var(--g-900);
       border-color: var(--g-900);
       color: var(--ink-on-dark);
     }
-
     .team-avatar {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid var(--g-900);
-      background: var(--card-recessed);
-      flex-shrink: 0;
-      transition: border-color 200ms var(--ease-out);
+      width: 56px; height: 56px; border-radius: 50%;
+      object-fit: cover; border: 2px solid var(--g-900);
+      background: var(--card-recessed); flex-shrink: 0;
     }
-
-    .team-card:hover .team-avatar {
-      border-color: var(--accent);
-    }
-
-    .team-meta {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-
+    .team-card:hover .team-avatar { border-color: var(--accent); }
+    .team-meta { display: flex; flex-direction: column; min-width: 0; }
     .team-role {
-      display: inline-block;
       align-self: flex-start;
       font-family: var(--font-mono);
-      font-size: 0.68rem;
-      font-weight: 600;
-      text-transform: uppercase;
+      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.06em;
-      background: var(--g-900);
-      color: var(--accent);
-      padding: 2px 7px;
-      border-radius: 5px;
-      margin-bottom: 6px;
-      transition: background-color 200ms var(--ease-out);
+      background: var(--g-900); color: var(--accent);
+      padding: 2px 7px; border-radius: 5px; margin-bottom: 6px;
     }
-
-    .team-card:hover .team-role {
-      background: var(--g-800);
-    }
-
-    .team-name {
-      font-family: var(--font-display);
-      font-size: 1.18rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.15;
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .team-handle {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--ink-muted);
-      transition: color 200ms var(--ease-out);
-    }
-
-    .team-card:hover .team-handle {
-      color: var(--ink-on-dark-muted);
-    }
+    .team-card:hover .team-role { background: var(--g-800); }
+    .team-name { font-family: var(--font-display); font-size: 1.18rem; font-weight: 700; line-height: 1.15; }
+    .team-handle { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-muted); }
+    .team-card:hover .team-handle { color: var(--ink-on-dark-muted); }
 
     @media (max-width: 880px) {
-      .hero {
-        grid-template-columns: 1fr;
-        gap: var(--space-10);
-        padding: var(--space-10) 0 var(--space-16);
-      }
-      .steps-grid,
-      .engines-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      .team-grid {
-        grid-template-columns: 1fr;
-      }
+      .hero { grid-template-columns: 1fr; }
+      .steps-grid, .engines-grid { grid-template-columns: repeat(2, 1fr); }
+      .team-grid { grid-template-columns: 1fr; }
     }
-
     @media (max-width: 540px) {
-      .container {
-        padding: 0 var(--space-5);
-      }
-      .steps-grid,
-      .engines-grid {
-        grid-template-columns: 1fr;
-      }
-      .nav-links {
-        gap: var(--space-4);
-      }
+      .steps-grid, .engines-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <header class="reveal" style="--delay: 0ms;">
+    <header>
       <nav class="nav-bar" aria-label="Primary">
         <a href="#" class="brand" aria-label="dub.game">
           <img class="brand-logo" src="logo.png" alt="dub.game" width="44" height="44" />
@@ -716,9 +535,9 @@
         </a>
 
         <div class="nav-links">
-          <a href="#pipeline" class="nav-link" data-scroll>Pipeline</a>
-          <a href="#engines" class="nav-link" data-scroll>Engines</a>
-          <a href="#about" class="nav-link" data-scroll>About</a>
+          <a href="#pipeline" class="nav-link">Pipeline</a>
+          <a href="#engines" class="nav-link">Engines</a>
+          <a href="#about" class="nav-link">About</a>
           <a href="https://github.com/edwardvu7/dub.game" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
@@ -730,12 +549,12 @@
 
     <main>
       <section class="hero">
-        <div class="hero-copy reveal" style="--delay: 60ms;">
+        <div class="hero-copy">
           <h1>Voice every <span>visual novel</span></h1>
-          <p class="lead">One-click Steam hook. Real-time character voices.</p>
-          <div class="actions">
+          <p class="lead">One-click Steam hook. Real-time character voices tuned live inside your game window.</p>
+          <div class="hero-controls">
             <a href="https://github.com/edwardvu7/dub.game/releases/latest/download/dub.game-Setup.exe" class="btn-download" download>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
@@ -745,94 +564,111 @@
           </div>
         </div>
 
-        <aside class="panel reveal" style="--delay: 140ms;" aria-label="Overlay Tuning Preview">
-          <div class="panel-bar">
-            <span>IN-GAME OVERLAY</span>
-            <kbd>Shift + F2</kbd>
+        <aside class="vn-stage" aria-label="Interactive In-Game Overlay Sandbox">
+          <div class="vn-topbar">
+            <span class="vn-status"><span class="pulse-dot"></span> HOOK ACTIVE · 127.0.0.1:49210</span>
+            <button type="button" class="hud-toggle-btn" id="toggle-hud">Overlay [Shift + F2]</button>
           </div>
 
-          <div class="tabs" role="tablist">
-            <button class="tab active" type="button" data-char="sylvie">
-              Sylvie
-              <small>Warm</small>
-            </button>
-            <button class="tab" type="button" data-char="voss">
-              Voss
-              <small>Gruff</small>
-            </button>
-            <button class="tab" type="button" data-char="narrator">
-              Narrator
-              <small>Calm</small>
-            </button>
-          </div>
-
-          <div class="quote-box">
-            <div class="quote-speaker" id="preview-speaker">Sylvie</div>
-            <div class="quote-line" id="preview-line">"Did you hear footsteps on the stairs?"</div>
-          </div>
-
-          <div class="sliders">
-            <div class="slider-row">
-              <span class="slider-name">Stability</span>
-              <input type="range" id="sl-stability" min="0" max="1" step="0.05" value="0.45" />
-              <span class="slider-val" id="val-stability">0.45</span>
+          <div class="vn-scene-body">
+            <div class="char-selector" role="tablist">
+              <button class="char-chip active" type="button" data-char="sylvie">
+                Sylvie <small>Warm · Lead</small>
+              </button>
+              <button class="char-chip" type="button" data-char="voss">
+                Voss <small>Gruff · Detective</small>
+              </button>
+              <button class="char-chip" type="button" data-char="narrator">
+                Narrator <small>Calm · Omniscient</small>
+              </button>
             </div>
-            <div class="slider-row">
-              <span class="slider-name">Style</span>
-              <input type="range" id="sl-style" min="0" max="1" step="0.05" value="0.65" />
-              <span class="slider-val" id="val-style">0.65</span>
+
+            <div class="waveform-box">
+              <div class="dialogue-header">
+                <span class="speaker-badge" id="preview-speaker">Sylvie</span>
+                <span class="mood-tag" id="preview-mood">Mood: Apprehensive</span>
+              </div>
+              <div class="dialogue-text" id="preview-line">"Did you hear footsteps on the stairs?"</div>
+              <div class="wave-bars" id="wave-bars"></div>
             </div>
-            <div class="slider-row">
-              <span class="slider-name">Speed</span>
-              <input type="range" id="sl-speed" min="0.7" max="1.2" step="0.05" value="1.05" />
-              <span class="slider-val" id="val-speed">1.05×</span>
+
+            <div class="vn-controls-row">
+              <button type="button" class="btn-next-line" id="next-line-btn">Next Line ↵</button>
+              <span class="cache-readout" id="cache-readout">SHA256: 8f3a…9c12 · 18ms</span>
+            </div>
+
+            <div class="hud-drawer" id="hud-drawer">
+              <div class="slider-row">
+                <span class="slider-name">Stability</span>
+                <input type="range" id="sl-stability" min="0" max="1" step="0.05" value="0.45" />
+                <span class="slider-val" id="val-stability">0.45</span>
+              </div>
+              <div class="slider-row">
+                <span class="slider-name">Style</span>
+                <input type="range" id="sl-style" min="0" max="1" step="0.05" value="0.65" />
+                <span class="slider-val" id="val-style">0.65</span>
+              </div>
+              <div class="slider-row">
+                <span class="slider-name">Speed</span>
+                <input type="range" id="sl-speed" min="0.7" max="1.2" step="0.05" value="1.05" />
+                <span class="slider-val" id="val-speed">1.05×</span>
+              </div>
             </div>
           </div>
         </aside>
       </section>
 
       <section class="section" id="pipeline">
-        <div class="section-label reveal">Pipeline</div>
+        <div class="section-header">
+          <div class="section-label">Pipeline</div>
+          <div class="section-hint">Click any stage to inspect runtime hook</div>
+        </div>
         <div class="steps-grid">
-          <article class="step-card reveal" style="--delay: 0ms;">
+          <article class="step-card active" data-step="0">
             <div class="step-idx">01</div>
             <h2>Scan Library</h2>
             <p>Auto-detects installed Steam games.</p>
           </article>
-          <article class="step-card reveal" style="--delay: 70ms;">
+          <article class="step-card" data-step="1">
             <div class="step-idx">02</div>
             <h2>Hook Script</h2>
             <p>Captures exact dialogue lines.</p>
           </article>
-          <article class="step-card reveal" style="--delay: 140ms;">
+          <article class="step-card" data-step="2">
             <div class="step-idx">03</div>
             <h2>Cast Voices</h2>
             <p>Profiles every character once.</p>
           </article>
-          <article class="step-card reveal" style="--delay: 210ms;">
+          <article class="step-card" data-step="3">
             <div class="step-idx">04</div>
             <h2>Tune Live</h2>
             <p>Adjust sliders mid-scene.</p>
           </article>
         </div>
+        <div class="pipeline-inspector" id="pipeline-inspector">
+          <span id="pipeline-code">steam/scan.js → parses libraryfolders.vdf &amp; appmanifest_*.acf</span>
+          <span>READY</span>
+        </div>
       </section>
 
       <section class="section" id="engines">
-        <div class="section-label reveal">Engines</div>
+        <div class="section-header">
+          <div class="section-label">Engines</div>
+        </div>
         <div class="engines-grid">
-          <div class="engine-pill reveal" style="--delay: 0ms;">
+          <div class="engine-pill">
             <span>Ren'Py</span>
             <span class="badge badge-full">Full</span>
           </div>
-          <div class="engine-pill reveal" style="--delay: 60ms;">
+          <div class="engine-pill">
             <span>Godot</span>
             <span class="badge badge-full">Full</span>
           </div>
-          <div class="engine-pill reveal" style="--delay: 120ms;">
+          <div class="engine-pill">
             <span>RPG Maker</span>
             <span class="badge badge-full">Full</span>
           </div>
-          <div class="engine-pill reveal" style="--delay: 180ms;">
+          <div class="engine-pill">
             <span>Unity</span>
             <span class="badge">Beta</span>
           </div>
@@ -840,27 +676,29 @@
       </section>
 
       <section class="section" id="about">
-        <div class="section-label reveal">About Us</div>
+        <div class="section-header">
+          <div class="section-label">About Us</div>
+        </div>
         <div class="team-grid">
-          <a href="https://github.com/edwardvu7" class="team-card reveal" style="--delay: 0ms;" target="_blank" rel="noopener noreferrer" data-gh-user="edwardvu7">
+          <a href="https://github.com/edwardvu7" class="team-card" target="_blank" rel="noopener noreferrer">
             <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="Edward Vu" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Engine Hooks</span>
-              <div class="team-name" id="name-edwardvu7">Edward Vu</div>
+              <div class="team-name">Edward Vu</div>
               <div class="team-handle">@edwardvu7</div>
             </div>
           </a>
 
-          <a href="https://github.com/chadscheeks" class="team-card reveal" style="--delay: 70ms;" target="_blank" rel="noopener noreferrer" data-gh-user="chadscheeks">
+          <a href="https://github.com/chadscheeks" class="team-card" target="_blank" rel="noopener noreferrer">
             <img class="team-avatar" src="https://github.com/chadscheeks.png?size=160" onerror="this.src='logo.png'" alt="Alexander Miller" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Overlay &amp; UI</span>
-              <div class="team-name" id="name-chadscheeks">Alexander Miller</div>
+              <div class="team-name">Alexander Miller</div>
               <div class="team-handle">@chadscheeks</div>
             </div>
           </a>
 
-          <a href="https://github.com/Craz33matt" class="team-card reveal" style="--delay: 140ms;" target="_blank" rel="noopener noreferrer" data-gh-user="Craz33matt">
+          <a href="https://github.com/Craz33matt" class="team-card" target="_blank" rel="noopener noreferrer">
             <img class="team-avatar" src="https://github.com/Craz33matt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
             <div class="team-meta">
               <span class="team-role">Core &amp; Voice Pipeline</span>
@@ -877,30 +715,52 @@
     const profiles = {
       sylvie: {
         speaker: "Sylvie",
-        line: '"Did you hear footsteps on the stairs?"',
-        stability: 0.45,
-        style: 0.65,
-        speed: 1.05
+        moods: ["Apprehensive", "Urgent", "Relieved"],
+        lines: [
+          '"Did you hear footsteps on the stairs?"',
+          '"Wait—the lantern by the cellar door is still warm."',
+          '"Stay close. I know a shortcut through the conservatory."'
+        ],
+        stability: 0.45, style: 0.65, speed: 1.05
       },
       voss: {
         speaker: "Voss",
-        line: '"The station logs were wiped at midnight."',
-        stability: 0.75,
-        style: 0.35,
-        speed: 0.90
+        moods: ["Stoic", "Suspicious", "Grim"],
+        lines: [
+          '"The station logs were wiped at midnight."',
+          '"Whoever keyed that airlock had clearance from the director."',
+          '"Check the ballast tanks before the storm hits."'
+        ],
+        stability: 0.75, style: 0.35, speed: 0.90
       },
       narrator: {
         speaker: "Narrator",
-        line: '"Rain streaked across the terminal glass."',
-        stability: 0.85,
-        style: 0.20,
-        speed: 0.95
+        moods: ["Atmospheric", "Melancholic", "Serene"],
+        lines: [
+          '"Rain streaked across the terminal glass."',
+          '"Far below the viaduct, the last commuter train hummed into the fog."',
+          '"Dawn arrived without a sound over the harbor."'
+        ],
+        stability: 0.85, style: 0.20, speed: 0.95
       }
     };
 
-    const tabs = document.querySelectorAll(".tab");
+    let currentChar = "sylvie";
+    let lineIdx = 0;
+    let typeTimer = null;
+
+    const waveContainer = document.getElementById("wave-bars");
+    for (let i = 0; i < 28; i++) {
+      const bar = document.createElement("div");
+      bar.className = "wave-bar";
+      waveContainer.appendChild(bar);
+    }
+    const bars = document.querySelectorAll(".wave-bar");
+
     const speakerEl = document.getElementById("preview-speaker");
+    const moodEl = document.getElementById("preview-mood");
     const lineEl = document.getElementById("preview-line");
+    const cacheEl = document.getElementById("cache-readout");
     const slStability = document.getElementById("sl-stability");
     const slStyle = document.getElementById("sl-style");
     const slSpeed = document.getElementById("sl-speed");
@@ -908,65 +768,93 @@
     const valStyle = document.getElementById("val-style");
     const valSpeed = document.getElementById("val-speed");
 
+    function animateWaveform() {
+      const styleVal = Number(slStyle.value);
+      const stabVal = Number(slStability.value);
+      bars.forEach((bar, i) => {
+        const variance = (1 - stabVal) * 55 + styleVal * 45;
+        const height = Math.max(15, Math.min(100, 22 + Math.sin(i * 0.65 + lineIdx) * variance + Math.random() * 25));
+        bar.style.height = height + "%";
+        bar.style.opacity = (0.45 + (height / 200)).toFixed(2);
+      });
+    }
+
+    function typeLine(text) {
+      clearInterval(typeTimer);
+      lineEl.textContent = "";
+      let i = 0;
+      const delay = Math.round(18 / Number(slSpeed.value));
+      typeTimer = setInterval(() => {
+        lineEl.textContent += text.charAt(i);
+        i++;
+        if (i % 3 === 0) animateWaveform();
+        if (i >= text.length) clearInterval(typeTimer);
+      }, delay);
+    }
+
+    function renderScene() {
+      const p = profiles[currentChar];
+      speakerEl.textContent = p.speaker;
+      moodEl.textContent = "Mood: " + p.moods[lineIdx % p.moods.length];
+      const hash = Math.random().toString(16).substring(2, 6) + "…" + Math.random().toString(16).substring(2, 6);
+      cacheEl.textContent = `SHA256: ${hash} · ${Math.floor(12 + Math.random() * 14)}ms`;
+      typeLine(p.lines[lineIdx % p.lines.length]);
+    }
+
     function updateReadouts() {
       valStability.textContent = Number(slStability.value).toFixed(2);
       valStyle.textContent = Number(slStyle.value).toFixed(2);
       valSpeed.textContent = Number(slSpeed.value).toFixed(2) + "×";
+      animateWaveform();
     }
 
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        tabs.forEach((t) => t.classList.remove("active"));
-        tab.classList.add("active");
-        const data = profiles[tab.dataset.char];
-        speakerEl.textContent = data.speaker;
-        lineEl.textContent = data.line;
-        slStability.value = data.stability;
-        slStyle.value = data.style;
-        slSpeed.value = data.speed;
+    document.querySelectorAll(".char-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll(".char-chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        currentChar = chip.dataset.char;
+        lineIdx = 0;
+        const p = profiles[currentChar];
+        slStability.value = p.stability;
+        slStyle.value = p.style;
+        slSpeed.value = p.speed;
         updateReadouts();
+        renderScene();
       });
     });
 
-    [slStability, slStyle, slSpeed].forEach((input) => {
-      input.addEventListener("input", updateReadouts);
+    document.getElementById("next-line-btn").addEventListener("click", () => {
+      lineIdx++;
+      renderScene();
     });
 
-    // Hydrate Matthew's full display name from GitHub's public API if configured on his profile
+    document.getElementById("toggle-hud").addEventListener("click", () => {
+      document.getElementById("hud-drawer").classList.toggle("collapsed");
+    });
+
+    [slStability, slStyle, slSpeed].forEach((s) => s.addEventListener("input", updateReadouts));
+
+    const stepSnippets = [
+      "steam/scan.js → parses libraryfolders.vdf & appmanifest_*.acf",
+      "mod/renpy/dubgame.rpy & mod/godot/generic.gd → streams { speaker, text } to :49210",
+      "main/cast.js + xai.js → infers character archetype, voice ID & emotional mood",
+      "ui/overlay.js → Shift+F2 frameless window anchored via game-window.ps1"
+    ];
+
+    document.querySelectorAll(".step-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".step-card").forEach((c) => c.classList.remove("active"));
+        card.classList.add("active");
+        document.getElementById("pipeline-code").textContent = stepSnippets[Number(card.dataset.step)];
+      });
+    });
+
     fetch("https://api.github.com/users/Craz33matt")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((user) => {
-        if (user && user.name) {
-          const el = document.getElementById("name-Craz33matt");
-          if (el) el.textContent = user.name;
-        }
-      })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => { if (u && u.name) document.getElementById("name-Craz33matt").textContent = u.name; })
       .catch(() => {});
 
-    const revealEls = document.querySelectorAll(".reveal");
-    const revealObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            revealObserver.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -30px 0px" }
-    );
-
-    revealEls.forEach((el) => revealObserver.observe(el));
-
-    document.querySelectorAll("a[data-scroll]").forEach((link) => {
-      link.addEventListener("click", (e) => {
-        const targetId = link.getAttribute("href");
-        const target = document.querySelector(targetId);
-        if (!target) return;
-        e.preventDefault();
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
+    animateWaveform();
   </script>
 </body>
 </html>
