@@ -54,6 +54,11 @@
           </label>
         </div>
       </header>
+      <div class="pool" id="voices-pool" hidden>
+        <div class="pool-head"><b>Custom voices</b><span class="pool-count" id="pool-count"></span></div>
+        <div class="pool-chips" id="pool-chips"></div>
+        <p class="pool-note" id="pool-note"></p>
+      </div>
       <div id="cards-host"></div>
     </section>
 
@@ -132,11 +137,13 @@
           <span class="switch-track" aria-hidden="true"></span>
           <span class="switch-text"><b>Read narration aloud</b><small>Lines with no speaker use a narrator voice. Turn this off to save ElevenLabs credits.</small></span>
         </label>
-        <label class="switch">
-          <input type="checkbox" id="opt-quality">
-          <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-text"><b>Best voice quality</b><small>Uses ElevenLabs' Multilingual v2 model: richer, clearer voices, especially custom ones. Lines start about a second later and cost twice the credits per character.</small></span>
-        </label>
+        <div class="quality-row">
+          <span class="switch-text"><b>Voice quality</b><small class="quality-desc" id="quality-desc" aria-live="polite"></small></span>
+          <div class="quality-slider">
+            <input type="range" id="quality" min="0" max="2" step="1" value="0" aria-label="Voice quality" aria-describedby="quality-desc">
+            <div class="quality-ticks" id="quality-ticks" aria-hidden="true"><span>Fast</span><span>Balanced</span><span>Best</span></div>
+          </div>
+        </div>
         <label class="switch">
           <input type="checkbox" id="opt-acting">
           <span class="switch-track" aria-hidden="true"></span>
@@ -145,7 +152,7 @@
         <label class="switch">
           <input type="checkbox" id="opt-custom">
           <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-text"><b>Custom voices <span class="tag tag-experimental">Experimental</span></b><small>Turn this on and dub.game designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (at most 8 characters per game) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
+          <span class="switch-text"><b>Custom voices <span class="tag tag-experimental">Experimental</span></b><small>Turn this on and dub.game designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (8 designed voices per game at a time; when all slots are taken, the longest-idle character's designed voice is replaced and that character goes back to its preset) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
         </label>
         <label class="switch">
           <input type="checkbox" id="opt-clipboard">

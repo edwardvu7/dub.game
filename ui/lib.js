@@ -236,7 +236,28 @@
     return Math.min(g, 0.98 / peak);
   }
 
-  return { loudnessGain, SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
+  // Voice quality: three stops. The backend takes 'fast' | 'balanced' | 'best'; older builds stored a boolean.
+  const QUALITY = [
+    { id: 'fast', label: 'Fast', text: 'Flash v2.5. Lines start fastest and cost the least: about 0.5 credit per character.' },
+    { id: 'balanced', label: 'Balanced', text: 'A middle ground: richer than Fast and a little slower to start. 0.5 to 1 credit per character.' },
+    { id: 'best', label: 'Best', text: 'Multilingual v2 with speaker boost: the richest voices, about 1 second slower to start. 1 credit per character.' },
+  ];
+  /** Index (0 to 2) of a stored quality: 'fast' | 'balanced' | 'best', or a legacy boolean (true = best). */
+  function qualityLevel(q) {
+    if (q === true) return 2;
+    const i = QUALITY.findIndex((s) => s.id === q);
+    return i < 0 ? 0 : i;
+  }
+
+  const MAX_CUSTOM = 8;
+  /** The rolling pool of designed voices in one game: who has one, and how many slots are used. */
+  function customPool(voices, max) {
+    const names = Object.keys(voices || {}).filter((n) => voices[n] && voices[n].custom_voice && voices[n].custom_voice.voice_id)
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    return { used: names.length, max: max > 0 ? max : MAX_CUSTOM, names };
+  }
+
+  return { QUALITY, qualityLevel, customPool, MAX_CUSTOM, loudnessGain, SLIDERS, clamp, formatSlider, supportBadge, gameStatus, filterGames, sortGames,
     sortSpeakers, initials, voiceLabel, customVoiceLabel, errorText, base64ToBytes, keyState, needsSetup,
     gamesSummary, gameHint, engineName, gameLabel, gameIds, voicesFor, savedGameId, formatCount, planSummary };
 });

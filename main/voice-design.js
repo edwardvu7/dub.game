@@ -3,6 +3,7 @@
 // Two calls: POST /v1/text-to-voice/design (previews) then POST /v1/text-to-voice (keep the first one).
 // Main process only; the key never leaves it and is never logged.
 // Sources: elevenlabs.io/docs/api-reference/text-to-voice/design and .../text-to-voice/create.
+const { OUTPUT_FORMAT } = require('./tts');
 const API = 'https://api.elevenlabs.io';
 const TIMEOUT_MS = 60000;
 // UNVERIFIED: 20-1000 characters comes from a search summary of the docs; the fetched reference page lists no limit.
@@ -113,7 +114,7 @@ function createVoiceDesigner({ settings, fetch: doFetch = globalThis.fetch, log 
     if (!key) throw Object.assign(new Error('No ElevenLabs API key. Add one in Settings.'), { hard: true });
     const voice_description = sanitizeDescription(description, avoid);
     log(`voice design prompt: ${voice_description}`); // printed so a refused prompt can be read
-    const designed = await post(`${API}/v1/text-to-voice/design?output_format=mp3_44100_128`, key, {
+    const designed = await post(`${API}/v1/text-to-voice/design?output_format=${OUTPUT_FORMAT}`, key, {
       voice_description,
       auto_generate_text: true, // the API writes a sample line that suits the voice
       // Quality over variety, and a fuller prompt: designed voices sounded thin with the defaults.
@@ -153,7 +154,24 @@ function createVoiceDesigner({ settings, fetch: doFetch = globalThis.fetch, log 
     return save({ id: made.previews[0].id, description: made.description, name });
   }
 
-  return { design, previews, save };
+  /**
+   * remove(voice_id) -> boolean: DELETE /v1/voices/{id}, freeing a custom-voice slot. Best effort: never
+   * throws; true when the voice is gone (404 counts). UNVERIFIED against a live account.
+   */
+  async function remove(voiceId) {
+    const key = settings.getKey('elevenlabs');
+    if (!key || typeof voiceId !== 'string' || !/^[A-Za-z0-9]{1,64}$/.test(voiceId)) return false;
+    try {
+      const res = await doFetch(`${API}/v1/voices/${voiceId}`, {
+        method: 'DELETE', headers: { 'xi-api-key': key }, signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (res.ok || res.status === 404) { log(`deleted voice ${voiceId}`); return true; }
+      log(`could not delete voice ${voiceId}: ElevenLabs ${res.status}`);
+    } catch (e) { log(`could not delete voice ${voiceId}: ${e && e.message}`); }
+    return false;
+  }
+
+  return { design, previews, save, remove };
 }
 
 module.exports = { createVoiceDesigner, sanitizeDescription, voiceName, DESC_MIN, DESC_MAX, NAME_MAX };

@@ -37,6 +37,9 @@ function prompt(characters, catalog, opts) {
     many
       ? 'For each character below, infer a profile from the name and sample lines and pick the best voice. Return one profile per character, with "speaker" copied exactly. Give different characters different voices where the catalog allows.'
       : 'Infer a profile for the character below from the name and sample lines and pick the best voice. Copy "speaker" exactly.',
+    // The game text is what the actors read: a Japanese-school VN in English is performed in natural English.
+    'The lines are performed in the language of the game text, almost always English. Foreign settings do not mean foreign accents: teens in a Japanese-school game speak natural, casual American English. Pick a plain-accent voice unless the character is explicitly an accented speaker.',
+    'age_range teen or young_adult: only voices described as young (or a girl/boy). Never a middle-aged, older or deep authoritative voice, and not an accented one. Avoid giving one voice to two characters when another fits.',
     'Pick the catalog voice that best matches the character\'s gender, age and personality; "Known about them" notes beat guesses.',
     'voice_id must be one of the catalog IDs. stability 0.3-0.7, style 0.0-0.6, speed 0.9-1.1 unless the character clearly calls for more.',
     `gender is one of ${GENDERS.join(', ')}. age_range is one of ${AGES.join(', ')}. personality and reason are one sentence each.`,
@@ -77,15 +80,43 @@ function noteFields(known) {
   return out;
 }
 
+const YOUNG_AGES = ['child', 'teen', 'young_adult'];
+const ACCENT = /\b(British|Australian|Swedish|Transatlantic|NZ|Irish|Scottish)\b/i;
+const ACCENT_OK = /brit|engl|\buk\b|austral|swed|new zealand|\bnz\b|irish|ireland|scot/i;
+const OLD = /middle-aged|\bolder\b|\belder|\b[4-9]0s\b/i;
+const YOUNG = /young|\bgirl\b|\bboy\b|youthful|teen/i;
+
+/**
+ * Grok sometimes picks a voice that contradicts what it just said (a middle-aged man for a teen, a Swedish
+ * accent for a Tokyo student). A pick that is too old, or accented without the origin/setting calling for it,
+ * is swapped for a fitting catalog voice (deterministic per name). Unchanged when nothing fits better.
+ */
+function fitVoice(voiceId, speaker, gender, age, catalog, known) {
+  const v = catalog.find((x) => x.voice_id === voiceId);
+  const d = (v && v.description) || '';
+  const young = YOUNG_AGES.includes(age);
+  const context = [known && known.origin, known && known.setting, known && known.speech].filter(Boolean).join(' ');
+  const accentOk = ACCENT_OK.test(context);
+  const badAccent = ACCENT.test(d) && !accentOk && (young || !!context); // an adult with no known setting is left to Grok
+  if (!(young && (OLD.test(d) || !YOUNG.test(d))) && !badAccent) return voiceId;
+  const sex = { female: /\b(woman|girl|female)\b/i, male: /\b(man|boy|male)\b/i }[gender];
+  const pool = catalog.filter((x) => (!sex || sex.test(x.description)) &&
+    (!young || (!OLD.test(x.description) && YOUNG.test(x.description))) && (accentOk || !ACCENT.test(x.description)));
+  return pool.length ? fallbackVoice(speaker, pool).voice_id : voiceId;
+}
+
 function sanitizeProfile(raw, speaker, catalog, known) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const ids = catalog.map((v) => v.voice_id);
+  const gender = GENDERS.includes(r.gender) ? r.gender : 'neutral';
+  const age_range = AGES.includes(r.age_range) ? r.age_range : 'adult';
+  const picked = ids.includes(r.voice_id) ? r.voice_id : fallbackVoice(speaker, catalog).voice_id;
   return {
     speaker,
-    gender: GENDERS.includes(r.gender) ? r.gender : 'neutral',
-    age_range: AGES.includes(r.age_range) ? r.age_range : 'adult',
+    gender,
+    age_range,
     personality: String(r.personality || '').slice(0, 300),
-    voice_id: ids.includes(r.voice_id) ? r.voice_id : fallbackVoice(speaker, catalog).voice_id,
+    voice_id: fitVoice(picked, speaker, gender, age_range, catalog, known),
     stability: round2(clamp(r.stability, 0, 1, 0.5)),
     style: round2(clamp(r.style, 0, 1, 0.3)),
     speed: round2(clamp(r.speed, 0.7, 1.2, 1)),
@@ -134,19 +165,25 @@ async function profileCharacters(characters, catalog, key, deps = {}) {
 
 const VOICE_DESC_MAX = 600;
 
-/** Prompt asking Grok for an ElevenLabs Voice Design description. profile: gender/age_range/personality/origin/speech. */
+/**
+ * Prompt asking Grok for an ElevenLabs Voice Design description. profile: gender, age_range, personality,
+ * origin, speech; setting is the researched world line (country, language, era, how people talk).
+ * The voice must belong to THIS game, so every researched fact is passed and the model is told to use it.
+ */
 function buildVoiceDescriptionPrompt(profile, notes, setting) {
   const p = profile || {};
   return [
     'Write a text description of a voice for an AI voice designer (a text-to-voice tool). It is for a visual novel character.',
+    'The voice must sound like it belongs to THIS game: use the setting, era, origin, speech style, personality and age below. A generic voice is a failure.',
     `Character: ${short(p.speaker, 80)}${p.game ? ` from "${short(p.game, 80)}"` : ''}`,
-    `Gender: ${short(p.gender, 20) || 'unknown'}. Age: ${short(p.age_range, 20) || 'adult'}.`,
-    p.personality ? `Personality: ${short(p.personality, 300)}` : '',
+    `Gender: ${short(p.gender, 20) || 'unknown'}. Age: ${short(p.age_range, 20).replace('_', ' ') || 'adult'}.`,
+    setting ? `Game setting (place, language, era, how people talk): ${short(setting, 300)}` : '',
     p.origin ? `Origin: ${short(p.origin, 80)}` : '',
     p.speech ? `How they speak: ${short(p.speech, 160)}` : '',
+    p.personality ? `Personality: ${short(p.personality, 300)}` : '',
     notes ? `Known about them: ${short(notes, 400)}` : '',
-    setting ? `Setting of the game: ${short(setting, 300)}` : '',
-    'Describe age, gender, accent, tone, pitch, pacing and emotional color in one or two sentences, 150-400 characters.',
+    'Describe age, gender, accent, tone, pitch, pacing, vocabulary register and emotional color in one or two sentences, 150-400 characters.',
+    'The game text is in a language the voice speaks natively (usually English): a character from a foreign setting still speaks natural, plain English unless their origin says they have an accent. Match the era and social register (formal, slangy, old-fashioned, modern teen).',
     'The accent must fit the character\'s origin and the game\'s setting. Do NOT use a British or Australian accent unless that fits; if unknown, use a neutral American accent.',
     'Never name a real person, actor or celebrity and never ask for a soundalike.',
     'Do not mention the character\'s name, the game\'s title, or any age under 18: describe young characters as a young adult with a light, youthful voice.',
@@ -164,7 +201,8 @@ function fallbackVoiceDescription(profile) {
   const accent = p.origin ? `with an accent fitting ${short(p.origin, 60)}` : 'with a neutral American accent';
   const tone = p.speech ? short(p.speech, 160) : p.personality ? short(p.personality, 160) : 'natural, conversational tone';
   const t = /[.!?]$/.test(tone) ? tone : tone + '.';
-  return `A ${age} ${g} ${accent}. Tone and manner: ${t} Clear, natural pacing.`.slice(0, VOICE_DESC_MAX);
+  const world = p.setting ? ` Fitting the world of the story: ${short(p.setting, 120).replace(/\.$/, '')}.` : '';
+  return `A ${age} ${g} ${accent}. Tone and manner: ${t} Clear, natural pacing.${world}`.slice(0, VOICE_DESC_MAX);
 }
 
 /** Parse Grok's reply; null when unusable (not an object, too short or too long to be useful). */

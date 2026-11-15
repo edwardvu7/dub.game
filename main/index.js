@@ -27,6 +27,7 @@ const catalog = require('../voices_catalog.json');
 
 const ROOT = path.join(__dirname, '..');
 const HOTKEY = 'Shift+F2';
+const BACKUP_HOTKEYS = ['Control+Alt+F2']; // also registered, in case a game or tool swallows Shift+F2
 const EXTERNAL_HOSTS = ['elevenlabs.io', 'aistudio.google.com', 'store.steampowered.com', 'console.x.ai'];
 
 let mainWindow = null;
@@ -120,11 +121,16 @@ let overlayPosition = null; // created in start(), once userData is known
 
 let gameFrame = null;
 let overlayWanted = false;
+let gameLaunched = false;
 let gameTracker = null;
 let applyingOverlayBounds = false;
 let overlayOffset = null;
 
+// When game-window tracking has not found the window (Ren'Py's splash window, a launcher process,
+// an unreadable elevated game), Shift+F2 still opens the overlay on the screen the cursor is on.
+let fallbackArea = null;
 function gameArea() {
+  if (!gameFrame && fallbackArea) return fallbackArea;
   if (!gameFrame || gameFrame.minimized) return null;
   const rect = { x: gameFrame.x, y: gameFrame.y, width: gameFrame.width, height: gameFrame.height };
   return process.platform === 'win32' ? screen.screenToDipRect(null, rect) : rect;
@@ -132,7 +138,7 @@ function gameArea() {
 function overlayBounds() {
   const area = gameArea();
   if (!area) return { x: 0, y: 0, width: OVERLAY.width, height: OVERLAY.height };
-  const display = { id: 'game:' + gameFrame.gameId, workArea: area };
+  const display = { id: gameFrame ? 'game:' + gameFrame.gameId : 'screen', workArea: area };
   const spot = overlayOffset ? { x: area.x + overlayOffset.dx, y: area.y + overlayOffset.dy }
     : overlayPosition && overlayPosition.place(display, OVERLAY.width, OVERLAY.height);
   return constrainToGame(area, { ...spot, width: OVERLAY.width, height: OVERLAY.height });
@@ -143,16 +149,27 @@ function placeOverlay(bounds) {
   applyingOverlayBounds = true;
   try { overlayWindow.setBounds(bounds); } finally { applyingOverlayBounds = false; }
 }
+// Re-assert the top-most level: a game that takes the foreground (or a fullscreen switch) can push
+// a window below it, and Windows drops the level of windows shown without activation.
+function raiseOverlay() {
+  try {
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+    overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    overlayWindow.moveTop();
+  } catch { /* cosmetic */ }
+}
 function syncOverlay() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   const area = gameArea();
   const overlayFocused = overlayWindow.isFocused && overlayWindow.isFocused();
-  if (!overlayWanted || !area || (!gameFrame.focused && !overlayFocused)) {
+  // Without a tracked game window (fallback) the overlay stays until Shift+F2 hides it.
+  if (!overlayWanted || !area || (gameFrame && !gameFrame.focused && !overlayFocused)) {
     overlayWindow.hide();
     return;
   }
   placeOverlay(overlayBounds());
   if (!overlayWindow.isVisible()) overlayWindow.showInactive();
+  raiseOverlay();
 }
 function rememberOverlaySpot() {
   if (applyingOverlayBounds || !overlayWindow || overlayWindow.isDestroyed()) return;
@@ -161,7 +178,7 @@ function rememberOverlaySpot() {
   const bounds = constrainToGame(area, overlayWindow.getBounds());
   overlayOffset = { dx: bounds.x - area.x, dy: bounds.y - area.y };
   placeOverlay(bounds);
-  if (overlayPosition) overlayPosition.remember({ id: 'game:' + gameFrame.gameId, workArea: area }, bounds);
+  if (overlayPosition) overlayPosition.remember({ id: gameFrame ? 'game:' + gameFrame.gameId : 'screen', workArea: area }, bounds);
 }
 
 function createOverlayWindow() {
@@ -188,7 +205,6 @@ function createOverlayWindow() {
       rememberOverlaySpot();
     }
   });
-  // The overlay's Hide button calls window.close(): hide instead, so it reopens instantly.
   overlayWindow.on('close', (event) => {
     if (!quitting) { event.preventDefault(); hideOverlay(); }
   });
@@ -214,6 +230,7 @@ function warnIfExclusiveFullscreen() {
 // counting as focused and the next Shift+F2 was refused. blur() hands focus to the window behind.
 function hideOverlay() {
   overlayWanted = false;
+  fallbackArea = null;
   if (overlayWindow.isFocused && overlayWindow.isFocused()) overlayWindow.blur();
   overlayWindow.hide();
 }
@@ -222,15 +239,22 @@ function toggleOverlay() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   if (overlayWanted) { hideOverlay(); return; }
   // Shift+F2 is a global hotkey: a running, visible game is enough, whichever window has focus.
+  fallbackArea = null;
   if (!gameArea()) {
-    emit('app:status', { level: 'warn', message: 'Launch a game from dub.game, focus its window, then press Shift+F2. Game-window tracking requires Windows.' });
-    return;
+    if (!gameFrame && gameLaunched) {
+      // Tracking has not found the game window: show on the screen under the cursor instead of nothing.
+      fallbackArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    } else {
+      emit('app:status', { level: 'warn', message: 'Launch a game from dub.game, then press Shift+F2. Game-window tracking requires Windows.' });
+      return;
+    }
   }
   overlayWanted = true;
   placeOverlay(overlayBounds());
-  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
-  overlayWindow.show();
-  overlayWindow.focus();
+  // Shown without taking focus so the game keeps running (Ren'Py/SDL fullscreen minimizes or pauses
+  // when it loses focus). Clicking a card activates the panel as usual.
+  overlayWindow.showInactive();
+  raiseOverlay();
   send(overlayWindow, 'overlay:toggle');
   warnIfExclusiveFullscreen();
 }
@@ -290,6 +314,8 @@ async function start() {
     modDir: path.join(ROOT, 'mod'),
     onLaunch: (game, pid) => {
       overlayWanted = false;
+      fallbackArea = null;
+      gameLaunched = true;
       gameTracker.start(game, pid);
     },
     pickGodot: async () => {
@@ -357,8 +383,13 @@ async function start() {
   createMainWindow();
   createOverlayWindow();
 
-  if (!globalShortcut.register(HOTKEY, toggleOverlay)) {
+  const hotkeys = [HOTKEY, ...BACKUP_HOTKEYS].filter((key) => {
+    try { return globalShortcut.register(key, toggleOverlay); } catch { return false; }
+  });
+  if (!hotkeys.length) {
     pendingStatus.push({ level: 'warn', message: `${HOTKEY} is taken by another program; the overlay hotkey is off.` });
+  } else if (hotkeys[0] !== HOTKEY) {
+    pendingStatus.push({ level: 'warn', message: `${HOTKEY} is taken by another program; use ${hotkeys[0]} for the overlay.` });
   }
 
   app.on('before-quit', () => {

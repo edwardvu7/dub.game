@@ -5,7 +5,7 @@ const { speakable, words, ordinal } = require('../main/speakable');
 const tts = require('../main/tts');
 
 test('speakable: times, money, titles, ordinals, percents, years, codes', () => {
-  assert.equal(speakable('Dr. Smith will see you at 3:45 pm.'), 'Doctor Smith will see you at three forty-five P M');
+  assert.equal(speakable('Dr. Smith will see you at 3:45 pm.'), 'Doctor Smith will see you at three forty-five P M.');
   assert.equal(speakable('It costs $20, or $1.50 each.'), 'It costs twenty dollars, or one dollar fifty each.');
   assert.equal(speakable('We won 1st place, 50% of 120 people!'), 'We won first place, fifty percent of one hundred twenty people!');
   assert.equal(speakable('Back in 1999, and 2024.'), 'Back in nineteen ninety-nine, and two thousand twenty-four.');

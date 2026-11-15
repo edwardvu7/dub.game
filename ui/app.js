@@ -293,9 +293,25 @@
     gamePick.disabled = ids.length === 0 && !liveGame;
   }
 
+  // The rolling pool of designed voices for the game on show (Settings > Custom voices).
+  function paintPool() {
+    const box = $('voices-pool');
+    const on = !!settings && settings.customVoices === true;
+    const id = shownGame();
+    box.hidden = !on || !id;
+    if (box.hidden) return;
+    const pool = L.customPool(L.voicesFor(lastStore, id));
+    $('pool-count').textContent = pool.used + ' of ' + pool.max + ' custom slots';
+    $('pool-chips').replaceChildren(...pool.names.map((n) => el('span', 'tag tag-yours', n)));
+    $('pool-note').textContent = pool.used
+      ? 'These characters speak with a designed voice. When all ' + pool.max + ' slots are taken, a new character replaces the one idle longest, which goes back to its preset voice. Presets are always kept.'
+      : 'No designed voices yet. Characters speak with their preset voice until one is made, a few lines into the game.';
+  }
+
   function showGame() {
     if (cards && cards.game() !== shownGame()) cards.setGame(shownGame());
     paintGamePicker();
+    paintPool();
   }
 
   gamePick.addEventListener('change', () => {
@@ -315,13 +331,14 @@
 
   openers.voices = () => {
     cards = window.DubCards.mount($('cards-host'), {
-      dub, onError: (m) => toast(m, 'error'), onStore: paintGamePicker, follow: false,
+      dub, onError: (m) => toast(m, 'error'), onStore: (s) => { paintGamePicker(s); paintPool(); }, follow: false,
       pickText: 'Pick a game to see its voices, or start one and they show up here.',
       emptyText: 'No characters for this game yet. Voices appear here as soon as it sends its first line.',
     });
     if (settings) cards.setCustomVoices(settings.customVoices === true);
     cards.setGame(shownGame());
     cards.setCurrent(currentSpeaker);
+    paintPool();
   };
 
   // ---------- Usage (cost control) ----------
@@ -390,9 +407,10 @@
     $('opt-narration').checked = !!settings.narration;
     $('opt-clipboard').checked = !!settings.clipboardMode;
     $('opt-acting').checked = settings.acting !== false;
-    $('opt-quality').checked = settings.quality === 'best';
+    paintQuality(L.qualityLevel(settings.quality));
     $('opt-custom').checked = settings.customVoices === true;
     if (cards) cards.setCustomVoices(settings.customVoices === true);
+    paintPool();
     $('settings-flag').hidden = !L.needsSetup(settings);
     // First launch opens here, so say why: nothing can speak until both keys are in.
     $('settings-title').textContent = L.needsSetup(settings) ? 'Welcome. Add two keys to start' : 'Settings';
@@ -471,7 +489,27 @@
   bindSwitch('opt-narration', 'settings:setNarration');
   bindSwitch('opt-clipboard', 'settings:setClipboardMode');
   bindSwitch('opt-acting', 'settings:setActing');
-  bindSwitch('opt-quality', 'settings:setQuality');
+
+  // Voice quality: Fast / Balanced / Best.
+  const quality = $('quality');
+  function paintQuality(level) {
+    quality.value = String(level);
+    quality.style.setProperty('--fill', (level * 50) + '%');
+    $('quality-desc').textContent = L.QUALITY[level].text;
+    Array.from($('quality-ticks').children).forEach((t, i) => t.setAttribute('aria-current', String(i === level)));
+  }
+  quality.addEventListener('input', () => paintQuality(Number(quality.value)));
+  quality.addEventListener('change', async () => {
+    quality.disabled = true;
+    try {
+      paintSettings(await dub.invoke('settings:setQuality', L.QUALITY[Number(quality.value)].id));
+    } catch (e) {
+      fail(e);
+      paintSettings();
+    } finally {
+      quality.disabled = false;
+    }
+  });
   bindSwitch('opt-custom', 'settings:setCustomVoices');
 
   // ---------- Audio (volume lives in Settings) ----------
@@ -526,13 +564,15 @@
       return true;
     } catch { leveler = false; audioCtx = null; return false; }
   }
+  // Measures a clip and returns its gain (null without Web Audio). The caller applies it only if the
+  // clip is still the current one, so a slow measurement of an old clip never levels a newer one.
   async function levelFor(bytes) {
-    if (!levelGraph()) return;
+    if (!levelGraph()) return null;
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
     try {
       const decoded = await audioCtx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-      leveler.gain.value = L.loudnessGain(decoded.getChannelData(0));
-    } catch { leveler.gain.value = 1; }
+      return L.loudnessGain(decoded.getChannelData(0));
+    } catch { return 1; }
   }
 
   dub.on('audio:play', async (clip) => {
@@ -551,8 +591,9 @@
     clipVolume = Number.isFinite(clip.volume) ? L.clamp(clip.volume, 0, 1) : 1;
     audio.volume = Number(volume.value) * clipVolume;
     const mine = clipUrl;
-    await levelFor(bytes);
+    const gain = await levelFor(bytes);
     if (clipUrl !== mine) return; // a newer line arrived while this one was measured
+    if (gain !== null && leveler) leveler.gain.value = gain;
     audio.src = clipUrl;
     audio.play().catch((e) => {
       // AbortError just means a newer line replaced this one.

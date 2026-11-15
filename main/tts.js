@@ -1,9 +1,17 @@
 'use strict';
 // ElevenLabs text-to-speech. Runs in the main process only; the key never leaves it.
 const API = 'https://api.elevenlabs.io';
-const MODEL = 'eleven_flash_v2_5'; // fastest model, 0.5 credit per character
-const BEST_MODEL = 'eleven_multilingual_v2'; // Settings > Best voice quality: richer, ~1 s slower, 1 credit per character
-const OUTPUT_FORMAT = 'mp3_44100_128'; // 64 kbps sounded thin on designed voices
+// Settings > Voice quality, three levels ('fast' | 'balanced' | 'best'):
+const MODEL = 'eleven_flash_v2_5'; // fast: lowest latency, 0.5 credit per character
+// UNVERIFIED: balanced = Turbo v2.5 (a step richer than Flash, still low latency, 0.5 credit per character). Like Flash
+// it gets numbers/abbreviations spelled out by speakable(). Not compared against Flash by ear on a real account.
+const BALANCED_MODEL = 'eleven_turbo_v2_5';
+const BEST_MODEL = 'eleven_multilingual_v2'; // best: richest, ~1 s slower, 1 credit per character, with speaker boost
+const QUALITIES = ['fast', 'balanced', 'best'];
+/** 'fast' | 'balanced' | 'best' from a setting value; legacy true -> 'best', anything else -> 'fast'. */
+const normalizeQuality = (q) => (q === true || q === 'best' ? 'best' : q === 'balanced' ? 'balanced' : 'fast');
+/** The ElevenLabs model for a quality level. */
+const modelFor = (q) => ({ fast: MODEL, balanced: BALANCED_MODEL, best: BEST_MODEL })[normalizeQuality(q)];const OUTPUT_FORMAT = 'mp3_44100_128'; // 64 kbps sounded thin on designed voices (also used by voice-design.js)
 const MIME = 'audio/mpeg';
 const { speakable } = require('./speakable');
 
@@ -11,12 +19,13 @@ const clamp = (n, lo, hi, dflt) => (Number.isFinite(Number(n)) ? Math.min(hi, Ma
 
 function buildRequest({ text, voice_id, stability, style, speed, previous_text, next_text, model }) {
   const best = model === BEST_MODEL;
+  const modelId = model === BEST_MODEL || model === BALANCED_MODEL ? model : MODEL;
   if (!voice_id || !/^[A-Za-z0-9]+$/.test(voice_id)) throw new Error('tts: bad voice_id');
   return {
     url: `${API}/v1/text-to-speech/${voice_id}?output_format=${OUTPUT_FORMAT}`,
     body: {
       text: best ? String(text) : speakable(text), // Flash skips number/abbreviation reading: spell them out
-      model_id: best ? BEST_MODEL : MODEL,
+      model_id: modelId,
       // UNVERIFIED: flash v2.5 is believed to ignore `style`; `speed` is accepted in 0.7-1.2.
       voice_settings: {
         stability: clamp(stability, 0, 1, 0.5),
@@ -110,4 +119,4 @@ async function subscription(key, deps = {}) {
   }
 }
 
-module.exports = { speak, testKey, subscription, buildRequest, MODEL, BEST_MODEL, MIME };
+module.exports = { speak, testKey, subscription, buildRequest, modelFor, normalizeQuality, QUALITIES, MODEL, BALANCED_MODEL, BEST_MODEL, MIME, OUTPUT_FORMAT };

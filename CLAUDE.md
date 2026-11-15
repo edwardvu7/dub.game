@@ -76,6 +76,7 @@ One cast per game. `current` is the game that sent the last line (what the overl
 comes from the Steam scan. `locked: true` means the player set it; Grok must never overwrite a
 locked profile. `muted: true` skips the character (nothing is sent to ElevenLabs); muting does not
 lock. `volume` (0 to 1, default 1) is playback-only: applied by the renderer to the playing clip, not in the audio cache key, never locks. A version 1 file (speaker to profile) is moved to the first game voiced after the upgrade.
+Profiles also carry `lines` (lines voiced, all sessions) and `last_spoken` (ms timestamp), written by main (`touch()`, saved every 5th line, never patchable); the custom-voice pool uses them to pick the least valuable voice to evict.
 `spoken: true` is set by main when a line from that character is voiced (never patchable); the UI lists only
 characters that have spoken (or are locked/muted) and counts the rest. Names of one person (`Mark`, `MarkBorja`,
 `MarkSprite`, `Sylvie_Happy`) share one entry, keyed by the short name (`main/speaker-names.js`); a one-time
@@ -83,7 +84,7 @@ migration (`migrated: true` at the top of the file, not returned by `voices:get`
 existing entries `spoken` and dropped unlocked crowd/UI-label Godot entries. A Godot `/line` whose speaker is a
 crowd/UI label (`main/godot-names.js`) and matches no known character is dropped.
 `voices:get` and `voices:changed` return `{current, games}` (the file without `version`).
-Optional `custom_voice: {voice_id, name, description}` is set by the backend when a designed voice was created (`voices:customize`): `voice_id` becomes that voice and the profile becomes `locked: true`. It is not in the catalog, so the UI adds it to the dropdown as "Custom: <name>".
+Optional `custom_voice: {voice_id, name, description}` is set by the backend when a designed voice was created (`voices:customize` or `voices:pickPreview`). It does not touch `voice_id` or `locked` (see "Two voice sets" below). It is not in the catalog, so the UI adds it to the dropdown as "Custom: <name>".
 
 ### Two voice sets per character (Custom voices setting)
 A profile keeps its preset voice (`voice_id` + sliders, cast by Gemini/Grok or picked by the player) and, optionally,
@@ -98,11 +99,12 @@ With the setting on, the card's Voice list starts with "Custom: <name>"; picking
 Profiles from the first version (voice_id overwritten by the designed id) are repaired on load: the preset becomes the
 catalog voice closest in gender/age, `locked` is released and `source` is `fallback`, so Grok recasts it once.
 When the setting is on, characters that speak and have no `custom_voice` are designed automatically in one serialized
-background queue (`pipeline.js`): current speaker first, then most lines this session; at most `MAX_CUSTOM_PER_GAME` (8) per game;
+background queue (`pipeline.js`): current speaker first, then most lines this session; at most `MAX_CUSTOM_PER_GAME` (8) live per game (rolling, see below);
 muted, Narrator and unknown skipped; needs an ElevenLabs key. Lines never wait: they speak with the preset until the
 custom voice exists. Hard failures (401/402/403/429, quota/slot/plan) stop the queue for the session and send one
 `app:status` `error` notice; transient errors retry 3 times with backoff. Turning the setting off clears the queue; turning it on
-resets the stop. The manual "Custom voice" button (`voices:customize`) still redoes one character and clears a stop on success.
+resets the stop. The card's "Custom voice" button uses the two preview channels: `voices:designPreviews` (audition up to 3 versions, nothing saved) then `voices:pickPreview` (saves the chosen one); `voices:customize` (one-shot design) remains for the automatic queue/legacy callers. Saving a pick clears a queue stop on success.
+Custom voices are a rolling pool of `MAX_CUSTOM_PER_GAME` (8) live designed voices per game, not a hard cap: when a new one is needed and the pool is full, the least valuable live one is evicted (that character falls back to its preset voice and the ElevenLabs voice is deleted to free the slot). Main characters from the cast research (`cast.json`) are protected from eviction.
 `settings:setCustomVoices` also calls `pipeline.customVoicesChanged(on)`.
 
 ### `cast.json` (in `userData`, main/cast.js)
@@ -164,15 +166,18 @@ list, main sends `games:changed` with the new list.
 | `usage:get` | invoke | → `{session, month, monthChars, monthAI, totalChars, limit, byGame, overLimit}` |
 | `usage:setLimit` | invoke | `number` (0 = none) → same as get |
 | `usage:plan` | invoke | → `{ok, used, limit, resetAt?}` from ElevenLabs, or `{ok:false, error}` |
-| `settings:get` | invoke | → `{hasElevenLabsKey, hasGrokKey, narration, clipboardMode, acting, customVoices, quality}` (never the keys) |
+| `settings:get` | invoke | → `{hasElevenLabsKey, hasGrokKey, narration, clipboardMode, acting, customVoices, quality}` (never the keys). `quality` is the string `'fast'`, `'balanced'` or `'best'` |
 | `settings:setKeys` | invoke | `{elevenlabs?, grok?}` → same shape as get |
 | `settings:test` | invoke | `{provider}` → `{ok, error?}` |
 | `settings:setNarration` | invoke | `boolean` |
 | `settings:setActing` | invoke | `boolean`: Grok directs each line ahead of time (default on) |
-| `settings:setQuality` | invoke | `true`/`'best'` → Multilingual v2 with speaker boost (richer, ~1 s slower, 1 credit/char); anything else → Flash v2.5 (default `'fast'`). A character speaking with its designed (custom) voice always uses Multilingual v2. The model is part of the audio cache key |
+| `settings:setQuality` | invoke | `'fast'` (Flash v2.5, default) | `'balanced'` | `'best'` (Multilingual v2 with speaker boost: richer, ~1 s slower, 1 credit/char); returns the `settings:get` shape. Legacy `true` means `'best'`, anything else `'fast'`. A character speaking with its designed (custom) voice always uses Multilingual v2. The model is part of the audio cache key. `balanced` is Turbo v2.5 (UNVERIFIED against the live API). |
+| `settings:setClipboardMode` | invoke | `boolean`: clipboard mode (lines copied to the clipboard are voiced, game `"clipboard"`); → `settings:get` shape; also starts/stops the clipboard watcher in main |
 | `settings:setCustomVoices` | invoke | `boolean` (anything else is an error): Experimental custom ElevenLabs voices (default off) |
 | `audio:play` | main → renderer event | `{speaker, text, mime, data /* base64 */, volume /* 0..1, that character's own */}` |
-| `line:received` | main → renderer event | `{speaker, text, engine}` |
+| `line:received` | main → renderer event | `{speaker, text, engine, game}` |
+| `audio:stop` | main → renderer event | no payload: stop the playing clip (muted character, narration off, a newer silent line). Not sent to the overlay |
+| `app:status` | main → renderer event | `{level: 'warn'|'error', message}`: a one-line notice for the main window (queue stopped, exclusive fullscreen, missing key, ...). Buffered until the main window has loaded |
 | `voices:changed` | main → renderer event | `{current, games}` |
 | `usage:changed` | main → renderer event | same as `usage:get` |
 | `overlay:toggle` | main → overlay event | — |

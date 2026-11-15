@@ -66,3 +66,15 @@ test('worker failure clears its frame and reports an error', () => {
   assert.equal(frames.at(-1), null);
   assert.match(errors[0], /Access denied/);
 });
+
+test('a lost game window (Ren\'Py splash closing) clears the frame without an error', () => {
+  let child;
+  const frames = [], errors = [];
+  createGameWindowTracker({ platform: 'win32', onFrame: f => frames.push(f), onError: e => errors.push(e),
+    spawnWorker: () => { child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {}; return child; } })
+    .start({ appid: 'a', installDir: 'C:\Games\A' });
+  child.stdout.emit('data', JSON.stringify({ x: 0, y: 0, width: 10, height: 10, focused: true, minimized: false }) + '\n');
+  child.stdout.emit('data', '{"gone":true}\n');
+  assert.equal(frames.at(-1), null);
+  assert.deepEqual(errors, []);
+});

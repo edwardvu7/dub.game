@@ -108,7 +108,7 @@ test('pipeline: names resolve to the cast, Grok gets notes, and the cast arrivin
     settings: { getKey: () => 'k', narration: () => true }, emit: () => {}, settleMs: 0, gameName: () => 'Until Then',
     speak: async () => Buffer.from('mp3'),
     profileCharacter: async (c) => { asked.push(c); return profiler.sanitizeProfile(pick(c, 1), c.speaker, catalog); },
-    profileCharacters: async (list) => { asked.push(...list); return list.map((c) => profiler.sanitizeProfile(pick(c, 2), c.speaker, catalog, c)); } });
+    profileCharacters: async (list) => { asked.push(...list); return list.map((c) => profiler.sanitizeProfile(pick(c, 6), c.speaker, catalog, c)); } });
   await p.handleLine({ speaker: 'Cathy', text: 'Hi.', game: 'godot:Until Then' });
   assert.equal(asked[0].game, 'Until Then', 'Grok is told which game, even before any lookup');
   assert.equal(asked[0].notes, undefined);
@@ -117,7 +117,7 @@ test('pipeline: names resolve to the cast, Grok gets notes, and the cast arrivin
   castReady = true;
   assert.equal(await p.recast('godot:Until Then'), 1, 'only Mark is recast: Cathy is the player\'s');
   const mark = store.forGame('godot:Until Then').get('Mark');
-  assert.equal(mark.voice_id, catalog[2].voice_id);
+  assert.equal(mark.voice_id, catalog[6].voice_id);
   assert.equal(mark.cast, true);
   assert.equal(asked.at(-1).notes, 'male; teen');
   assert.equal(asked.at(-1).setting, 'Philippines (Manila); modern day');

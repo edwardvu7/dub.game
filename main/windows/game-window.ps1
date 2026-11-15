@@ -38,30 +38,58 @@ $handle = [IntPtr]::Zero
 $owner = 0
 $deadline = [DateTime]::UtcNow.AddMinutes(2)
 $borderlessAt = $null
+function Find-GameWindow {
+  # Foreground window first; otherwise any visible top-level window of a process in the game folder
+  # (Ren'Py starts a splash window, then a launcher/child process, and may never take the foreground).
+  param($fg)
+  [uint32]$candidate = 0
+  [void][DubWindow]::GetWindowThreadProcessId($fg, [ref]$candidate)
+  $found = $false
+  try {
+    if ($targetPid -gt 0) { $found = $candidate -eq $targetPid }
+    else {
+      $exe = (Get-Process -Id $candidate -ErrorAction Stop).Path
+      $found = $exe -and $exe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)
+    }
+  } catch {}
+  if ($found -and [DubWindow]::IsWindowVisible($fg)) { return @($fg, $candidate) }
+  if (([DateTime]::UtcNow - $script:lastScan).TotalMilliseconds -lt 1000) { return $null }
+  $script:lastScan = [DateTime]::UtcNow
+  foreach ($proc in (Get-Process -ErrorAction SilentlyContinue)) {
+    try {
+      if ($proc.MainWindowHandle -eq [IntPtr]::Zero) { continue }
+      if ($targetPid -gt 0) { if ($proc.Id -ne $targetPid) { continue } }
+      else { if (-not ($proc.Path -and $proc.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase))) { continue } }
+      if (-not [DubWindow]::IsWindowVisible($proc.MainWindowHandle)) { continue }
+      return @($proc.MainWindowHandle, [uint32]$proc.Id)
+    } catch {}
+  }
+  return $null
+}
+$lastScan = [DateTime]::UtcNow.AddSeconds(-5)
 while ($true) {
   if (-not (Get-Process -Id ([int]$env:DUB_APP_PID) -ErrorAction SilentlyContinue)) { break }
   $fg = [DubWindow]::GetForegroundWindow()
   if ($handle -eq [IntPtr]::Zero) {
     if ([DateTime]::UtcNow -gt $deadline) { break }
-    [uint32]$candidate = 0
-    [void][DubWindow]::GetWindowThreadProcessId($fg, [ref]$candidate)
-    $matches = $false
-    try {
-      if ($targetPid -gt 0) { $matches = $candidate -eq $targetPid }
-      else {
-        $exe = (Get-Process -Id $candidate -ErrorAction Stop).Path
-        $matches = $exe -and $exe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)
-      }
-    } catch {}
-    if ($matches -and [DubWindow]::IsWindowVisible($fg)) {
-      $handle = $fg; $owner = $candidate
-      $borderlessAt = [DateTime]::UtcNow.AddSeconds(1)
+    $hit = Find-GameWindow $fg
+    if ($hit) {
+      $handle = [IntPtr]$hit[0]; $owner = [uint32]$hit[1]
+      $borderlessAt = [DateTime]::UtcNow.AddSeconds(2)
     }
   }
   if ($handle -ne [IntPtr]::Zero) {
     [uint32]$currentOwner = 0
     [void][DubWindow]::GetWindowThreadProcessId($handle, [ref]$currentOwner)
-    if (-not [DubWindow]::IsWindow($handle) -or $currentOwner -ne $owner) { break }
+    if (-not [DubWindow]::IsWindow($handle) -or $currentOwner -ne $owner) {
+      # The splash window closed or the window moved to another process: look for the real one
+      # instead of giving up (this is what made the overlay vanish for Ren'Py games).
+      $handle = [IntPtr]::Zero; $owner = 0
+      $deadline = [DateTime]::UtcNow.AddMinutes(2)
+      '{"gone":true}'
+      Start-Sleep -Milliseconds 150
+      continue
+    }
     if ($borderlessAt -and [DateTime]::UtcNow -ge $borderlessAt -and $fg -eq $handle) {
       if (-not [DubWindow]::Borderless($handle)) {
         @{ error = 'Windows could not position the game. Use its borderless display setting.' } | ConvertTo-Json -Compress

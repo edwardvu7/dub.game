@@ -186,3 +186,23 @@ test('loudnessGain: quiet and loud clips meet in the middle, silence ignored, pe
   assert.ok(L.loudnessGain(spiky) * spiky[10] <= 0.98 + 1e-9, 'never clips');
   assert.equal(L.loudnessGain(new Float32Array(100)), 1, 'silent clip untouched');
 });
+
+test('quality stops: strings, legacy booleans and unknown values', () => {
+  assert.deepEqual(L.QUALITY.map((s) => s.id), ['fast', 'balanced', 'best']);
+  assert.equal(L.qualityLevel('fast'), 0);
+  assert.equal(L.qualityLevel('balanced'), 1);
+  assert.equal(L.qualityLevel('best'), 2);
+  assert.equal(L.qualityLevel(true), 2);
+  assert.equal(L.qualityLevel(false), 0);
+  assert.equal(L.qualityLevel(undefined), 0);
+});
+
+test('custom pool lists characters with a designed voice', () => {
+  const voices = { Zed: { custom_voice: { voice_id: 'z' } }, Amy: { custom_voice: { voice_id: 'a' } }, Bob: {}, Cy: { custom_voice: {} } };
+  assert.deepEqual(L.customPool(voices), { used: 2, max: 8, names: ['Amy', 'Zed'] });
+  assert.deepEqual(L.customPool(null), { used: 0, max: 8, names: [] });
+});
+
+test('the overlay page allows blob audio (custom voice versions play there)', () => {
+  assert.match(read('overlay.html'), /media-src blob:/);
+});

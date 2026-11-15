@@ -9,7 +9,9 @@ const { voiceName } = require('./voice-design');
 
 const { effectiveVoiceId } = require('./voices');
 
-const MAX_CUSTOM_PER_GAME = 8; // ElevenLabs voice slots are limited per plan; automatic design stops here
+// ElevenLabs voice slots are limited per plan: each game keeps at most this many designed voices live. When the pool
+// is full, a character that matters more takes the slot of the one that matters least (see pickVictim).
+const MAX_CUSTOM_PER_GAME = 8;
 const DESIGN_ATTEMPTS = 3;     // automatic design: transient failures retry this many times per character
 const DESIGN_BACKOFF_MS = 30000; // ... waiting attempt * this long
 
@@ -46,7 +48,6 @@ function createPipeline(deps) {
   // Automatic design (Custom voices on): one background queue, one design at a time, never awaited by a line.
   const pending = new Map();   // key -> {game, speaker, notBefore}
   const attempts = new Map();  // key -> failed tries; at DESIGN_ATTEMPTS the character keeps its preset this session
-  const lineCount = new Map(); // key -> lines voiced this session (priority)
   const backoffMs = deps.designBackoffMs === undefined ? DESIGN_BACKOFF_MS : deps.designBackoffMs;
   let hardStop = null;         // message of the failure that stopped automatic design for the session
   let pump = null;             // Promise of the running queue loop
@@ -163,7 +164,8 @@ function createPipeline(deps) {
   const ttsParams = (profile, text) => ({
     text, voice_id: profile.voice_id, stability: profile.stability, style: profile.style,
     speed: profile.speed,
-    model: settings.quality && settings.quality() === 'best' || playsCustom(profile) ? ttsModule.BEST_MODEL : ttsModule.MODEL,
+    // Designed voices always use the best model; presets follow Settings > Voice quality (fast | balanced | best).
+    model: playsCustom(profile) ? ttsModule.BEST_MODEL : ttsModule.modelFor(settings.quality && settings.quality()),
   });
   // Designed voices sound thin on the fast model, so they always use the better one (few characters,
   // so the extra cost and ~1 s delay stay small).
@@ -196,7 +198,6 @@ function createPipeline(deps) {
     emit('audio:play', { speaker, text, mime: ttsModule.MIME, data: audio.toString('base64'),
       volume: profile && Number.isFinite(profile.volume) ? Math.min(1, Math.max(0, profile.volume)) : 1 });
 
-  // Design (or redo) one character's custom voice. The preset and the lock are never touched.
   // The prompt Grok writes for a character's designed voice (fallback: built from the profile).
   async function voicePrompt(g, speaker, existing) {
     const grokKey = settings.getKey('grok');
@@ -207,41 +208,114 @@ function createPipeline(deps) {
       : { description: profiler.fallbackVoiceDescription(asked) };
     return description;
   }
+  // The one rule for "can this character get a designed voice": it exists and a designer is available.
   function checkCanDesign(voices, speaker, existing) {
     if (!existing) throw new Error('Unknown character: ' + speaker);
     if (!designer) throw new Error('Custom voices are not available.');
-    if (!existing.custom_voice && voices.customCount() >= MAX_CUSTOM_PER_GAME) {
-      throw new Error(`This game already has ${MAX_CUSTOM_PER_GAME} custom voices (ElevenLabs limits voice slots). Delete some on ElevenLabs and pick catalog voices instead.`);
-    }
   }
   const PREVIEW_TTL_MS = 30 * 60 * 1000; // UNVERIFIED how long ElevenLabs keeps unsaved previews; 30 min is cautious
   const auditions = new Map(); // key -> {description, ids, at}: previews shown to the player, not saved yet
 
-  async function designVoice(g, speaker) {
+  // ---- Rotating pool of designed voices (at most MAX_CUSTOM_PER_GAME live per game) ----
+  const removals = new Set(); // in-flight ElevenLabs deletions (designIdle waits for them)
+  const rankOf = (game, speaker) => (cast && typeof cast.rank === 'function' ? cast.rank(game, speaker) : -1);
+
+  /** Delete a designed voice on ElevenLabs to free its slot. Best effort, never throws, never while a profile still uses it. */
+  function removeRemote(voiceId) {
+    if (!designer || typeof designer.remove !== 'function' || !voiceId || (store.usesVoice && store.usesVoice(voiceId))) return;
+    const job = Promise.resolve().then(() => designer.remove(voiceId)).catch(() => {}).finally(() => removals.delete(job));
+    removals.add(job);
+  }
+
+  // Standing of a character in the pool: main characters (researched, ranked first) beat the rest; then lines
+  // voiced (persisted \`lines\` in voices.json), then who spoke last.
+  const standing = (game, name, p) => {
+    const rank = rankOf(game, name);
+    return { name, locked: !!p.locked, main: rank >= 0, rank, lines: Number.isFinite(p.lines) ? p.lines : 0,
+      at: Number.isFinite(p.last_spoken) ? p.last_spoken : 0 };
+  };
+  const priority = (game, speaker) => {
+    const p = store.forGame(game).get(speaker);
+    if (!p) return 0;
+    const st = standing(game, speaker, p);
+    return (st.main ? 1e6 - st.rank * 1000 : 0) + st.lines;
+  };
+
+  /**
+   * The designed voice to give up, or null. Never the current speaker or \`speaker\` itself; characters the player
+   * locked go last; then main characters; then fewest lines, then least recently spoken.
+   */
+  function pickVictim(game, speaker) {
+    const pool = Object.entries(store.forGame(game).all())
+      .filter(([name, p]) => p.custom_voice && name !== speaker && keyOf(game, name) !== lastSpeaker)
+      .map(([name, p]) => standing(game, name, p));
+    pool.sort((x, y) => (x.locked - y.locked) || (x.main - y.main) || (y.rank - x.rank) || (x.lines - y.lines) ||
+      (x.at - y.at) || (x.name < y.name ? -1 : 1));
+    return pool[0] || null;
+  }
+
+  /**
+   * Room for \`speaker\`'s designed voice: {} when the pool has space, {victim} when someone must go, null when
+   * nobody should (automatic design only evicts for a character that matters more: main beats non-main, a
+   * better-ranked main beats a lower one, otherwise more lines; a locked voice is only taken by a main character
+   * from a non-main one). \`force\` (the player asked) takes the least valuable voice regardless.
+   */
+  function roomFor(game, speaker, force) {
+    const voices = store.forGame(game);
+    if (voices.customCount() < MAX_CUSTOM_PER_GAME) return {};
+    const victim = pickVictim(game, speaker);
+    if (!victim) return null;
+    if (force) return { victim };
+    const me = standing(game, speaker, voices.get(speaker) || {});
+    const better = me.main !== victim.main ? me.main
+      : me.main ? me.rank < victim.rank : me.lines > victim.lines;
+    if (victim.locked && !(me.main && !victim.main)) return null;
+    return better ? { victim } : null;
+  }
+
+  /** Save a freshly designed voice; the one it replaces and the evicted one are deleted on ElevenLabs. */
+  function keepCustom(game, speaker, custom, victim) {
+    const voices = store.forGame(game);
+    const old = (voices.get(speaker) || {}).custom_voice;
+    const out = voices.setCustom(speaker, custom);
+    if (old && old.voice_id !== custom.voice_id) removeRemote(old.voice_id);
+    const gone = victim && voices.clearCustom(victim.name);
+    if (gone) {
+      log(`custom voice of ${victim.name} (${victim.lines} lines) given up for ${speaker}; it falls back to its preset`);
+      removeRemote(gone.voice_id);
+    }
+    return out;
+  }
+
+  /** The voice to give up for `speaker` right now: only when the pool is full and `speaker` has none yet. */
+  function victimFor(game, speaker) {
+    const voices = store.forGame(game);
+    const p = voices.get(speaker);
+    return p && !p.custom_voice && voices.customCount() >= MAX_CUSTOM_PER_GAME ? pickVictim(game, speaker) : null;
+  }
+
+  async function designVoice(g, speaker, { force = true } = {}) {
     const voices = store.forGame(g);
     const existing = voices.get(speaker);
-    if (!existing) throw new Error('Unknown character: ' + speaker);
-    if (!designer) throw new Error('Custom voices are not available.');
+    checkCanDesign(voices, speaker, existing);
     const k = keyOf(g, speaker);
     if (designing.has(k)) return designing.get(k);
-    if (!existing.custom_voice && voices.customCount() >= MAX_CUSTOM_PER_GAME) {
-      throw new Error(`This game already has ${MAX_CUSTOM_PER_GAME} custom voices (ElevenLabs limits voice slots). Delete some on ElevenLabs and pick catalog voices instead.`);
-    }
     const work = (async () => {
+      const room = existing.custom_voice ? {} : roomFor(g, speaker, force);
+      if (!room) throw new Error(`This game's ${MAX_CUSTOM_PER_GAME} custom voices all belong to characters that matter more.`);
       const description = await voicePrompt(g, speaker, existing);
       // Names stay out of the prompt: the voice is described, never identified.
       const made = await designer.design({ description, name: voiceName(titleOf(g), speaker), avoid: [speaker, titleOf(g)] });
-      return voices.setCustom(speaker, { voice_id: made.voice_id, name: made.name, description: made.description || description });
+      // The slot is given up only now that the new voice exists: a failed design costs nobody their voice.
+      return keepCustom(g, speaker, { voice_id: made.voice_id, name: made.name, description: made.description || description }, victimFor(g, speaker));
     })();
     designing.set(k, work);
     try { return await work; } finally { designing.delete(k); }
   }
 
   function wantsDesign(game, speaker) {
-    const voices = store.forGame(game);
-    const p = voices.get(speaker);
-    return !!p && !p.custom_voice && !p.muted && speaker !== NARRATOR && speaker !== UNKNOWN &&
-      voices.customCount() < MAX_CUSTOM_PER_GAME;
+    const p = store.forGame(game).get(speaker);
+    return !!p && !p.custom_voice && !p.muted && speaker !== NARRATOR && speaker !== UNKNOWN && !!roomFor(game, speaker, false);
   }
 
   /** Queue a character for automatic design (no-op unless the setting is on and it needs one). */
@@ -258,7 +332,7 @@ function createPipeline(deps) {
     let best = null, bestScore = -1;
     for (const [k, j] of pending) {
       if (j.notBefore > t) continue;
-      const score = k === lastSpeaker ? Infinity : (lineCount.get(k) || 0);
+      const score = k === lastSpeaker ? Infinity : priority(j.game, j.speaker);
       if (score > bestScore) { best = [k, j]; bestScore = score; }
     }
     return best;
@@ -315,7 +389,15 @@ function createPipeline(deps) {
       }
     },
     /** Resolves when the automatic design queue is idle (tests). */
-    designIdle: async () => { while (pump) await pump; },
+    designIdle: async () => { while (pump || removals.size) await Promise.all([pump, ...removals]); },
+
+    /** voices:clearGame: forget a game's voices and delete its designed voices on ElevenLabs (best effort). */
+    clearGame(game) {
+      const ids = store.customVoiceIds ? store.customVoiceIds(game) : [];
+      const out = store.clearGame(game);
+      for (const id of ids) removeRemote(id);
+      return out;
+    },
 
     /** POST /line */
     async handleLine(line) {
@@ -326,15 +408,17 @@ function createPipeline(deps) {
       // after a pause means the game was restarted and counts from 1 again, so it is accepted.
       if (line.seq !== undefined && lastLineSeq !== undefined && line.seq <= lastLineSeq &&
           now() - lastLineAt < RESTART_GAP_MS) return;
+      // Cast aliases first, then the offline same-person rule (Mark / MarkBorja / MarkSprite).
+      const resolved = nameIn(game, heard);
+      const known = store.forGame(game);
+      const speaker = known.canonical(resolved);
+      // Godot names come from scene nodes: a crowd or UI label that never matched a known character
+      // is not a speaker. A known (or cast-resolved) name is kept even if it holds a crowd word. This
+      // runs before the line counts as the newest one, so a label cannot cancel the real line before it.
+      if (line.engine === 'godot' && resolved === heard && !known.has(speaker) && isCrowdName(heard)) return;
       const mine = ++generation;
       if (line.seq !== undefined) { lastLineSeq = line.seq; lastLineAt = now(); }
       const voices = activate(game);
-      // Cast aliases first, then the offline same-person rule (Mark / MarkBorja / MarkSprite).
-      const resolved = nameIn(game, heard);
-      const speaker = voices.canonical(resolved);
-      // Godot names come from scene nodes: a crowd or UI label that never matched a known character
-      // is not a speaker. A known (or cast-resolved) name is kept even if it holds a crowd word.
-      if (line.engine === 'godot' && resolved === heard && !voices.has(speaker) && isCrowdName(heard)) return;
       if (line.upcoming) {
         line = { ...line, upcoming: line.upcoming.map((u) => ({ ...u, speaker: voices.canonical(nameIn(game, u.speaker)) })) };
       }
@@ -365,9 +449,8 @@ function createPipeline(deps) {
         })]));
         voices.markSpoken(speaker);
         if (base && base.muted) { emit('audio:stop'); return; } // muted in the overlay: free
-        const k = keyOf(game, speaker);
-        lineCount.set(k, (lineCount.get(k) || 0) + 1);
-        lastSpeaker = k;
+        voices.touch(speaker, now());
+        lastSpeaker = keyOf(game, speaker);
         enqueueDesign(game, speaker); // background; this line speaks with whatever voice exists now
         const effective = withEffectiveVoice(base);
         const profile = moods ? applyMood(effective, moods.get(game, speaker, text)) : effective;
@@ -476,10 +559,6 @@ function createPipeline(deps) {
     },
 
     /**
-     * EXPERIMENTAL: design a custom ElevenLabs voice for one character (Grok writes the description).
-     * On any failure the profile is untouched. One call per character at a time.
-     */
-    /**
      * Manual design, step 1: ElevenLabs makes up to 3 versions of the character's voice for the player
      * to audition. Nothing is saved and no voice slot is used until pickPreview.
      */
@@ -508,9 +587,14 @@ function createPipeline(deps) {
       const made = await designer.save({ id, description: a.description, name: voiceName(titleOf(g), speaker) });
       auditions.delete(k);
       hardStop = null; // a manual success proves the key works again
-      return voices.setCustom(speaker, { voice_id: made.voice_id, name: made.name, description: made.description });
+      return keepCustom(g, speaker, { voice_id: made.voice_id, name: made.name, description: made.description }, victimFor(g, speaker));
     },
 
+    /**
+     * EXPERIMENTAL: design a custom ElevenLabs voice for one character (Grok writes the description).
+     * On any failure the profile is untouched. One call per character at a time. A full pool gives up its
+     * least valuable voice (the player asked for this one).
+     */
     async customizeVoice({ game, speaker } = {}) {
       const out = await designVoice(gameOf({ game }), speaker);
       hardStop = null; // a manual success proves the key works again
@@ -539,9 +623,6 @@ function createPipeline(deps) {
       log(`recast ${profiles.length} character(s) of ${game} with the looked-up cast`);
       return profiles.length;
     },
-
-    /** Kept for callers of the old API: handleCharacters now seeds samples itself. */
-    seedSamples() {},
   };
 }
 

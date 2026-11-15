@@ -122,12 +122,15 @@ test('customizeVoice: failure leaves the profile untouched; unknown character is
   await assert.rejects(r.pipeline.customizeVoice({ game: 'g', speaker: 'Nobody' }), /Unknown character/);
 });
 
-test('customizeVoice: per-game cap and concurrency guard', async () => {
+test('customizeVoice: a full pool rotates (the player asked) and concurrency guard', async () => {
   const names = Array.from({ length: MAX_CUSTOM_PER_GAME + 1 }, (_, i) => 'C' + i);
   const r = rig({ speakers: names });
   for (const n of names.slice(0, MAX_CUSTOM_PER_GAME)) await r.pipeline.customizeVoice({ game: 'g', speaker: n });
-  await assert.rejects(r.pipeline.customizeVoice({ game: 'g', speaker: names[MAX_CUSTOM_PER_GAME] }), /already has 8 custom voices/);
-  await r.pipeline.customizeVoice({ game: 'g', speaker: 'C0' }); // redo is allowed at the cap
+  await r.pipeline.customizeVoice({ game: 'g', speaker: names[MAX_CUSTOM_PER_GAME] }); // pool full: the least valuable one is given up
+  assert.equal(r.voices.customCount(), MAX_CUSTOM_PER_GAME);
+  assert.ok(r.voices.get(names[MAX_CUSTOM_PER_GAME]).custom_voice);
+  await r.pipeline.customizeVoice({ game: 'g', speaker: names[MAX_CUSTOM_PER_GAME] }); // redo keeps its own slot
+  assert.equal(r.voices.customCount(), MAX_CUSTOM_PER_GAME);
 
   let n = 0, release;
   const gate = new Promise((res) => { release = res; });

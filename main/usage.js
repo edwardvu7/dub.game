@@ -1,6 +1,6 @@
 'use strict';
 // Cost control: counts the characters dub.game sends to ElevenLabs (it bills per character) and
-// the Gemini calls, and enforces an optional monthly character limit. Lines replayed from the
+// the Grok calls, and enforces an optional monthly character limit. Lines replayed from the
 // audio cache are free and are not counted. Saved in userData/usage.json.
 const fs = require('node:fs');
 const path = require('node:path');

@@ -9,24 +9,25 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { callGrok, replyText, extractJson, API } = require('./xai');
-
+const { GENDERS, AGES } = require('./profiler');
 
 const MODEL = process.env.GROK_MODEL || 'grok-4.7';
 const TIMEOUT_MS = 90000;            // web search runs several queries: allow time, it is in the background
 const RETRY_MS = 60 * 60 * 1000;     // after a failed lookup, try that game again in an hour
-const GENDERS = ['female', 'male', 'neutral'];
-const AGES = ['child', 'teen', 'young_adult', 'adult', 'elder'];
+const MAIN_RANK = 12; // researched characters are listed most important first; the first dozen count as "main"
 
 function prompt(gameName, seen) {
   return [
     `Search the web (wikis, guides, the store page) for the main characters of the video game "${gameName}".`,
     seen.length ? `Names the game has shown so far: ${seen.slice(0, 30).join(', ')}.` : '',
     'Reply with JSON only, no other text, in exactly this shape:',
-    '{"setting":{"country":"Philippines","region":"Manila","language":"Filipino-English","era":"modern day","notes":"one sentence on the world and how people talk"},',
-    '"characters":[{"name":"Mark","aliases":["Mark Borja"],"gender":"male","age_range":"teen",',
+    '{"setting":{"country":"","region":"","language":"","era":"","notes":"one sentence on the world and how people talk"},',
+    '"characters":[{"name":"","aliases":[],"protagonist":false,"gender":"male","age_range":"teen",',
     '"personality":"one sentence","voice":"one sentence on how they sound",',
     '"origin":"nationality or ethnic background if known, else empty","speech":"short: formal or slang, regional English, tone, pace"}]}',
-    'setting: where and when the game takes place and what language the characters speak; leave a field empty if unknown.',
+    'setting: where and when the game takes place and the language the game text is written in (voices are cast for that language); leave a field empty if unknown.',
+    'speech: how the character sounds in the game text language. For an English-language game set in Japan, a teen speaks natural, casual American English, not accented English.',
+    'protagonist: true for the player character; put the names the script uses for them in aliases (e.g. MC, Protagonist, the default name).',
     `gender is one of ${GENDERS.join(', ')}. age_range is one of ${AGES.join(', ')}.`,
     'aliases: full names, nicknames and titles the game may show instead of the name.',
     'Up to 25 characters, most important first. No plot spoilers in personality or voice.',
@@ -59,6 +60,7 @@ function parseCast(text) {
   const list = raw && Array.isArray(raw.characters) ? raw.characters : [];
   return list.slice(0, 25).map((c) => ({
     name: clean(c && c.name, 60),
+    protagonist: !!(c && c.protagonist === true),
     aliases: (Array.isArray(c && c.aliases) ? c.aliases : []).map((a) => clean(a, 60)).filter(Boolean).slice(0, 8),
     gender: GENDERS.includes(c && c.gender) ? c.gender : 'neutral',
     age_range: AGES.includes(c && c.age_range) ? c.age_range : 'adult',
@@ -71,6 +73,11 @@ function parseCast(text) {
 
 // "MarkSprite" -> ["mark", "sprite"]; "Mark Borja" -> ["mark", "borja"]
 const words = (s) => String(s).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+// Honorifics and titles a script puts around a name: "Sayori-chan", "Miss Monika", "Natsuki senpai".
+const HONORIFICS = new Set(['chan', 'kun', 'san', 'sama', 'senpai', 'sensei', 'dono', 'miss', 'mr', 'mrs', 'ms', 'dr', 'sir', 'lady', 'mister']);
+// Names the script uses for "whoever the player is": MC, Protagonist, and name variables like [player] or %(name)s.
+const PROTAGONIST = /^(mc|mcname|protagonist|protag|player|playername|pname|povname|pov|hero|heroname|yourname|name|me|you)$/;
+const isProtagonistName = (said) => PROTAGONIST.test(said.replace(/\)s$/, ')').replace(/[\s[\]{}()%<>$_-]/g, ''));
 
 /** The cast member a speaker name refers to, or null. */
 function match(characters, speaker) {
@@ -80,11 +87,19 @@ function match(characters, speaker) {
   for (const c of characters) {
     if (c.name.toLowerCase() === said || c.aliases.some((a) => a.toLowerCase() === said)) return c;
   }
-  // 2. The first name as a whole word ("Mark Borja", "MarkSprite"), when only one character fits.
-  const tokens = words(speaker);
+  // 2. The player character under a generic label or a name variable ("MC", "[player]", "Mc").
+  if (isProtagonistName(said)) {
+    const hero = characters.filter((c) => c.protagonist);
+    if (hero.length === 1) return hero[0];
+  }
+  // 3. Whole words ("Mark Borja", "MarkSprite", "Sayori-chan"), honorifics ignored: the first name, or all the
+  // words of an alias, must appear, and only one character may fit.
+  const tokens = words(speaker).filter((w) => !HONORIFICS.has(w));
+  if (!tokens.length) return null;
   const hits = characters.filter((c) => {
     const first = words(c.name)[0];
-    return first && first.length >= 3 && tokens.includes(first);
+    if (first && first.length >= 3 && tokens.includes(first)) return true;
+    return c.aliases.some((a) => { const w = words(a).filter((x) => !HONORIFICS.has(x)); return w.join('').length >= 3 && w.every((x) => tokens.includes(x)); });
   });
   return hits.length === 1 ? hits[0] : null;
 }
@@ -150,6 +165,13 @@ function createCastBook({ file, settings, fetch: doFetch = globalThis.fetch, now
     detail(game, speaker) {
       const c = match(characters(game), speaker);
       return { origin: clean(c && c.origin, 80), speech: clean(c && c.speech, 160) };
+    },
+    /** Importance of a speaker: 0 = most important researched character; -1 = not a main character. */
+    rank(game, speaker) {
+      const list = characters(game);
+      const c = match(list, speaker);
+      const i = c ? list.indexOf(c) : -1;
+      return i >= 0 && (i < MAIN_RANK || c.protagonist) ? i : -1;
     },
     resolve(game, speaker) {
       const c = match(characters(game), speaker);

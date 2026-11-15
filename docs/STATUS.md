@@ -58,15 +58,11 @@ Sections A, B and C are merged into `main`. They merged with no conflicts.
 - Mute per character (cards in the overlay and Voices tab): a muted character is not sent to ElevenLabs.
 
 ## Not verified yet (needs a real Windows machine)
-- The app has never been started in Electron. `npm install` and `npm start` are the first real run.
 - Overlay over a real game: windowed, borderless, and the exclusive-fullscreen warning.
 - Steam scan against a real library, and installing the hook into a real game.
 - The Ren'Py hook against a real game (speaker names, Ren'Py 7 vs 8).
 - Real ElevenLabs and Grok calls, including the model IDs.
 - The Windows installer (`npm run dist`).
-
-## Known limitation
-Voices are saved per speaker name, not per game (see CLAUDE.md).
 
 ## First run
 ```bash
@@ -149,3 +145,19 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
   (`voices:designPreviews`, `voices:pickPreview`). The automatic queue still keeps the first.
 - Flash lines are spelled out before sending (`main/speakable.js`: titles, times, money, ordinals,
   percents, years, numbers); Multilingual v2 gets the text as is.
+
+## Demo-readiness audit (Nov 14, 2026)
+- Ren'Py hook is now version 8. Audited by reading: it binds no keys (Shift+F2 is never swallowed), sends
+  from one daemon thread with a 2 s timeout, swallows every error, strips tags ({i}, {w}, {nw}, {fast}, {{),
+  interpolates [player] with renpy.substitute, and uses "Narrator" for a nameless character.
+- Fixed in v8: on macOS, `config.basedir` is `<Game>.app/Contents/Resources/autorun`, so the game id was
+  `renpy:autorun` and never matched Steam's folder name; it now uses the folder above the .app. Speaker lookup
+  now also handles a quoted literal name (`"Eileen" "line"`) when `ast.eval_who` is unavailable (old Ren'Py).
+- The game id `renpy:<basename of config.basedir>` equals `path.basename(installDir)` that `gameName()` in
+  `main/index.js` matches against the scan (case-insensitive), so overlay and Voices tab show the Steam name.
+- UNVERIFIED on DDLC (Ren'Py 6.99, Python 2): DynamicCharacter names, renpy.substitute on 6.99, glitch text
+  and `extend` lines (sent as Ren'Py gives them), and the poem game's custom screens (no say statements, so
+  nothing is sent). Background /characters collection evaluates character names off the main thread.
+- Settings: quality is now 'fast' | 'balanced' | 'best', and custom voices are a rolling pool of 8 per game with
+  eviction (see CLAUDE.md). At the time of writing main/settings.js and main/ipc.js did not yet implement
+  'balanced' or eviction; CLAUDE.md describes the target.

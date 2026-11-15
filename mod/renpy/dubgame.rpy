@@ -19,7 +19,10 @@
 #
 # UNVERIFIED: not yet run inside a real Ren'Py game. The speaker lookup (_last_say_who) and the
 # script walk used for sample lines are the two things to check first against the demo game.
-# DUBGAME_HOOK_VERSION 7
+# UNVERIFIED (DDLC, Ren'Py 6.99 / Python 2): DynamicCharacter names (s_name), [player] substitution via
+# renpy.substitute (if missing on 6.99 the text keeps "[player]"), garbled glitch text sent as is, and
+# `extend` lines (Ren'Py passes the whole accumulated text). The hook binds no keys, so Shift+F2 is never eaten.
+# DUBGAME_HOOK_VERSION 8
 
 init -999 python:
     import json as _dubgame_json
@@ -41,7 +44,15 @@ init -999 python:
         # The folder the game is installed in (config.basedir), the same name Steam uses.
         try:
             import os as _os
-            base = _os.path.basename(_os.path.normpath(config.basedir))
+            path = _os.path.normpath(config.basedir)
+            # macOS: <Steam folder>/<Game>.app/Contents/Resources/autorun. Steam's folder name is the
+            # one above the .app, which is what the app matches against.
+            parts = path.replace("\\", "/").split("/")
+            for i, part in enumerate(parts):
+                if i > 0 and part.lower().endswith(".app") and parts[i + 1:i + 4] == ["Contents", "Resources", "autorun"]:
+                    path = "/".join(parts[:i])
+                    break
+            base = _os.path.basename(path)
             if base:
                 return u"renpy:" + (base if isinstance(base, type(u"")) else base.decode("utf-8", "replace"))
         except Exception:
@@ -140,7 +151,7 @@ init -999 python:
             char = ast.eval_who(who)
         except Exception:
             try:
-                char = getattr(store, who, None)
+                char = eval(who, vars(store))  # a variable name, or a quoted literal name
             except Exception:
                 char = None
         return _dubgame_char_name(char) or u"Narrator"

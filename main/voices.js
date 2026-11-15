@@ -4,6 +4,8 @@
 // File format (version 2):
 //   { "version": 2, "current": "renpy:DDLC",
 //     "games": { "renpy:DDLC": { "name": "Doki Doki Literature Club", "voices": { "Sayori": {...} } } } }
+// Per-profile counters for custom-voice rotation (pipeline.js): `lines` (lines voiced, all sessions) and
+// `last_spoken` (ms since epoch). Written by touch(); flushed to disk every few lines, not on every one.
 // A version 1 file (speaker -> profile, no games) is kept as "legacy" and handed to the first game
 // that is voiced afterwards, so players who already tuned voices keep them.
 const fs = require('node:fs');
@@ -68,6 +70,10 @@ function consolidate(voices) {
       if (v) merged.volume = v.volume;
     }
     if (profiles.some((p) => p.spoken)) merged.spoken = true;
+    merged.lines = profiles.reduce((n, p) => n + (Number.isFinite(p.lines) ? p.lines : 0), 0) || undefined;
+    if (merged.lines === undefined) delete merged.lines;
+    const ls = Math.max(0, ...profiles.map((p) => (Number.isFinite(p.last_spoken) ? p.last_spoken : 0)));
+    if (ls) merged.last_spoken = ls;
     if (profiles.some((p) => p.muted)) merged.muted = true;
     for (const m of members) delete voices[m];
     voices[c] = merged;
@@ -194,6 +200,8 @@ function createVoiceStore({ file, catalogIds, catalog }) {
         v[profile.speaker] = { ...profile, locked: false, spoken: !!(existing && existing.spoken), muted: !!(existing && existing.muted),
           volume: existing && Number.isFinite(existing.volume) ? existing.volume : 1 };
         // A designed voice record survives recasts and re-rolls (kept so the player can switch back to it).
+        if (existing && Number.isFinite(existing.lines)) v[profile.speaker].lines = existing.lines;
+        if (existing && Number.isFinite(existing.last_spoken)) v[profile.speaker].last_spoken = existing.last_spoken;
         if (existing && existing.custom_voice) {
           v[profile.speaker].custom_voice = existing.custom_voice;
           if (existing.use_preset) v[profile.speaker].use_preset = true;
@@ -209,6 +217,26 @@ function createVoiceStore({ file, catalogIds, catalog }) {
         if (!v || !v[speaker] || v[speaker].spoken) return;
         v[speaker].spoken = true;
         save();
+      },
+
+      /** Count one voiced line (rotation priority). Kept in memory; written to disk every 5th line. */
+      touch(speaker, at = Date.now()) {
+        const v = voicesOf(false);
+        if (!v || !v[speaker]) return;
+        v[speaker].lines = (Number.isFinite(v[speaker].lines) ? v[speaker].lines : 0) + 1;
+        v[speaker].last_spoken = at;
+        if (v[speaker].lines % 5 === 1) save();
+      },
+
+      /** Rotation: drop a designed voice. The profile falls back to its preset (voice_id and sliders are untouched). */
+      clearCustom(speaker) {
+        const v = voicesOf(false);
+        if (!v || !v[speaker] || !v[speaker].custom_voice) return null;
+        const old = v[speaker].custom_voice;
+        delete v[speaker].custom_voice;
+        delete v[speaker].use_preset;
+        save();
+        return old;
       },
 
       /** Player edit from the UI: applies the allowed fields; a sound change locks the profile. */
@@ -266,6 +294,18 @@ function createVoiceStore({ file, catalogIds, catalog }) {
     forGame,
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     current: () => data.current,
+
+    /** True when any profile of any game still points at this ElevenLabs voice (so it must not be deleted). */
+    usesVoice(voiceId) {
+      return Object.values(data.games).some((g) => isObject(g) && isObject(g.voices) && Object.values(g.voices)
+        .some((p) => p && (p.voice_id === voiceId || (p.custom_voice && p.custom_voice.voice_id === voiceId))));
+    },
+
+    /** The designed voices of one game (for deleting them on ElevenLabs when the game is cleared). */
+    customVoiceIds(game) {
+      const b = own(data.games, String(game)) ? data.games[String(game)] : null;
+      return [...new Set(Object.values((b && b.voices) || {}).filter((p) => p && p.custom_voice).map((p) => p.custom_voice.voice_id))];
+    },
 
     /** A game sent a line or its cast: it becomes the one the overlay and Voices tab show. */
     setCurrent(game, name) {

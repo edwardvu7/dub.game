@@ -130,7 +130,7 @@
         const play = el('button', 'btn btn-quiet', 'Play ' + (i + 1));
         play.type = 'button';
         play.disabled = !v.data;
-        play.addEventListener('click', () => playVersion(v));
+        play.addEventListener('click', () => { try { playVersion(v); } catch { onError('That version could not be played.'); } });
         const keep = el('button', 'btn', 'Keep');
         keep.type = 'button';
         keep.addEventListener('click', () => run(card, keep, async () => {
@@ -146,7 +146,7 @@
       cancel.addEventListener('click', close);
       box.replaceChildren(title, ...rows, cancel);
       box.hidden = false;
-      if (versions && versions[0]) playVersion(versions[0]);
+      if (versions && versions[0]) { try { playVersion(versions[0]); } catch { /* the Play buttons report it */ } }
     }
 
     function paintOpen(card, open) {
@@ -174,13 +174,14 @@
       head.append(toggle);
 
       const about = el('p', 'card-about');
+      const notes = el('p', 'card-notes'); // read-only: where the character is from and how they talk (from the game research)
 
       const voiceRow = el('label', 'field');
       voiceRow.append(el('span', 'field-label', 'Voice'));
       const select = el('select', 'select');
       voiceRow.append(select);
 
-      const card = { root, badge, about, select, sliders: {}, busy: false };
+      const card = { root, badge, about, notes, select, sliders: {}, busy: false };
 
       select.addEventListener('change', () => run(card, null, () => {
         const p = voices[speaker] || {};
@@ -268,7 +269,7 @@
       const body = el('div', 'card-body');
       body.id = bodyId;
       const inner = el('div', 'card-body-inner');
-      inner.append(about, voiceRow, faders, actions, audition);
+      inner.append(about, notes, voiceRow, faders, actions, audition);
       body.append(inner);
       card.toggle = toggle;
       card.body = body;
@@ -286,24 +287,33 @@
     function patch(speaker, profile) {
       const card = cards.get(speaker);
       if (!card) return;
-      card.badge.textContent = profile.muted ? 'Muted' : (profile.locked ? 'Custom' : 'Auto');
-      card.badge.className = 'pick ' + (profile.muted ? 'pick-muted' : (profile.locked ? 'pick-custom' : 'pick-auto'));
+      // Muted, then "Designed" (a custom ElevenLabs voice is speaking), then "Locked" (the player set it), else Auto.
+      const kind = profile.muted ? 'muted' : usesCustom(profile) ? 'designed' : profile.locked ? 'locked' : 'auto';
+      card.badge.textContent = { muted: 'Muted', designed: 'Designed voice', locked: 'Locked', auto: 'Auto' }[kind];
+      card.badge.className = 'pick ' + { muted: 'pick-muted', designed: 'pick-custom', locked: 'pick-custom', auto: 'pick-auto' }[kind];
       card.root.classList.toggle('is-muted', !!profile.muted);
       card.custom.hidden = !customOn;
       if (!card.custom.hasAttribute('aria-busy')) card.custom.textContent = profile.custom_voice ? 'Redo custom voice' : 'Custom voice';
       card.mute.textContent = profile.muted ? 'Unmute' : 'Mute';
       card.mute.setAttribute('aria-pressed', profile.muted ? 'true' : 'false');
       card.mute.title = profile.muted ? 'Speak this character again.' : 'Stop speaking this character. Saves ElevenLabs credits.';
-      card.badge.title = profile.locked
-        ? 'You set this voice. dub.game will not change it.'
-        : (profile.reason || 'Chosen automatically.');
+      card.badge.title = usesCustom(profile)
+        ? 'A voice designed for this character is speaking. Your preset voice is kept.'
+        : profile.locked
+          ? 'You set this voice. dub.game will not change it.'
+          : (profile.reason || 'Chosen automatically.');
       card.about.textContent = profile.personality || '';
       card.about.hidden = !profile.personality;
+      const notes = [profile.origin, profile.speech].filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim().replace(/\.$/, ''));
+      card.notes.textContent = notes.length ? 'Notes: ' + notes.join('. ') + '.' : '';
+      card.notes.hidden = !notes.length;
       if (document.activeElement !== card.select) fillVoices(card.select, profile);
       for (const def of SLIDERS) {
         const slot = card.sliders[def.key];
         if (slot.dirty) continue; // the player is dragging this one
-        if (profile[def.key] !== undefined) slot.input.value = profile[def.key];
+        // A profile with no volume yet plays at full volume.
+        const v = profile[def.key] !== undefined ? profile[def.key] : (def.key === 'volume' ? 1 : undefined);
+        if (v !== undefined) slot.input.value = v;
         slot.paint();
       }
     }

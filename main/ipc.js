@@ -2,6 +2,8 @@
 // IPC handlers for the channels in CLAUDE.md. createHandlers is plain JS (testable);
 // registerIpc attaches it to Electron's ipcMain.
 
+const { normalizeQuality } = require('./tts');
+
 const INVOKE_CHANNELS = [
   'games:list', 'games:rescan', 'games:addFolder', 'games:setEnabled', 'games:launch', 'games:godotConfig',
   'voices:get', 'voices:catalog', 'voices:update', 'voices:reroll', 'voices:customize', 'voices:designPreviews', 'voices:pickPreview', 'voices:preview', 'voices:clearGame',
@@ -54,7 +56,11 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
       return pipeline.pickPreview({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), id: String(need(arg, 'id').id) });
     },
     'voices:preview': (arg) => pipeline.preview({ game: gameArg(arg), speaker: String(need(arg, 'speaker').speaker), text: arg.text }),
-    'voices:clearGame': (arg) => voices.clearGame(String(need(arg, 'game').game)),
+    // The pipeline also deletes the game's designed voices on ElevenLabs (best effort) when it can.
+    'voices:clearGame': (arg) => {
+      const game = String(need(arg, 'game').game);
+      return pipeline && typeof pipeline.clearGame === 'function' ? pipeline.clearGame(game) : voices.clearGame(game);
+    },
 
     'usage:get': () => (usage ? usage.get() : null),
     'usage:setLimit': (arg) => {
@@ -68,8 +74,8 @@ function createHandlers({ games, voices, settings, pipeline, catalog, usage, pla
     'settings:test': (arg) => settings.test(arg),
     'settings:setNarration': (arg) => settings.setNarration(arg === true),
     'settings:setActing': (arg) => settings.setActing(arg === true),
-    // true or 'best': Multilingual v2; anything else: Flash v2.5
-    'settings:setQuality': (arg) => settings.setQuality(arg === true || arg === 'best' ? 'best' : 'fast'),
+    // 'fast' | 'balanced' | 'best'; legacy true means 'best', anything else 'fast' (tts.normalizeQuality)
+    'settings:setQuality': (arg) => settings.setQuality(normalizeQuality(arg)),
     'settings:setCustomVoices': (arg) => {
       const out = settings.setCustomVoices(arg);
       if (pipeline && typeof pipeline.customVoicesChanged === 'function') pipeline.customVoicesChanged(out.customVoices);
