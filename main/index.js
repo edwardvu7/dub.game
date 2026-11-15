@@ -27,7 +27,7 @@ const catalog = require('../voices_catalog.json');
 
 const ROOT = path.join(__dirname, '..');
 const HOTKEY = 'Shift+F2';
-const BACKUP_HOTKEYS = ['Control+Alt+F2']; // also registered, in case a game or tool swallows Shift+F2
+const BACKUP_HOTKEYS = ['Alt+F2', 'Control+Alt+F2']; // also registered, in case a game or tool swallows Shift+F2
 const EXTERNAL_HOSTS = ['elevenlabs.io', 'aistudio.google.com', 'store.steampowered.com', 'console.x.ai'];
 
 let mainWindow = null;
@@ -383,8 +383,9 @@ async function start() {
   createMainWindow();
   createOverlayWindow();
 
+  startHotkeyPoller();
   const hotkeys = [HOTKEY, ...BACKUP_HOTKEYS].filter((key) => {
-    try { return globalShortcut.register(key, toggleOverlay); } catch { return false; }
+    try { return globalShortcut.register(key, toggleOnce); } catch { return false; }
   });
   if (!hotkeys.length) {
     pendingStatus.push({ level: 'warn', message: `${HOTKEY} is taken by another program; the overlay hotkey is off.` });
@@ -397,6 +398,23 @@ async function start() {
     clipboardWatcher.stop();
     server.close();
   });
+}
+
+// Backup that reads the keyboard directly (Windows): Shift+F2 or Alt+F2 toggles the overlay even if a
+// game or another program swallowed the global shortcut. Debounced so both paths never double-toggle.
+let lastToggle = 0;
+function toggleOnce() { const now = Date.now(); if (now - lastToggle < 350) return; lastToggle = now; toggleOverlay(); }
+function startHotkeyPoller() {
+  if (process.platform !== 'win32') return;
+  try {
+    const script = path.join(__dirname.replace(/app\.asar(?=[/\\])/, 'app.asar.unpacked'), 'windows', 'hotkey.ps1');
+    const child = require('node:child_process').spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+      Buffer.from(require('node:fs').readFileSync(script, 'utf8'), 'utf16le').toString('base64')],
+      { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, DUB_APP_PID: String(process.pid) } });
+    child.stdout.on('data', (d) => { if (String(d).includes('toggle')) toggleOnce(); });
+    child.on('error', () => {});
+    app.on('before-quit', () => { try { child.kill(); } catch {} });
+  } catch { /* the global shortcut still works */ }
 }
 
 if (!app.requestSingleInstanceLock()) {
