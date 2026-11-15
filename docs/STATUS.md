@@ -156,7 +156,7 @@ Without a game: `curl -X POST http://127.0.0.1:8000/line -H "Content-Type: appli
 
 ## Demo-readiness audit (Nov 14, 2026)
 - Ren'Py hook is now version 8. Audited by reading: it binds no keys (Shift+F2 is never swallowed), sends
-  from one daemon thread with a 2 s timeout, swallows every error, strips tags ({i}, {w}, {nw}, {fast}, {{),
+  from one daemon thread with a 2 s timeout, swallows every error, strips tags ({i}, {w}, {nw}, {fast}, and the doubled opening brace),
   interpolates [player] with renpy.substitute, and uses "Narrator" for a nameless character.
 - Fixed in v8: on macOS, `config.basedir` is `<Game>.app/Contents/Resources/autorun`, so the game id was
   `renpy:autorun` and never matched Steam's folder name; it now uses the folder above the .app. Speaker lookup
