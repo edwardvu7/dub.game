@@ -3,7 +3,7 @@
 extends Node
 
 const BASE_URL := "http://127.0.0.1:8000"
-const VERSION := 4
+const VERSION := 5
 const MAX_LABELS := 512
 var _labels: Array[WeakRef] = []
 var _config: Dictionary = {}
@@ -18,6 +18,7 @@ var _sent := false
 var _text_now := ""
 var _growing := false   # the text itself grows letter by letter (a string typewriter)
 var _done_once := false # the current line was fully shown at least once
+var _inline_name := RegEx.create_from_string("^([^\\s:][^:\\n]{0,23}):\\s+(.+)$") # "Cathy: Not yet."
 var _seq := 0
 var _selected := ""
 
@@ -130,6 +131,41 @@ func _person(name: String) -> String:
 			return ""
 	return clean
 
+# Text that reads like a name: short, one line, no sentence ending, no clock or score.
+func _looks_like_name(t: String) -> bool:
+	if t.length() < 2 or t.length() > 32 or "\n" in t or ":" in t:
+		return false
+	if t.split(" ", false).size() > 4 or t.right(1) in [".", "!", "?", ",", ";", "…"]:
+		return false
+	var first := t.unicode_at(0)
+	return (first >= 65 and first <= 90) or (first >= 97 and first <= 122) or first > 127
+
+func _name_plate(node: Node, labels: Array) -> String:
+	if not node is Control:
+		return ""
+	var line: Rect2 = node.get_global_rect()
+	var text := _text(node)
+	var best := ""
+	var best_gap := 1e9
+	for other in labels:
+		if other == node or not other is Control or other.get_viewport() != node.get_viewport():
+			continue
+		var t := _text(other)
+		if t == text or not _looks_like_name(t):
+			continue
+		var r: Rect2 = other.get_global_rect()
+		var above := line.position.y - r.end.y          # gap between the plate's bottom and the line's top
+		var beside := line.position.x - r.end.x         # gap between the plate's right and the line's left
+		var gap := 1e9
+		if above >= -8 and above <= 80 and r.position.x <= line.position.x + line.size.x * 0.5 and r.end.x >= line.position.x - 80:
+			gap = maxf(above, 0.0) + absf(r.position.x - line.position.x) * 0.1
+		elif beside >= -8 and beside <= 120 and absf(r.position.y - line.position.y) <= 30:
+			gap = maxf(beside, 0.0)
+		if gap < best_gap:
+			best_gap = gap
+			best = t
+	return best.left(100)
+
 func _speaker(node: Node, labels: Array) -> String:
 	var chosen := str(_config.get("speakerPath", ""))
 	var best: Node = null
@@ -150,6 +186,11 @@ func _speaker(node: Node, labels: Array) -> String:
 			best_distance = d
 	if best != null:
 		return _text(best).left(100)
+	# A name plate: a short name-like label just above or to the left of the line on screen,
+	# whatever the game called the node.
+	var plate := _name_plate(node, labels)
+	if not plate.is_empty():
+		return plate
 	# No name label: a bubble that floats over a character usually sits inside that character's
 	# node (/root/World/Cathy/Bubble/Text), so the nearest world node with a real name is the speaker.
 	var up := node.get_parent()
@@ -205,6 +246,12 @@ func _process(delta: float) -> void:
 		speaker = _speaker(best, visible)
 		if speaker.is_empty():
 			speaker = "Narrator"
+		# Some games print the name inside the line: "Cathy: Not yet." Speak only the line.
+		if speaker == "Narrator":
+			var inline := _inline_name.search(text)
+			if inline != null and _looks_like_name(inline.get_string(1)):
+				speaker = inline.get_string(1)
+				text = inline.get_string(2)
 		next_key = _selected + "\n" + speaker + "\n" + text
 		complete = best.visible_characters < 0 or best.visible_ratio >= 1.0
 	# A new reveal of the same full text is also a new utterance.

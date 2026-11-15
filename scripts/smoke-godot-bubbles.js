@@ -56,6 +56,27 @@ func _ready() -> void:
 	get_tree().quit()
 `;
 
+// A classic dialogue box: the name plate is a plain "Label" above the text, found by where it sits
+// on screen. The last line has no name plate and prints the name inside the line.
+const PLATE = `extends Node
+var lines := [["Mark", "Hey, did you finish the homework?"], ["Cathy", "Not yet. Let's do it together."], ["", "Cathy: Then again, maybe later."]]
+func _ready() -> void:
+	var layer := CanvasLayer.new(); layer.name = "UI"; add_child(layer)
+	var hud := Label.new(); hud.name = "Clock"; hud.text = "7:45 AM"; layer.add_child(hud)
+	var box := Control.new(); box.name = "DialogueBox"; box.position = Vector2(100, 500); box.size = Vector2(800, 200); layer.add_child(box)
+	var plate := Label.new(); plate.position = Vector2(20, 10); plate.size = Vector2(200, 30); box.add_child(plate)
+	var text := RichTextLabel.new(); text.name = "Body"; text.position = Vector2(20, 50); text.size = Vector2(760, 140); box.add_child(text)
+	for l in lines:
+		plate.text = l[0]
+		text.text = l[1]
+		text.visible_characters = 0
+		for i in range(l[1].length() + 1):
+			text.visible_characters = i
+			await get_tree().create_timer(0.02).timeout
+		await get_tree().create_timer(1.2).timeout
+	get_tree().quit()
+`;
+
 async function play({ bubble, name, pick, source }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dub-godot-generic-'));
   fs.writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n[application]\nrun/main_scene="res://main.tscn"\n');
@@ -88,7 +109,10 @@ async function play({ bubble, name, pick, source }) {
   assert.deepEqual(await play({ bubble: 'Thing', name: 'Who', pick: {
     textPath: '/root/Main/UI/Thing/@VBoxContainer@5/Text', speakerPath: '/root/Main/UI/Thing/@VBoxContainer@5/Who' } }), want,
   'picked once: later copies of the node are voiced too');
+  assert.deepEqual(await play({ source: PLATE }), [['Mark', 'Hey, did you finish the homework?'],
+    ['Cathy', "Not yet. Let's do it together."], ['Cathy', 'Then again, maybe later.']],
+  'dialogue box: name plate found by position, and "Name: line" split');
   assert.deepEqual(await play({ source: WORLD }), [['Mark', 'Hey, did you finish the homework?'],
     ['Cathy', "Not yet. Let's do it together."], ['Mark', 'Deal.']], 'bubbles over characters: the character is the speaker');
-  console.log('PASS: generic Godot hook: automatic, picked-once, and speakers from the character a bubble floats over.');
+  console.log('PASS: generic Godot hook: automatic, picked-once, and speakers from name plates, "Name: line" text, and the character a bubble floats over.');
 })().catch((e) => { console.error(e); process.exitCode = 1; });
