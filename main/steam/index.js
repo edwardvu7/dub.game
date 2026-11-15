@@ -115,7 +115,7 @@ function createGames(opts) {
     async setEnabled({ appid, enabled }) {
       const game = await find(appid);
       if (enabled && game.support === 'soon' && game.engine !== 'godot') {
-        throw new Error(`Voices for ${game.name} aren't available yet. dub.game supports Ren'Py and RPG Maker MV games for now.`);
+        throw new Error(`Voices for ${game.name} aren't available yet. dubplay supports Ren'Py and RPG Maker MV games for now.`);
       }
       if (enabled) install.installHook(game, { modDir: opts.modDir });
       else install.uninstallHook(game);

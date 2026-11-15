@@ -1,10 +1,10 @@
 {
   "name": "dub-game",
-  "productName": "dub.game",
+  "productName": "dubplay",
   "version": "0.1.7",
   "description": "AI voice-over for visual novels: Grok casts a voice per character, ElevenLabs speaks every line.",
   "main": "main/index.js",
-  "author": "dub.game team",
+  "author": "dubplay team",
   "license": "MIT",
   "private": true,
   "engines": {
@@ -29,7 +29,7 @@
   "dependencies": {},
   "build": {
     "appId": "game.dub.app",
-    "productName": "dub.game",
+    "productName": "dubplay",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -61,7 +61,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "dub.game",
+      "shortcutName": "dubplay",
       "artifactName": "dub.game-Setup.${ext}",
       "runAfterFinish": true
     },

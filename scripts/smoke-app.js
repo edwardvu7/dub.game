@@ -100,6 +100,7 @@ const app = new EventEmitter();
 Object.assign(app, {
   isPackaged: false,
   getPath: (n) => path.join(tmp, n),
+  setPath() {},
   commandLine: { appendSwitch() {} },
   requestSingleInstanceLock: () => true,
   whenReady: () => Promise.resolve(),
@@ -152,8 +153,8 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   await wait(400);
 
   // 1. Windows and pages
-  const main = windows.find((w) => w.opts.title === 'dub.game');
-  const overlay = windows.find((w) => w.opts.title === 'dub.game overlay');
+  const main = windows.find((w) => w.opts.title === 'dubplay');
+  const overlay = windows.find((w) => w.opts.title === 'dubplay overlay');
   check(main && fs.existsSync(main.file), 'main window loads an existing page: ' + (main && path.relative(REPO, main.file)));
   check(overlay && fs.existsSync(overlay.file), 'overlay loads an existing page: ' + (overlay && path.relative(REPO, overlay.file)));
   check(main && main.visible, 'main window is shown');
@@ -251,7 +252,7 @@ const events = (ch) => sent.filter((s) => s[1] === ch);
   const line = events('line:received').pop();
   check(line && line[2].speaker === 'Sylvie', 'line:received sent to the windows');
   const play = sent.slice(before).filter((x) => x[1] === 'audio:play');
-  check(play.length === 1 && play[0][0] === 'dub.game', 'audio:play goes to the main window only (once)');
+  check(play.length === 1 && play[0][0] === 'dubplay', 'audio:play goes to the main window only (once)');
   check(play[0] && Buffer.from(play[0][2].data, 'base64').toString() === 'ID3fakeaudio' && play[0][2].mime, 'audio payload is the ElevenLabs bytes as base64 with a mime type');
   const store = await invoke('voices:get');
   const voices = (store.games[GAME] || {}).voices || {};

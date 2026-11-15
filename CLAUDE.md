@@ -1,4 +1,4 @@
-# dub.game — shared contract
+# dubplay — shared contract
 
 AI voice-over for visual novels. An Electron desktop app scans the Steam library, installs a tiny
 hook script into compatible games, receives every line of dialogue over localhost, casts a voice

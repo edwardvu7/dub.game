@@ -25,6 +25,10 @@ const profiler = require('./profiler');
 const { createFullscreenCheck, EXCLUSIVE_MESSAGE } = require('./fullscreen');
 const catalog = require('../voices_catalog.json');
 
+// The app is called dubplay now, but settings, keys, voices and the audio cache stay in the old
+// dub.game folder, so players keep them after updating.
+app.setPath('userData', path.join(app.getPath('appData'), 'dub.game'));
+
 const ROOT = path.join(__dirname, '..');
 const HOTKEY = 'Shift+F2';
 const BACKUP_HOTKEYS = ['Alt+F2', 'Control+Alt+F2']; // also registered, in case a game or tool swallows Shift+F2
@@ -44,7 +48,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 function log(message) {
   // Timed (UTC): "line" to "audio" is the wait before a voice; a line with no "audio" was never played.
-  console.log(`[dub.game ${new Date().toISOString().slice(11, 23)}] ${message}`);
+  console.log(`[dubplay ${new Date().toISOString().slice(11, 23)}] ${message}`);
 }
 
 function send(win, channel, payload) {
@@ -89,7 +93,7 @@ const webPreferences = () => ({
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1180, height: 780, minWidth: 880, minHeight: 600,
-    backgroundColor: '#0b0d10', title: 'dub.game', show: false,
+    backgroundColor: '#0b0d10', title: 'dubplay', show: false,
     icon: APP_ICON, // taskbar; the installed .exe gets build/icon.png
     // No title bar: the app fills the window. Windows keeps its own minimise/maximise/close
     // buttons on the right end of the app's own title bar (.titlebar in ui/index.html).
@@ -186,7 +190,7 @@ function createOverlayWindow() {
     ...overlayBounds(),
     transparent: true, frame: false, resizable: false, movable: true, minimizable: false,
     maximizable: false, fullscreenable: false, skipTaskbar: true, hasShadow: false, show: false,
-    alwaysOnTop: true, title: 'dub.game overlay',
+    alwaysOnTop: true, title: 'dubplay overlay',
     webPreferences: webPreferences(),
   });
   overlayWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -221,7 +225,7 @@ function warnIfExclusiveFullscreen() {
     emit('app:status', { level: 'warn', message: EXCLUSIVE_MESSAGE });
     // Windows holds notifications back during exclusive fullscreen and shows them afterwards.
     try {
-      if (Notification.isSupported()) new Notification({ title: 'dub.game overlay is hidden', body: EXCLUSIVE_MESSAGE }).show();
+      if (Notification.isSupported()) new Notification({ title: 'dubplay overlay is hidden', body: EXCLUSIVE_MESSAGE }).show();
     } catch { /* the main-window message is enough */ }
   });
 }
@@ -245,7 +249,7 @@ function toggleOverlay() {
       // Tracking has not found the game window: show on the screen under the cursor instead of nothing.
       fallbackArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     } else {
-      emit('app:status', { level: 'warn', message: 'Launch a game from dub.game, then press Shift+F2. Game-window tracking requires Windows.' });
+      emit('app:status', { level: 'warn', message: 'Launch a game from dubplay, then press Shift+F2. Game-window tracking requires Windows.' });
       return;
     }
   }
@@ -374,7 +378,7 @@ async function start() {
     log(`listening on http://${HOST}:${PORT}`);
   } catch (e) {
     const message = e.code === 'EADDRINUSE'
-      ? `Port ${PORT} is already in use, so games cannot reach dub.game. Close the other program (or a second dub.game) and restart.`
+      ? `Port ${PORT} is already in use, so games cannot reach dubplay. Close the other program (or a second dubplay) and restart.`
       : `Could not start the local server: ${e.message}`;
     log(message);
     pendingStatus.push({ level: 'error', message });
@@ -428,7 +432,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(start).catch((e) => {
     console.error(e);
-    dialog.showErrorBox('dub.game could not start', String(e && e.stack ? e.stack : e));
+    dialog.showErrorBox('dubplay could not start', String(e && e.stack ? e.stack : e));
     app.quit();
   });
   app.on('will-quit', () => {

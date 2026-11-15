@@ -76,7 +76,7 @@ function install(game, opts = {}) {
   names.forEach(n => safeFile(target(game, n)));
   const previous = Object.fromEntries(names.map(n => [n, read(target(game, n))]));
   const r = record(game);
-  if (!r && [SCRIPT, CONFIG, RECORD].some(n => previous[n])) throw new Error('Unrecognized dub.game sidecar files exist. Restore or move them before enabling the generic hook.');
+  if (!r && [SCRIPT, CONFIG, RECORD].some(n => previous[n])) throw new Error('Unrecognized dubplay sidecar files exist. Restore or move them before enabling the generic hook.');
   if (r && (!previous['override.cfg'] || hash(previous['override.cfg']) !== r.overrideHash)) {
     throw new Error('override.cfg changed since hook installation. Refusing to overwrite your changes. Restore the recorded version or remove the hook block manually.');
   }

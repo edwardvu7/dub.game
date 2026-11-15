@@ -44,10 +44,10 @@ function sanitizeDescription(raw, avoid = []) {
   return d;
 }
 
-/** "dub.game <Game> - <Speaker>", capped. */
+/** "dubplay <Game> - <Speaker>", capped. */
 function voiceName(game, speaker) {
   const g = clean(game), s = clean(speaker) || 'Character';
-  return (`dub.game ${g ? g + ' - ' : ''}${s}`).slice(0, NAME_MAX);
+  return (`dubplay ${g ? g + ' - ' : ''}${s}`).slice(0, NAME_MAX);
 }
 
 const STEP = { 1: 'Voice Design (step 1/2)', 2: 'saving the voice (step 2/2)' };
@@ -136,7 +136,7 @@ function createVoiceDesigner({ settings, fetch: doFetch = globalThis.fetch, log 
   async function save({ id, description, name } = {}) {
     const key = settings.getKey('elevenlabs');
     if (!key) throw Object.assign(new Error('No ElevenLabs API key. Add one in Settings.'), { hard: true });
-    const voice_name = clean(name).slice(0, NAME_MAX) || 'dub.game voice';
+    const voice_name = clean(name).slice(0, NAME_MAX) || 'dubplay voice';
     const voice_description = sanitizeDescription(description);
     const created = await post(`${API}/v1/text-to-voice`, key, {
       voice_name, voice_description, generated_voice_id: String(id),

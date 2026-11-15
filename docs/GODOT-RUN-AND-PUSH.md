@@ -20,7 +20,7 @@ npm.cmd start
 ```
 
 If the extracted folder has a different name, change only the `$update` path.
-Do not launch two copies of dub.game at once: both use port 8000.
+Do not launch two copies of dubplay at once: both use port 8000.
 
 3. Close the game. Enable **Voices** on its Godot tile, then launch it.
 4. Enable **Narration** in Settings. Open the cutscene and check the connection.
@@ -33,7 +33,7 @@ how to distinguish a loading failure from missed text selection.
 
 ## Import the committed update into your existing Desktop clone
 
-Close dub.game first. Use the SAME PowerShell window for the commands below.
+Close dubplay first. Use the SAME PowerShell window for the commands below.
 Run each block separately. If any Git command fails, stop before the next block.
 Do not delete your Desktop clone.
 

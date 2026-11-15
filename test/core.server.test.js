@@ -74,7 +74,7 @@ test('server: /stop, empty text, bad input and other routes', async () => {
     assert.equal((await fetch(base + '/line')).status, 405);
     assert.equal((await post(base + '/line', 'x'.repeat(1024 * 1024 + 10)).catch(() => ({ status: 413 }))).status, 413);
     const health = await fetch(base + '/health');
-    assert.deepEqual(await health.json(), { ok: true, app: 'dub.game' });
+    assert.deepEqual(await health.json(), { ok: true, app: 'dubplay' });
     await tick();
   });
   assert.deepEqual(stops, [{ engine: 'renpy', seq: 4 }, { engine: 'renpy', seq: undefined }]);

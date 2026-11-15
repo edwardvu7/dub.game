@@ -1,17 +1,17 @@
-> Copied from the "dub.game — 8-Hour Build Roadmap" doc (2026-11-14). Code samples are in the appendix at the end.
+> Copied from the "dubplay — 8-Hour Build Roadmap" doc (2026-11-14). Code samples are in the appendix at the end.
 
-dub.game — 8-Hour Build Roadmap
+dubplay — 8-Hour Build Roadmap
  · 
 Summary
 In 8 hours, build a desktop app plus a Ren'Py mod. The app scans the player's Steam library, shows only compatible games, and installs a small script into the ones they tick (this is the injection). In game, the script sends every line of dialogue, with the speaker's name, to the app. Gemini builds a voice profile for each new character, and ElevenLabs speaks the line. A see-through overlay, opened with a hotkey on top of the game, lets players retune any voice, like the ReShade menu.
-What the demo shows: open dub.game and it lists only the installed Steam games it supports. Tick an unvoiced Ren'Py visual novel and launch it. Every character speaks in their own voice, picked automatically. Press Shift+F2, change a slider, and the next line sounds different.
+What the demo shows: open dubplay and it lists only the installed Steam games it supports. Tick an unvoiced Ren'Py visual novel and launch it. Every character speaks in their own voice, picked automatically. Press Shift+F2, change a slider, and the next line sounds different.
 Why this route: the game hands over exact text and speaker names, so there's no screen reading to get wrong. Other engines (Godot, RPG Maker, Unity) each get their own small adapter that feeds the same app. Textractor and screen capture are the fallbacks.
 Stack: an Electron desktop app, JavaScript throughout. Its main process listens for the hook on localhost, scans Steam, and calls the Gemini and ElevenLabs APIs. The main window and the overlay are HTML. All of it can be vibecoded with Claude Code.
 Gemini is called once per character. After that, every line goes straight from the server to ElevenLabs.
 Desktop app: scan, pick, enable
-dub.game ships as an Electron desktop app. On first launch it scans the Steam library and lists only the games it supports. Players tick the ones they want voiced.
+dubplay ships as an Electron desktop app. On first launch it scans the Steam library and lists only the games it supports. Players tick the ones they want voiced.
 What the player does
-Install dub.game and open it. It scans every Steam library automatically, which takes a few seconds.
+Install dubplay and open it. It scans every Steam library automatically, which takes a few seconds.
 
 The list shows only compatible games, each with cover art and a checkbox. Unsupported games never appear.
 
@@ -46,7 +46,7 @@ Build at hour 6. If it fails, demo from npm start
 A compatible game is missing from the list
 Add "Rescan" and "Add game folder" buttons for non-Steam games and unusual installs
 API keys: each player connects their own
-Players paste their own ElevenLabs and Gemini API keys into a Settings screen. Neither service offers a "Sign in with..." link that a third-party app can use, so pasted keys are the only direct route. It also means dub.game pays nothing per line and needs no server.
+Players paste their own ElevenLabs and Gemini API keys into a Settings screen. Neither service offers a "Sign in with..." link that a third-party app can use, so pasted keys are the only direct route. It also means dubplay pays nothing per line and needs no server.
 How it works
 First launch opens Settings with two fields. Each has a Get a key button that opens the provider's key page in the browser (ElevenLabs: Developers, then API Keys. Gemini: aistudio.google.com/apikey).
 
@@ -64,7 +64,7 @@ Players paste their own keys
 The player, on their own free or paid plan
 Low: one Settings screen
 Hackathon and early releases
-Your own server holds your keys; players log in to dub.game
+Your own server holds your keys; players log in to dubplay
 You, for every spoken line
 High: a backend, accounts, billing
 A real product, later
@@ -215,7 +215,7 @@ Get clipboard mode working before writing a custom Textractor extension (a C++ D
 Engine adapters: one hook per engine
 Every engine gets a small adapter that sends the same message to the app: POST /line with {speaker, text, engine}. The app, the voices and the overlay never change. Ren'Py is built first. Godot is the next target, and it can be hooked by adding two files beside the game without opening the game's own files.
 Engine
-What dub.game installs
+What dubplay installs
 How it reads text
 Speaker name
 Status
@@ -257,7 +257,7 @@ Last resort
 Godot: how the injection works
 At startup, a Godot game reads a file named override.cfg beside its executable and lets it override project settings. Godot mod loaders use this to install themselves without touching the game's source.
 
-dub.game's override.cfg adds one autoload, a script Godot starts automatically and keeps running for the whole session.
+dubplay's override.cfg adds one autoload, a script Godot starts automatically and keeps running for the whole session.
 
 That script, dubgame.gd, sits beside the exe too. Five times a second it looks through the scene tree for visible Label and RichTextLabel nodes and posts any new text to the app.
 
@@ -280,7 +280,7 @@ func _scan() -> void:
 
 func _check(n: Node, text: String) -> void:
     if not n.is_visible_in_tree() or text.strip_edges().length() ]]><Calibration: the fix for speaker names and menu noise (Godot and Unity)
-A generic watcher sees all text: menus, buttons, phone screens, and dialogue. Each line arrives tagged with its source (the node's path). The first time a game runs, the overlay lists the sources it has seen. The player ticks which one is dialogue and which one is the speaker's name, and dub.game saves that per game. Before calibration, the app skips one-word strings and exact repeats, and Gemini guesses the speaker from context.
+A generic watcher sees all text: menus, buttons, phone screens, and dialogue. Each line arrives tagged with its source (the node's path). The first time a game runs, the overlay lists the sources it has seen. The player ticks which one is dialogue and which one is the speaker's name, and dubplay saves that per game. Before calibration, the app skips one-word strings and exact repeats, and Gemini guesses the speaker from context.
 Godot limitations and fixes
 Limitation
 Fix
@@ -313,7 +313,7 @@ Keep only supported games and show them with cover art (loaded from Steam's imag
 
 Engine
 Files that identify it
-dub.game support
+dubplay support
 Ren'Py
 a renpy/ folder plus a game/ folder holding .rpy, .rpyc or .rpa files
 Full: exact speaker names
@@ -348,7 +348,7 @@ Steam normally leaves extra files alone, but recheck at launch and show "Reinsta
 The game is already running when it's ticked
 Ren'Py loads scripts at startup. Tell the player to restart the game
 Copying fails with permission denied
-Show the error and the folder path. Suggest running dub.game as administrator, or copying the file by hand
+Show the error and the folder path. Suggest running dubplay as administrator, or copying the file by hand
 Libraries on other drives
 Read every path in libraryfolders.vdf, not just the default library
 Auto character identification with Gemini

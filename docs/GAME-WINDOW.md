@@ -1,13 +1,13 @@
 # Game-bound overlay (Windows)
 
-Launch the game from dub.game, focus the game and wait a few seconds for Windows
+Launch the game from dubplay, focus the game and wait a few seconds for Windows
 tracking to initialize. The launcher removes the caption/resize border and positions
 the window at the full bounds of the monitor containing it, including monitors with
 negative desktop coordinates. It applies this once; later player-selected window
 sizes are respected. This is a window-style change, not a guarantee that an engine
 has exited exclusive fullscreen. Use the game's own borderless setting if necessary.
 
-Ren'Py games start windowed the first time they run through dub.game (hook v9), so the overlay always
+Ren'Py games start windowed the first time they run through dubplay (hook v9), so the overlay always
 shows; the player can switch to fullscreen afterwards and it stays. The overlay is always-on-top
 (screen-saver level), so it also works over a borderless fullscreen SDL window.
 
@@ -23,7 +23,7 @@ PID. Exports and Steam games match a foreground process executable inside the ch
 installation directory (including subdirectories). Unrelated foreground apps are
 never resized. A game executable outside that directory, an elevated game whose
 process cannot be read, or an external launcher may prevent detection. A splash
-window that closes after acquisition requires relaunching from dub.game. Tracking
+window that closes after acquisition requires relaunching from dubplay. Tracking
 waits up to two minutes for initial focus and uses one PowerShell worker, not a new
 process per frame. Worker failures are shown in the app; no screen-wide overlay is
 shown when tracking is unavailable. The worker stops when the app or target exits.

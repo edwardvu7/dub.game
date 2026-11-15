@@ -1,7 +1,7 @@
 @echo off
-rem dub.game for the team: double-click to install everything (first time) and start the app.
+rem dubplay for the team: double-click to install everything (first time) and start the app.
 cd /d "%~dp0"
-title dub.game
+title dubplay
 
 where node >nul 2>nul
 if errorlevel 1 (
@@ -28,7 +28,7 @@ if exist package-lock.json if exist node_modules\.dubgame-installed.lock (
   fc /b package-lock.json node_modules\.dubgame-installed.lock >nul 2>nul || set NEED_INSTALL=1
 )
 if "%NEED_INSTALL%"=="1" (
-  echo Installing dub.game. The first time takes a few minutes...
+  echo Installing dubplay. The first time takes a few minutes...
   call npm install
   if errorlevel 1 (
     echo.
@@ -39,6 +39,6 @@ if "%NEED_INSTALL%"=="1" (
   copy /y package-lock.json node_modules\.dubgame-installed.lock >nul
 )
 
-echo Starting dub.game. Keep this window open while you use the app.
+echo Starting dubplay. Keep this window open while you use the app.
 call npm start
 if errorlevel 1 pause

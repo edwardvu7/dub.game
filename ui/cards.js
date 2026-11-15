@@ -17,7 +17,7 @@
   /**
    * mount(container, { dub, onError, emptyText, pickText?, follow?, scene?, onStore }) -> { refresh, setCurrent, setGame, game, destroy }
    * scene (the overlay): list only the characters of the current scene, meaning whoever spoke in
-   * this game's last SCENE_LINES lines since dub.game started, newest first. Everyone else is one
+   * this game's last SCENE_LINES lines since dubplay started, newest first. Everyone else is one
    * click away ("Show all").
    * follow (default true): with no game picked, show the game that spoke last. pickText: shown
    * instead of emptyText while no game is picked.
@@ -336,7 +336,7 @@
       card.badge.title = usesCustom(profile)
         ? 'A voice designed for this character is speaking. Your preset voice is kept.'
         : profile.locked
-          ? 'You set this voice. dub.game will not change it.'
+          ? 'You set this voice. dubplay will not change it.'
           : (profile.reason || 'Chosen automatically.');
       card.about.textContent = profile.personality || '';
       card.about.hidden = !profile.personality;

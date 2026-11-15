@@ -20,7 +20,7 @@ Every box below is ticked by the section owner:
 6. Fast-forward `main` to `integrate` and push. Never force-push.
 
 ## Prompt to give Fable (Claude Code, model: Fable 5)
-> You are project manager and lead developer for dub.game. Read CLAUDE.md and docs/INTEGRATION.md.
+> You are project manager and lead developer for dubplay. Read CLAUDE.md and docs/INTEGRATION.md.
 > All three section branches are finished. Combine them per docs/INTEGRATION.md: merge, fix conflicts
 > and contract mismatches, get `npm test` passing, write docs/STATUS.md, and push to main. Do not
 > implement unfinished section tasks; report them instead.

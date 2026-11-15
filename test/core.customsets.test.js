@@ -234,7 +234,7 @@ test('custom voices always speak with the better model; preset voices keep the f
   const v = store.forGame('g');
   v.setAuto({ speaker: 'A', voice_id: catalog[0].voice_id, stability: 0.5, style: 0, speed: 1, source: 'grok' });
   v.setAuto({ speaker: 'B', voice_id: catalog[1].voice_id, stability: 0.5, style: 0, speed: 1, source: 'grok' });
-  v.setCustom('B', { voice_id: 'Designed1', name: 'dub.game - B', description: 'x' });
+  v.setCustom('B', { voice_id: 'Designed1', name: 'dubplay - B', description: 'x' });
   const models = {};
   const p = createPipeline({ voices: store, cache: createCache({ dir: path.join(dir, 'c') }), catalog, emit: () => {}, settleMs: 0,
     settings: { getKey: () => 'k', narration: () => true, customVoices: () => true, quality: () => 'fast' },

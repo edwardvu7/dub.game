@@ -135,7 +135,7 @@
       if (tile.busy) return;
       launch.disabled = true;
       try {
-        // Launch always means "launch with voices": the dub.game script has to be in the game
+        // Launch always means "launch with voices": the dubplay script has to be in the game
         // first. It is also what starts the game in borderless fullscreen so the overlay can show.
         const game = games.find((g) => g.appid === appid);
         if (game && game.support === 'soon' && game.engine !== 'godot') return;
@@ -366,7 +366,7 @@
       const u = await dub.invoke('usage:setLimit', n);
       paintUsage(u);
       out.dataset.tone = 'ok';
-      out.textContent = u.limit ? 'Saved. dub.game stops after ' + L.formatCount(u.limit) + ' characters this month.' : 'Saved. No monthly limit.';
+      out.textContent = u.limit ? 'Saved. dubplay stops after ' + L.formatCount(u.limit) + ' characters this month.' : 'Saved. No monthly limit.';
     } catch (err) {
       out.dataset.tone = 'bad';
       out.textContent = L.errorText(err);

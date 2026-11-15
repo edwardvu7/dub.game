@@ -103,7 +103,7 @@ function createServer(handlers = {}) {
     if (req.headers.origin || !/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(req.headers.host || '')) {
       return end(403, { error: 'local game hooks only' });
     }
-    if (req.method === 'GET' && (url === '/' || url === '/health')) return end(200, { ok: true, app: 'dub.game' });
+    if (req.method === 'GET' && (url === '/' || url === '/health')) return end(200, { ok: true, app: 'dubplay' });
     if (req.method !== 'POST') return end(405, { error: 'POST only' });
     if (!['/line', '/characters', '/stop', '/godot/hook'].includes(url)) return end(404, { error: 'unknown path' });
 

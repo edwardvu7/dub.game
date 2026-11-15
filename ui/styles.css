@@ -1,4 +1,4 @@
-/* dub.game: main window and overlay.
+/* dubplay: main window and overlay.
    The look is a dubbing booth: dark desk, warm paper text, one sage tally light (the green of the logo's dot) that means
    "this is live". Type matches the website (docs/index.html): Geist Sans and Geist Mono, bundled in
    ui/fonts (SIL OFL, see ui/fonts/OFL.txt) so the app works offline. The site's display face

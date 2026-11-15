@@ -27,13 +27,13 @@ const designer = (fetch, key = 'el-key') => createVoiceDesigner({ settings: { ge
 test('designer: design then create, headers and bodies', async () => {
   const { fetch, calls } = fakeEl([json(200, { previews: [{ generated_voice_id: 'gen1' }, { generated_voice_id: 'gen2' }], text: 't' }),
     json(200, { voice_id: 'NewVoice123' })]);
-  const out = await designer(fetch).design({ description: 'A young woman with a soft Midwestern accent.', name: 'dub.game X - Y' });
-  assert.deepEqual(out, { voice_id: 'NewVoice123', name: 'dub.game X - Y', description: 'A young woman with a soft Midwestern accent.' });
+  const out = await designer(fetch).design({ description: 'A young woman with a soft Midwestern accent.', name: 'dubplay X - Y' });
+  assert.deepEqual(out, { voice_id: 'NewVoice123', name: 'dubplay X - Y', description: 'A young woman with a soft Midwestern accent.' });
   assert.match(calls[0].url, /\/v1\/text-to-voice\/design/);
   assert.match(calls[1].url, /\/v1\/text-to-voice$/);
   assert.equal(calls[0].init.headers['xi-api-key'], 'el-key');
   assert.equal(calls[0].body.auto_generate_text, true);
-  assert.deepEqual(calls[1].body, { voice_name: 'dub.game X - Y', voice_description: 'A young woman with a soft Midwestern accent.', generated_voice_id: 'gen1' });
+  assert.deepEqual(calls[1].body, { voice_name: 'dubplay X - Y', voice_description: 'A young woman with a soft Midwestern accent.', generated_voice_id: 'gen1' });
 });
 
 test('designer: API errors are readable and keyless is refused', async () => {
@@ -61,7 +61,7 @@ test('designer: description and name are sanitized and capped', () => {
   assert.ok(sanitizeDescription('hi').length >= DESC_MIN);
   assert.equal(sanitizeDescription('a  b\n c'), 'a b c Clear, natural speaking voice.');
   assert.ok(voiceName('G'.repeat(300), 'S').length <= 100);
-  assert.equal(voiceName('The Question', 'Sylvie'), 'dub.game The Question - Sylvie');
+  assert.equal(voiceName('The Question', 'Sylvie'), 'dubplay The Question - Sylvie');
 });
 
 test('profiler: voice description prompt, parser, fallback', async () => {
@@ -101,7 +101,7 @@ test('customizeVoice: stores custom_voice, keeps preset and lock state, counts A
   assert.equal(p.locked, false);
   assert.equal(p.voice_id, catalog[0].voice_id);
   assert.notEqual(p.voice_id, p.custom_voice.voice_id);
-  assert.match(p.custom_voice.name, /^dub\.game .*Sylvie$/);
+  assert.match(p.custom_voice.name, /^dubplay .*Sylvie$/);
   assert.equal(p.custom_voice.description, 'A calm young woman with a soft voice.');
   assert.equal(r.ai(), 1);
   assert.ok(r.events.length >= 1);

@@ -30,8 +30,8 @@ function hookDirFor(game) {
 
 function friendly(err, dir, action) {
   if (err && (err.code === 'EACCES' || err.code === 'EPERM' || err.code === 'EROFS')) {
-    const e = new Error(`Permission denied while ${action} the dub.game hook in:\n${dir}\n` +
-      'Run dub.game as administrator, or copy the file by hand.');
+    const e = new Error(`Permission denied while ${action} the dubplay hook in:\n${dir}\n` +
+      'Run dubplay as administrator, or copy the file by hand.');
     e.code = err.code;
     e.folder = dir;
     return e;
@@ -72,7 +72,7 @@ function isHookOutdated(game, opts = {}) {
 function installHook(game, opts = {}) {
   if (game.engine === 'godot') return godot.install(game, opts);
   const files = HOOK_FILES[game.engine];
-  if (!files) throw new Error(`No dub.game hook for engine "${game.engine}".`);
+  if (!files) throw new Error(`No dubplay hook for engine "${game.engine}".`);
   const modDir = opts.modDir || DEFAULT_MOD_DIR;
   const dir = hookDirFor(game);
   try {

@@ -149,9 +149,9 @@
       return { tone: 'on', text: 'Voices are on.' };
     }
     if (status === 'integrated') return { tone: 'on', text: 'Demo voices included. Select Godot 4 on first launch.' };
-    if (status === 'launch') return { tone: 'off', text: 'Ready to launch. Voices require a dub.game integration in this game.' };
+    if (status === 'launch') return { tone: 'off', text: 'Ready to launch. Voices require a dubplay integration in this game.' };
     if (status === 'soon') return { tone: 'off', text: 'Voices for ' + engineName(game.engine) + " games aren't available yet." };
-    if (status === 'missing') return { tone: 'warn', text: 'The dub.game script is missing from this game. Reinstall it.' };
+    if (status === 'missing') return { tone: 'warn', text: 'The dubplay script is missing from this game. Reinstall it.' };
     if (status === 'on' && justEnabled) return { tone: 'note', text: 'Voices are on. If the game is open, restart it.' };
     if (status === 'on') return { tone: 'on', text: 'Voices are on.' };
     return { tone: 'off', text: 'Voices are off.' };

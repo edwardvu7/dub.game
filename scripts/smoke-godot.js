@@ -64,7 +64,7 @@ async function runGodot() {
   fs.copyFileSync(path.join(__dirname, '../mod/godot/bridge.gd'), path.join(dir, 'dubgame.gd'));
   fs.writeFileSync(path.join(dir, 'project.godot'), 'config_version=5\n[autoload]\nDubGame="*res://dubgame.gd"\n');
   fs.writeFileSync(path.join(dir, 'smoke.gd'), script);
-  await server.listen(); // Fails if dub.game is running: never talk to a user's live session.
+  await server.listen(); // Fails if dubplay is running: never talk to a user's live session.
   try {
     await runGodot();
     assert.equal(events[0][0], 'characters');

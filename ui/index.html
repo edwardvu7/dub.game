@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: https://cdn.cloudflare.steamstatic.com https://cdn.akamai.steamstatic.com https://shared.cloudflare.steamstatic.com; media-src blob:; base-uri 'none'; form-action 'none'">
-  <title>dub.game</title>
+  <title>dubplay</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="app">
   <div class="titlebar" aria-hidden="true"></div>
   <nav class="rail" aria-label="Sections">
-    <div class="wordmark"><img class="wordmark-logo" src="logo.png" alt="dub.game" width="36" height="36"></div>
+    <div class="wordmark"><img class="wordmark-logo" src="logo.png" alt="dubplay" width="36" height="36"></div>
     <div class="tabs" role="tablist" aria-orientation="vertical">
       <button class="tab" role="tab" id="tab-games" aria-controls="view-games" aria-selected="true" data-view="games">Games</button>
       <button class="tab" role="tab" id="tab-voices" aria-controls="view-voices" aria-selected="false" data-view="voices" tabindex="-1">Voices</button>
@@ -36,7 +36,7 @@
       <div class="games" id="games" aria-live="polite"></div>
       <div class="blank" id="games-empty" hidden>
         <h2>No supported games found</h2>
-        <p>dub.game checks your Steam library by itself and lists Ren'Py games, plus Godot, RPG Maker and Unity games that Steam tags as visual novels or story-rich. Voices work in Ren'Py and RPG Maker MV games today. If a game is installed outside Steam, or from itch.io, point to its folder.</p>
+        <p>dubplay checks your Steam library by itself and lists Ren'Py games, plus Godot, RPG Maker and Unity games that Steam tags as visual novels or story-rich. Voices work in Ren'Py and RPG Maker MV games today. If a game is installed outside Steam, or from itch.io, point to its folder.</p>
         <button class="btn btn-primary" id="games-add-empty" type="button">Add game folder</button>
       </div>
     </section>
@@ -66,7 +66,7 @@
       <header class="view-head">
         <div>
           <h1 id="settings-title">Settings</h1>
-          <p class="lede">dub.game speaks with your own ElevenLabs and xAI (Grok) accounts. Keys are encrypted on this computer and never leave it.</p>
+          <p class="lede">dubplay speaks with your own ElevenLabs and xAI (Grok) accounts. Keys are encrypted on this computer and never leave it.</p>
         </div>
       </header>
 
@@ -112,7 +112,7 @@
         <div class="keyrow-head">
           <h2 id="usage-title">Usage</h2>
         </div>
-        <p class="keyrow-what">ElevenLabs charges per character spoken. Lines dub.game has spoken before replay from this computer for free.</p>
+        <p class="keyrow-what">ElevenLabs charges per character spoken. Lines dubplay has spoken before replay from this computer for free.</p>
         <dl class="usage-stats">
           <div><dt>This session</dt><dd id="usage-session">0 characters</dd></div>
           <div><dt>This month</dt><dd id="usage-month">0 characters</dd></div>
@@ -152,12 +152,12 @@
         <label class="switch">
           <input type="checkbox" id="opt-custom">
           <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-text"><b>Custom voices <span class="tag tag-experimental">Experimental</span></b><small>Turn this on and dub.game designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (8 designed voices per game at a time; when all slots are taken, the longest-idle character's designed voice is replaced and that character goes back to its preset) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
+          <span class="switch-text"><b>Custom voices <span class="tag tag-experimental">Experimental</span></b><small>Turn this on and dubplay designs a custom voice for each character automatically while you play (Grok writes the description, ElevenLabs Voice Design makes the voice). The first lines use the preset voice; the custom one takes over once it is ready. Uses ElevenLabs credits and voice slots (8 designed voices per game at a time; when all slots are taken, the longest-idle character's designed voice is replaced and that character goes back to its preset) and needs a paid plan with an API key that allows Voice Design. Your preset voices are kept and come back when you turn this off. Off by default.</small></span>
         </label>
         <label class="switch">
           <input type="checkbox" id="opt-clipboard">
           <span class="switch-track" aria-hidden="true"></span>
-          <span class="switch-text"><b>Read lines from the clipboard</b><small>For games without a dub.game hook. Use Textractor with its copy-to-clipboard extension. Speakers are guessed.</small></span>
+          <span class="switch-text"><b>Read lines from the clipboard</b><small>For games without a dubplay hook. Use Textractor with its copy-to-clipboard extension. Speakers are guessed.</small></span>
         </label>
       </div>
     </section>

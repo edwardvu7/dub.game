@@ -153,7 +153,7 @@ async function play({ bubble, name, pick, source }) {
   announced = [];
   const server = createServer({ onLine: (l) => { lines.push([l.speaker, l.text]); heardAt.push(Date.now()); },
     onCharacters: (p) => announced.push({ names: p.characters.map((c) => c.speaker), at: Date.now() }) });
-  await server.listen(); // fails if dub.game is running: never talk to a live session
+  await server.listen(); // fails if dubplay is running: never talk to a live session
   try {
     const out = await new Promise((resolve) => execFile(process.env.GODOT_BIN || 'godot', ['--headless', '--path', dir],
       { timeout: 40000 }, (_e, stdout, stderr) => resolve(stdout + stderr)));

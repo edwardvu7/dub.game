@@ -7,13 +7,13 @@ support for every Godot game. Until Then has not been tested with this build.
 
 ## Run it
 
-1. Close the game. Start dub.game from `start.bat` or `npm start`.
+1. Close the game. Start dubplay from `start.bat` or `npm start`.
 2. Configure your API keys. Turn **Narration** on in Settings for unnamed text.
 3. Add the game's folder, containing its executable and a separate `.pck`, or
    `project.godot` for a source project. Steam story games can also appear automatically.
 4. Turn **Voices** on. The app verifies a Godot 4 project/pack before installing.
 5. Launch the game. An exported game uses its own executable, not your Godot editor.
-6. Show dialogue or the cutscene. Check the status in dub.game:
+6. Show dialogue or the cutscene. Check the status in dubplay:
    - **Connected** means a recent hook heartbeat and a selected dialogue node.
    - **Connected, but no dialogue candidate** means loading worked, but selection
      needs help. Expand **Choose dialogue text**, select the node containing the
@@ -150,7 +150,7 @@ cannot fix the loader; use the game's logs to determine its export restrictions.
 npm.cmd ci
 npm.cmd test
 npm.cmd run smoke
-# Stop dub.game first so the smoke tests can bind port 8000.
+# Stop dubplay first so the smoke tests can bind port 8000.
 $env:GODOT_BIN = "C:\path\to\Godot.exe"
 npm.cmd run smoke:godot
 npm.cmd run smoke:godot-generic

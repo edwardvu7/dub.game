@@ -1,4 +1,4 @@
-# dub.game
+# dubplay
 
 Real-time voice acting for unvoiced visual novels, hooked directly at the game engine.
 
@@ -8,7 +8,7 @@ Real-time voice acting for unvoiced visual novels, hooked directly at the game e
 
 ## How It Works
 
-Instead of relying on screen capture or OCR, **dub.game** reads exact dialogue straight from the engine runtime and streams spoken audio locally:
+Instead of relying on screen capture or OCR, **dubplay** reads exact dialogue straight from the engine runtime and streams spoken audio locally:
 
 1. **Steam Library Scan:** Parses local Steam manifests (`libraryfolders.vdf` and `appmanifest_*.acf`) to detect compatible visual novels and toggle engine hooks on or off cleanly.
 2. **Engine Callback Hook:** Injects a lightweight callback script (such as `game/dubgame.rpy` via `config.all_character_callbacks`) that strips text tags and dispatches `{ speaker, text }` payloads to `POST http://127.0.0.1:8000/line`.
@@ -39,7 +39,7 @@ Instead of relying on screen capture or OCR, **dub.game** reads exact dialogue s
 1. **Clone the repository:**
    ```bash
    git clone [https://github.com/edwardvu7/dub.game.git](https://github.com/edwardvu7/dub.game.git)
-   cd dub.game
+   cd dubplay
    ```
 
 2. **Install dependencies:**
