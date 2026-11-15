@@ -2,7 +2,7 @@
 
 Real-time voice acting for unvoiced visual novels, hooked directly at the game engine.
 
-**[Website](https://edwardvu7.github.io/dub.game/)** · **[Download Latest Release](https://github.com/edwardvu7/dub.game/releases/latest)**
+**[Website](https://dubplay.design/)** · **[Download Latest Release](https://github.com/edwardvu7/dubplay/releases/latest)**
 
 ---
 
@@ -38,7 +38,7 @@ Instead of relying on screen capture or OCR, **dubplay** reads exact dialogue st
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/edwardvu7/dub.game.git](https://github.com/edwardvu7/dub.game.git)
+   git clone [https://github.com/edwardvu7/dubplay.git](https://github.com/edwardvu7/dubplay.git)
    cd dubplay
    ```
 
@@ -77,11 +77,11 @@ Instead of relying on screen capture or OCR, **dubplay** reads exact dialogue st
 ## Project Structure
 
 ```text
-dub.game/
+dubplay/
 ├── main/                 # Electron main process, HTTP server (:8000), Mastra profiler, TTS pipeline
 ├── mod/                  # Engine hook scripts and adapters (Ren'Py, Godot, RPG Maker, Unity)
 ├── ui/                   # Electron renderer UI & Shift+F2 in-game overlay
-├── docs/                 # GitHub Pages landing page (edwardvu7.github.io/dub.game)
+├── docs/                 # GitHub Pages landing page (dubplay.design)
 ├── scripts/              # Build and packaging utilities
 ├── test/                 # Pipeline and hook tests
 └── voices_catalog.json   # Curated ElevenLabs voice definitions for character casting

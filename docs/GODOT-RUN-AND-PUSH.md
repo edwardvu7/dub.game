@@ -98,7 +98,7 @@ git push -u origin feature/generic-godot-hook
 ```
 
 Open:
-https://github.com/edwardvu7/dub.game/compare/main...feature/generic-godot-hook
+https://github.com/edwardvu7/dubplay/compare/main...feature/generic-godot-hook
 
 Create a pull request with base `main`. Review the changed files and tests, then
 merge it when ready. Your friends can pull main after the PR is merged:
