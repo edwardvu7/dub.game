@@ -1,7 +1,7 @@
 {
   "name": "dub-game",
   "productName": "dubplay",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "AI voice-over for visual novels: Grok casts a voice per character, ElevenLabs speaks every line.",
   "main": "main/index.js",
   "author": "dubplay team",
