@@ -4,6 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>dubplay</title>
+  <meta name="description" content="dubplay gives Steam visual novels per-character AI voices. One-click Steam hook, real-time character voices tuned live inside your game window." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="dubplay" />
+  <meta property="og:title" content="dubplay: voice every visual novel" />
+  <meta property="og:description" content="dubplay gives Steam visual novels per-character AI voices. One-click Steam hook, real-time character voices tuned live inside your game window." />
+  <meta property="og:url" content="https://dubplay.design/" />
+  <meta property="og:image" content="https://dubplay.design/logo.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="dubplay: voice every visual novel" />
+  <meta name="twitter:description" content="dubplay gives Steam visual novels per-character AI voices. One-click Steam hook, real-time character voices tuned live inside your game window." />
+  <meta name="twitter:image" content="https://dubplay.design/logo.png" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -23,6 +34,7 @@
       --g-900: #071a12;
 
       --card-surface: #d4e6da;
+      --card-hover: #c9ddd0;
       --card-recessed: #b7d1c0;
       --border-hairline: rgba(7, 26, 18, 0.12);
       --border-strong: rgba(7, 26, 18, 0.26);
@@ -30,7 +42,7 @@
       --accent: #e0f8c7;
       --ink: #071a12;
       --ink-secondary: #143529;
-      --ink-muted: #224d3d;
+      --ink-muted: #1c4333;
       --ink-on-dark: #f2f9f4;
       --ink-on-dark-muted: #a4c6b3;
 
@@ -66,6 +78,8 @@
       padding-bottom: var(--space-16);
     }
 
+    :focus-visible { outline: 2px solid var(--g-900); outline-offset: 2px; }
+
     .container { max-width: 1080px; margin: 0 auto; padding: 0 var(--space-8); }
 
     header { height: var(--space-24); display: flex; align-items: center; }
@@ -74,7 +88,7 @@
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       color: var(--ink);
       text-decoration: none;
       font-family: var(--font-display);
@@ -83,7 +97,7 @@
       letter-spacing: -0.03em;
     }
 
-    .brand-logo { width: 44px; height: 44px; border-radius: 11px; }
+    .brand-logo { width: 44px; height: 44px; border-radius: 12px; }
 
     .nav-links { display: flex; align-items: center; gap: var(--space-8); }
     .nav-link {
@@ -91,19 +105,19 @@
       text-decoration: none;
       font-size: 0.95rem;
       font-weight: 600;
-      padding: 6px 12px;
+      padding: 8px 12px;
       border-radius: 8px;
       transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
     }
-    .nav-link:hover { background: var(--g-900); color: var(--accent); }
+    .nav-link:hover { background: var(--border-hairline); color: var(--ink); }
 
     .github-icon-link {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 38px; height: 38px; border-radius: 9px; color: var(--ink);
-      transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--ease-out);
+      width: 40px; height: 40px; border-radius: 8px; color: var(--ink);
+      transition: background-color 160ms var(--ease-out);
     }
-    .github-icon-link:hover { background: var(--g-900); color: var(--accent); transform: translateY(-1px); }
-    .github-icon-link svg { width: 21px; height: 21px; fill: currentColor; }
+    .github-icon-link:hover { background: var(--border-hairline); }
+    .github-icon-link svg { width: 20px; height: 20px; fill: currentColor; }
 
     /* Hero Stage */
     .hero {
@@ -137,13 +151,14 @@
     .btn-download {
       display: inline-flex; align-items: center; gap: var(--space-3);
       background: var(--g-900); color: var(--accent);
-      padding: 15px 24px; border-radius: 12px;
+      padding: 16px 24px; border-radius: 12px;
       text-decoration: none; font-weight: 600; font-size: 0.95rem;
-      box-shadow: 0 12px 28px -8px rgba(7, 26, 18, 0.3);
+      box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.28);
       transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
     }
-    .btn-download:hover { background: var(--g-800); transform: translateY(-2px); }
-    .btn-download svg { width: 18px; height: 18px; stroke: var(--accent); }
+    .btn-download:hover { background: var(--g-800); }
+    .btn-download:active { transform: scale(0.97); }
+    .btn-download svg { width: 16px; height: 16px; stroke: var(--accent); }
 
     /* Interactive VN Stage */
     .vn-stage {
@@ -152,13 +167,13 @@
       border-radius: 18px;
       border: 1px solid var(--border-strong);
       overflow: hidden;
-      box-shadow: 0 24px 56px -16px rgba(7, 26, 18, 0.32);
+      box-shadow: 0 24px 56px -16px rgba(0, 0, 0, 0.32);
       position: relative;
     }
 
     .vn-topbar {
       background: rgba(255, 255, 255, 0.04);
-      padding: 12px 18px;
+      padding: 12px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -171,13 +186,6 @@
     .pulse-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--accent);
-      box-shadow: 0 0 0 0 rgba(224, 248, 199, 0.7);
-      animation: pulse 1.8s infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(224, 248, 199, 0.6); }
-      70% { box-shadow: 0 0 0 8px rgba(224, 248, 199, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(224, 248, 199, 0); }
     }
 
     .hud-toggle-btn {
@@ -186,8 +194,8 @@
       background: var(--g-800);
       color: var(--accent);
       border: 1px solid rgba(224, 248, 199, 0.3);
-      border-radius: 6px;
-      padding: 4px 10px;
+      border-radius: 8px;
+      padding: 4px 12px;
       cursor: pointer;
       transition: background-color 150ms var(--ease-out);
     }
@@ -206,20 +214,20 @@
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(224, 248, 199, 0.12);
       color: var(--ink-on-dark-muted);
-      padding: 10px 12px;
+      padding: 12px;
       border-radius: 10px;
       font-family: var(--font-sans);
       font-size: 0.84rem;
       font-weight: 600;
       text-align: left;
       cursor: pointer;
-      transition: all 150ms var(--ease-out);
+      transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out);
     }
     .char-chip small {
       display: block;
       font-family: var(--font-mono);
-      font-size: 0.68rem;
-      margin-top: 2px;
+      font-size: 0.72rem;
+      margin-top: 4px;
       opacity: 0.75;
     }
     .char-chip.active {
@@ -255,11 +263,11 @@
 
     .mood-tag {
       font-family: var(--font-mono);
-      font-size: 0.68rem;
+      font-size: 0.72rem;
       color: var(--ink-on-dark-muted);
       background: rgba(255, 255, 255, 0.06);
-      padding: 2px 8px;
-      border-radius: 999px;
+      padding: 4px 8px;
+      border-radius: 6px;
     }
 
     .dialogue-text {
@@ -280,8 +288,9 @@
       flex: 1;
       background: var(--accent);
       border-radius: 99px;
-      height: 30%;
-      transition: height 180ms var(--ease-out), opacity 180ms var(--ease-out);
+      height: 100%;
+      transform: scaleY(0.3);
+      transition: transform 180ms var(--ease-out), opacity 180ms var(--ease-out);
       opacity: 0.75;
     }
 
@@ -296,7 +305,7 @@
       background: var(--g-800);
       color: var(--accent);
       border: 1px solid rgba(224, 248, 199, 0.25);
-      padding: 7px 14px;
+      padding: 8px 16px;
       border-radius: 8px;
       font-family: var(--font-mono);
       font-size: 0.75rem;
@@ -317,7 +326,7 @@
       color: var(--ink);
       border-radius: 12px;
       padding: 16px;
-      transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out);
+      transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s;
       max-height: 240px;
       overflow: hidden;
     }
@@ -326,6 +335,8 @@
       padding-top: 0;
       padding-bottom: 0;
       opacity: 0;
+      visibility: hidden;
+      transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s linear 280ms;
     }
 
     .slider-row {
@@ -342,14 +353,14 @@
 
     input[type="range"] {
       -webkit-appearance: none; appearance: none;
-      width: 100%; height: 6px;
+      width: 100%; height: 8px;
       background: var(--card-recessed);
       border-radius: 999px; outline: none;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none; appearance: none;
       width: 16px; height: 16px; border-radius: 50%;
-      background: var(--accent); border: 2.5px solid var(--g-900);
+      background: var(--accent); border: 2px solid var(--g-900);
       cursor: pointer;
     }
 
@@ -389,29 +400,23 @@
       border-radius: 14px;
       padding: var(--space-5);
       text-align: left;
-      transition: all 180ms var(--ease-out);
+      transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
     }
     .step-card:hover {
-      background: var(--g-900);
-      border-color: var(--g-900);
-      color: var(--ink-on-dark);
-      transform: translateY(-2px);
+      background: var(--card-hover);
+      border-color: var(--border-strong);
     }
     .step-idx {
       display: inline-block;
       font-family: var(--font-mono);
       font-size: 0.72rem;
       font-weight: 600;
-      background: var(--g-900);
-      color: var(--accent);
-      padding: 3px 8px;
-      border-radius: 6px;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink-muted);
       margin-bottom: var(--space-3);
     }
-    .step-card:hover .step-idx { background: var(--g-800); }
     .step-card h2 { font-family: var(--font-display); font-size: 1.18rem; margin-bottom: 4px; }
     .step-card p { font-size: 0.86rem; color: var(--ink-muted); }
-    .step-card:hover p { color: var(--ink-on-dark-muted); }
 
     /* Engines */
     .engines-grid {
@@ -424,31 +429,34 @@
       background: var(--card-surface);
       border: 1px solid var(--border-hairline);
       border-radius: 12px;
-      padding: 18px 20px;
+      padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-weight: 600;
       font-size: 0.94rem;
-      transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out);
+      transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out);
     }
-    .engine-pill:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+    .engine-pill:hover { background: var(--card-hover); border-color: var(--border-strong); }
 
+    /* Status is quiet mono text with a dot */
     .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-family: var(--font-mono);
       font-size: 0.72rem;
       font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--card-recessed);
-      border: 1px solid var(--border-hairline);
-      color: var(--ink-secondary);
+      color: var(--ink-muted);
     }
-    .badge-full {
-      background: var(--g-900);
-      border-color: var(--g-900);
-      color: var(--accent);
+    .badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--g-500);
     }
+    .badge-soon::before { background: transparent; border: 1px solid var(--g-600); }
 
     /* Team Grid */
     .team-grid {
@@ -467,33 +475,28 @@
       gap: var(--space-4);
       text-decoration: none;
       color: var(--ink);
-      transition: all 180ms var(--ease-out);
+      transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
     }
     .team-card:hover {
-      transform: translateY(-3px);
-      background: var(--g-900);
-      border-color: var(--g-900);
-      color: var(--ink-on-dark);
+      background: var(--card-hover);
+      border-color: var(--border-strong);
     }
     .team-avatar {
       width: 56px; height: 56px; border-radius: 50%;
-      object-fit: cover; border: 2px solid var(--g-900);
+      object-fit: cover; border: 1px solid var(--border-strong);
       background: var(--card-recessed); flex-shrink: 0;
     }
-    .team-card:hover .team-avatar { border-color: var(--accent); }
     .team-meta { display: flex; flex-direction: column; min-width: 0; }
     .team-role {
       align-self: flex-start;
       font-family: var(--font-mono);
-      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.06em;
-      background: var(--g-900); color: var(--accent);
-      padding: 2px 7px; border-radius: 5px; margin-bottom: 6px;
+      color: var(--ink-muted);
+      margin-bottom: 4px;
     }
-    .team-card:hover .team-role { background: var(--g-800); }
-    .team-name { font-family: var(--font-display); font-size: 1.18rem; font-weight: 700; line-height: 1.15; }
+    .team-name { font-family: var(--font-display); font-size: 1.18rem; font-weight: 700; line-height: 1.2; margin-bottom: 4px; }
     .team-handle { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-muted); }
-    .team-card:hover .team-handle { color: var(--ink-on-dark-muted); }
 
     @media (max-width: 880px) {
       .hero { grid-template-columns: 1fr; }
@@ -502,6 +505,7 @@
     }
     @media (max-width: 540px) {
       .steps-grid, .engines-grid { grid-template-columns: 1fr; }
+      header .nav-links .nav-link { display: none; }
     }
   </style>
 </head>
@@ -517,7 +521,7 @@
         <div class="nav-links">
           <a href="#pipeline" class="nav-link">Pipeline</a>
           <a href="#engines" class="nav-link">Engines</a>
-          <a href="#about" class="nav-link">About</a>
+          <a href="#about" class="nav-link">Team</a>
           <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
@@ -539,7 +543,7 @@
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              Download Application
+              Download for Windows
             </a>
           </div>
         </div>
@@ -547,18 +551,18 @@
         <aside class="vn-stage" aria-label="Interactive In-Game Overlay Sandbox">
           <div class="vn-topbar">
             <span class="vn-status"><span class="pulse-dot"></span> DUBPLAY HOOK · 127.0.0.1:49210</span>
-            <button type="button" class="hud-toggle-btn" id="toggle-hud">Overlay [Shift + F2]</button>
+            <button type="button" class="hud-toggle-btn" id="toggle-hud" aria-expanded="true" aria-controls="hud-drawer">Overlay [Shift + F2]</button>
           </div>
 
           <div class="vn-scene-body">
-            <div class="char-selector" role="tablist">
-              <button class="char-chip active" type="button" data-char="sylvie">
+            <div class="char-selector" role="group" aria-label="Character voice">
+              <button class="char-chip active" type="button" aria-pressed="true" data-char="sylvie">
                 Sylvie <small>Warm · Lead</small>
               </button>
-              <button class="char-chip" type="button" data-char="voss">
+              <button class="char-chip" type="button" aria-pressed="false" data-char="voss">
                 Voss <small>Gruff · Detective</small>
               </button>
-              <button class="char-chip" type="button" data-char="narrator">
+              <button class="char-chip" type="button" aria-pressed="false" data-char="narrator">
                 Narrator <small>Calm · Omniscient</small>
               </button>
             </div>
@@ -580,17 +584,17 @@
             <div class="hud-drawer" id="hud-drawer">
               <div class="slider-row">
                 <span class="slider-name">Stability</span>
-                <input type="range" id="sl-stability" min="0" max="1" step="0.05" value="0.45" />
+                <input type="range" id="sl-stability" aria-label="Stability" min="0" max="1" step="0.05" value="0.45" />
                 <span class="slider-val" id="val-stability">0.45</span>
               </div>
               <div class="slider-row">
                 <span class="slider-name">Style</span>
-                <input type="range" id="sl-style" min="0" max="1" step="0.05" value="0.65" />
+                <input type="range" id="sl-style" aria-label="Style" min="0" max="1" step="0.05" value="0.65" />
                 <span class="slider-val" id="val-style">0.65</span>
               </div>
               <div class="slider-row">
                 <span class="slider-name">Speed</span>
-                <input type="range" id="sl-speed" min="0.7" max="1.2" step="0.05" value="1.05" />
+                <input type="range" id="sl-speed" aria-label="Speed" min="0.7" max="1.2" step="0.05" value="1.05" />
                 <span class="slider-val" id="val-speed">1.05×</span>
               </div>
             </div>
@@ -605,23 +609,23 @@
         <div class="steps-grid">
           <article class="step-card">
             <div class="step-idx">01</div>
-            <h2>Scan Library</h2>
-            <p>Auto-detects installed Steam games.</p>
+            <h2>Scan library</h2>
+            <p>Auto-detects installed Steam games</p>
           </article>
           <article class="step-card">
             <div class="step-idx">02</div>
-            <h2>Hook Script</h2>
-            <p>Captures exact dialogue lines.</p>
+            <h2>Hook script</h2>
+            <p>Captures exact dialogue lines</p>
           </article>
           <article class="step-card">
             <div class="step-idx">03</div>
-            <h2>Cast Voices</h2>
-            <p>Profiles every character once.</p>
+            <h2>Cast voices</h2>
+            <p>Profiles every character once</p>
           </article>
           <article class="step-card">
             <div class="step-idx">04</div>
-            <h2>Tune Live</h2>
-            <p>Adjust sliders mid-scene.</p>
+            <h2>Tune live</h2>
+            <p>Adjust sliders mid-scene</p>
           </article>
         </div>
       </section>
@@ -633,32 +637,32 @@
         <div class="engines-grid">
           <div class="engine-pill">
             <span>Ren'Py</span>
-            <span class="badge badge-full">Full</span>
+            <span class="badge">Beta</span>
           </div>
           <div class="engine-pill">
             <span>Godot</span>
-            <span class="badge badge-full">Full</span>
+            <span class="badge">Beta</span>
           </div>
           <div class="engine-pill">
             <span>RPG Maker</span>
-            <span class="badge badge-full">Full</span>
+            <span class="badge">Beta</span>
           </div>
           <div class="engine-pill">
             <span>Unity</span>
-            <span class="badge">Beta</span>
+            <span class="badge badge-soon">Soon</span>
           </div>
         </div>
       </section>
 
       <section class="section" id="about">
         <div class="section-header">
-          <div class="section-label">About Us</div>
+          <div class="section-label">Team</div>
         </div>
         <div class="team-grid">
           <a href="https://github.com/edwardvu7" class="team-card" target="_blank" rel="noopener noreferrer">
             <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="Edward Vu" width="56" height="56" loading="lazy" />
             <div class="team-meta">
-              <span class="team-role">Engine Hooks</span>
+              <span class="team-role">Engine hooks</span>
               <div class="team-name">Edward Vu</div>
               <div class="team-handle">@edwardvu7</div>
             </div>
@@ -676,7 +680,7 @@
           <a href="https://github.com/Craz33matt" class="team-card" target="_blank" rel="noopener noreferrer">
             <img class="team-avatar" src="https://github.com/Craz33matt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
             <div class="team-meta">
-              <span class="team-role">Core &amp; Voice Pipeline</span>
+              <span class="team-role">Core &amp; voice pipeline</span>
               <div class="team-name" id="name-Craz33matt">Matthew</div>
               <div class="team-handle">@Craz33matt</div>
             </div>
@@ -749,7 +753,7 @@
       bars.forEach((bar, i) => {
         const variance = (1 - stabVal) * 55 + styleVal * 45;
         const height = Math.max(15, Math.min(100, 22 + Math.sin(i * 0.65 + lineIdx) * variance + Math.random() * 25));
-        bar.style.height = height + "%";
+        bar.style.transform = "scaleY(" + (height / 100).toFixed(2) + ")";
         bar.style.opacity = (0.45 + (height / 200)).toFixed(2);
       });
     }
@@ -785,8 +789,9 @@
 
     document.querySelectorAll(".char-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
-        document.querySelectorAll(".char-chip").forEach((c) => c.classList.remove("active"));
+        document.querySelectorAll(".char-chip").forEach((c) => { c.classList.remove("active"); c.setAttribute("aria-pressed", "false"); });
         chip.classList.add("active");
+        chip.setAttribute("aria-pressed", "true");
         currentChar = chip.dataset.char;
         lineIdx = 0;
         const p = profiles[currentChar];
@@ -804,7 +809,8 @@
     });
 
     document.getElementById("toggle-hud").addEventListener("click", () => {
-      document.getElementById("hud-drawer").classList.toggle("collapsed");
+      const collapsed = document.getElementById("hud-drawer").classList.toggle("collapsed");
+      document.getElementById("toggle-hud").setAttribute("aria-expanded", String(!collapsed));
     });
 
     [slStability, slStyle, slSpeed].forEach((s) => s.addEventListener("input", updateReadouts));
