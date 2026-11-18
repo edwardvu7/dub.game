@@ -17,12 +17,17 @@
   <meta name="twitter:image" content="https://dubplay.design/logo.png" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- "js" gates the hidden reveal state so nothing stays invisible if scripts fail.
+       TEMP: "force-motion" keeps scroll animations on even with OS reduced motion (for testing).
+       Remove 'force-motion' below to honor the system setting again. -->
+  <script>document.documentElement.classList.add('js', 'force-motion');</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-sans/style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.css" />
   <link rel="stylesheet" href="https://use.typekit.net/ins2wgm.css" />
   <style>
     :root {
+      /* Same green ramp as the light site, used the other way round */
       --g-100: #c4dacb;
       --g-200: #a4c6b3;
       --g-300: #82b49b;
@@ -33,18 +38,19 @@
       --g-800: #143529;
       --g-900: #071a12;
 
-      --card-surface: #d4e6da;
-      --card-hover: #c9ddd0;
-      --card-recessed: #b7d1c0;
-      --border-hairline: rgba(7, 26, 18, 0.12);
-      --border-strong: rgba(7, 26, 18, 0.26);
+      --bg: #071a12;
+      --surface: #0c2218;
+      --surface-hover: #112d21;
+      --line: rgba(242, 249, 244, 0.1);
+      --line-strong: rgba(242, 249, 244, 0.2);
 
+      /* Accent: the primary action and the active voice */
       --accent: #e0f8c7;
-      --ink: #071a12;
-      --ink-secondary: #143529;
-      --ink-muted: #1c4333;
-      --ink-on-dark: #f2f9f4;
-      --ink-on-dark-muted: #a4c6b3;
+      --accent-hover: #eefbdd;
+
+      --text: #f2f9f4;
+      --text-secondary: #c4dacb;
+      --text-muted: #82b49b;
 
       --font-display: "forma-djr-display", "Forma DJR Display", "Forma", "Geist Sans", -apple-system, sans-serif;
       --font-sans: "Geist Sans", -apple-system, sans-serif;
@@ -66,62 +72,91 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
-    html { scroll-behavior: smooth; background-color: var(--g-100); color: var(--ink); }
+    /* Anchor scrolling is tweened in JS (native smooth scroll is skipped when the OS turns animations off) */
+    html { background-color: var(--bg); color: var(--text); color-scheme: dark; }
 
     body {
       font-family: var(--font-sans);
-      background: linear-gradient(180deg, #d4e7da 0%, var(--g-100) 35%, var(--g-200) 75%, var(--g-300) 100%);
-      background-attachment: fixed;
-      color: var(--ink);
+      background: var(--bg);
+      color: var(--text);
       line-height: 1.5;
       min-height: 100vh;
-      padding-bottom: var(--space-16);
     }
 
-    :focus-visible { outline: 2px solid var(--g-900); outline-offset: 2px; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .container { max-width: 1080px; margin: 0 auto; padding: 0 var(--space-8); }
+    .container { position: relative; max-width: 1080px; margin: 0 auto; padding: 0 var(--space-8); }
 
-    header { height: var(--space-24); display: flex; align-items: center; }
+    /* Textured gradient: soft green light on near-black, with film grain over it */
+    .top { position: relative; isolation: isolate; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; }
+    .top > .container { flex: 1; width: 100%; display: flex; flex-direction: column; }
+
+    .top-art {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(60% 80% at 82% 48%, rgba(98, 162, 134, 0.85) 0%, rgba(69, 142, 114, 0.45) 35%, transparent 70%),
+        radial-gradient(55% 60% at 62% 85%, rgba(49, 109, 86, 0.9) 0%, rgba(34, 77, 61, 0.5) 40%, transparent 72%),
+        radial-gradient(45% 55% at 100% 40%, rgba(130, 180, 155, 0.5) 0%, transparent 65%),
+        radial-gradient(70% 80% at 0% 0%, rgba(20, 53, 41, 0.9) 0%, transparent 70%),
+        var(--bg);
+      -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    }
+
+    .top-art::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.5;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      background-size: 240px 240px;
+    }
+
+    header { height: 72px; display: flex; align-items: center; }
     .nav-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 12px;
-      color: var(--ink);
+      gap: 8px;
+      color: var(--text);
       text-decoration: none;
       font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 1.65rem;
+      font-weight: 500;
+      font-size: 1.125rem;
       letter-spacing: -0.03em;
     }
 
-    .brand-logo { width: 44px; height: 44px; border-radius: 12px; }
+    .brand-logo { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); }
 
     .nav-links { display: flex; align-items: center; gap: var(--space-8); }
     .nav-link {
-      color: var(--ink-secondary);
+      color: var(--text-secondary);
       text-decoration: none;
       font-size: 0.95rem;
-      font-weight: 600;
+      font-weight: 500;
       padding: 8px 12px;
       border-radius: 8px;
       transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
     }
-    .nav-link:hover { background: var(--border-hairline); color: var(--ink); }
+    .nav-link:hover { background: var(--line); color: var(--text); }
 
     .github-icon-link {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 40px; height: 40px; border-radius: 8px; color: var(--ink);
+      width: 40px; height: 40px; border-radius: 8px; color: var(--text);
       transition: background-color 160ms var(--ease-out);
     }
-    .github-icon-link:hover { background: var(--border-hairline); }
+    .github-icon-link:hover { background: var(--line); }
     .github-icon-link svg { width: 20px; height: 20px; fill: currentColor; }
 
-    /* Hero Stage */
+    /* Hero */
     .hero {
-      padding: var(--space-10) 0 var(--space-16);
+      flex: 1;
+      padding: var(--space-6) 0 var(--space-8);
       display: grid;
       grid-template-columns: 0.95fr 1.05fr;
       gap: var(--space-12);
@@ -130,17 +165,17 @@
 
     h1 {
       font-family: var(--font-display);
-      font-weight: 700;
+      font-weight: 500;
       font-size: clamp(3rem, 5.2vw, 4.4rem);
       line-height: 1.02;
       letter-spacing: -0.035em;
       margin-bottom: var(--space-6);
     }
-    h1 span { display: block; color: var(--g-700); }
+    h1 span { display: block; color: var(--g-300); }
 
     .lead {
       font-size: 1.15rem;
-      color: var(--ink-muted);
+      color: var(--text-secondary);
       font-weight: 500;
       max-width: 390px;
       margin-bottom: var(--space-8);
@@ -150,34 +185,38 @@
 
     .btn-download {
       display: inline-flex; align-items: center; gap: var(--space-3);
-      background: var(--g-900); color: var(--accent);
+      background: var(--accent); color: var(--g-900);
       padding: 16px 24px; border-radius: 12px;
-      text-decoration: none; font-weight: 600; font-size: 0.95rem;
-      box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.28);
+      text-decoration: none; font-weight: 500; font-size: 0.95rem;
       transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
     }
-    .btn-download:hover { background: var(--g-800); }
+    .btn-download:hover { background: var(--accent-hover); }
     .btn-download:active { transform: scale(0.97); }
-    .btn-download svg { width: 16px; height: 16px; stroke: var(--accent); }
+    .btn-download svg { width: 16px; height: 16px; stroke: var(--g-900); }
 
-    /* Interactive VN Stage */
+    /* Interactive VN stage: the one rich object on the page */
     .vn-stage {
-      background: var(--g-900);
-      color: var(--ink-on-dark);
-      border-radius: 18px;
-      border: 1px solid var(--border-strong);
+      background: rgba(12, 34, 24, 0.62);
+      -webkit-backdrop-filter: blur(14px) saturate(1.1);
+      backdrop-filter: blur(14px) saturate(1.1);
+      color: var(--text);
+      border-radius: 16px;
+      border: 1px solid rgba(242, 249, 244, 0.14);
       overflow: hidden;
-      box-shadow: 0 24px 56px -16px rgba(0, 0, 0, 0.32);
+      box-shadow: 0 24px 56px -16px rgba(0, 0, 0, 0.5);
       position: relative;
+    }
+    @supports not (backdrop-filter: blur(1px)) {
+      .vn-stage { background: #0c2218; }
+      .waveform-box, .hud-drawer { background: #071a12; }
     }
 
     .vn-topbar {
-      background: rgba(255, 255, 255, 0.04);
       padding: 12px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid rgba(224, 248, 199, 0.12);
+      border-bottom: 1px solid var(--line);
       font-family: var(--font-mono);
       font-size: 0.74rem;
     }
@@ -187,19 +226,25 @@
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--accent);
     }
+    /* TEMP: reduced-motion override disabled for testing (the min-width never matches). Remove "and (min-width: 99999px)" to restore. */
+    @media (prefers-reduced-motion: reduce) and (min-width: 99999px) {
+      .btn-download:hover, .btn-download:active, .char-chip:hover, .char-chip:active,
+      .hud-toggle-btn:hover, .hud-toggle-btn:active, .btn-next-line:hover, .btn-next-line:active { transform: none; }
+    }
 
     .hud-toggle-btn {
       font-family: var(--font-mono);
       font-size: 0.72rem;
-      background: var(--g-800);
-      color: var(--accent);
-      border: 1px solid rgba(224, 248, 199, 0.3);
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--line-strong);
       border-radius: 8px;
       padding: 4px 12px;
       cursor: pointer;
-      transition: background-color 150ms var(--ease-out);
+      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
     }
-    .hud-toggle-btn:hover { background: var(--g-700); }
+    .hud-toggle-btn:hover { background: var(--surface-hover); border-color: rgba(242, 249, 244, 0.34); color: var(--text); }
+    .hud-toggle-btn:active { transform: scale(0.97); }
 
     .vn-scene-body { padding: var(--space-6); }
 
@@ -211,79 +256,65 @@
     }
 
     .char-chip {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(224, 248, 199, 0.12);
-      color: var(--ink-on-dark-muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text-secondary);
       padding: 12px;
       border-radius: 10px;
       font-family: var(--font-sans);
       font-size: 0.84rem;
-      font-weight: 600;
+      font-weight: 500;
       text-align: left;
       cursor: pointer;
-      transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out);
     }
+    .char-chip:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+    .char-chip:active { transform: scale(0.97); }
+    .char-chip.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
     .char-chip small {
       display: block;
       font-family: var(--font-mono);
       font-size: 0.72rem;
       margin-top: 4px;
-      opacity: 0.75;
+      color: var(--text-secondary);
     }
-    .char-chip.active {
-      background: var(--accent);
-      color: var(--g-900);
-      border-color: var(--accent);
-    }
+    .char-chip.active { background: var(--accent); color: var(--g-900); border-color: var(--accent); }
+    .char-chip.active small { color: var(--g-700); }
 
-    /* Waveform Visualizer */
     .waveform-box {
-      background: rgba(0, 0, 0, 0.28);
-      border: 1px solid rgba(224, 248, 199, 0.12);
+      background: rgba(7, 26, 18, 0.45);
+      border: 1px solid var(--line);
       border-radius: 12px;
       padding: 16px;
       margin-bottom: var(--space-4);
     }
 
-    .dialogue-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
+    .dialogue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 
     .speaker-badge {
       font-family: var(--font-mono);
       font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      
+      letter-spacing: 0.02em;
       color: var(--accent);
-      font-weight: 600;
+      font-weight: 500;
     }
 
     .mood-tag {
       font-family: var(--font-mono);
       font-size: 0.72rem;
-      color: var(--ink-on-dark-muted);
-      background: rgba(255, 255, 255, 0.06);
-      padding: 4px 8px;
-      border-radius: 6px;
+      color: var(--text-secondary);
     }
 
     .dialogue-text {
       font-size: 1.02rem;
       min-height: 3rem;
       line-height: 1.45;
-      color: var(--ink-on-dark);
-      margin-bottom: 14px;
+      color: var(--text);
+      margin-bottom: 16px;
     }
 
-    .wave-bars {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      height: 28px;
-    }
+    .wave-bars { display: flex; align-items: center; gap: 4px; height: 28px; }
     .wave-bar {
       flex: 1;
       background: var(--accent);
@@ -294,50 +325,33 @@
       opacity: 0.75;
     }
 
-    .vn-controls-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--space-4);
-    }
+    .vn-controls-row { display: flex; justify-content: flex-start; align-items: center; margin-bottom: var(--space-4); }
 
     .btn-next-line {
-      background: var(--g-800);
-      color: var(--accent);
-      border: 1px solid rgba(224, 248, 199, 0.25);
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line-strong);
       padding: 8px 16px;
       border-radius: 8px;
       font-family: var(--font-mono);
       font-size: 0.75rem;
       cursor: pointer;
-      transition: background-color 150ms var(--ease-out), transform 120ms var(--ease-out);
+      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
     }
-    .btn-next-line:hover { background: var(--g-700); }
-    .btn-next-line:active { transform: scale(0.96); }
-
-    .cache-readout {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--ink-on-dark-muted);
-    }
+    .btn-next-line:hover { background: var(--surface-hover); border-color: rgba(242, 249, 244, 0.34); }
+    .btn-next-line:active { transform: scale(0.97); }
 
     .hud-drawer {
-      background: var(--card-surface);
-      color: var(--ink);
+      background: rgba(7, 26, 18, 0.45);
+      border: 1px solid var(--line);
+      color: var(--text);
       border-radius: 12px;
       padding: 16px;
       transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s;
       max-height: 240px;
       overflow: hidden;
     }
-    .hud-drawer.collapsed {
-      max-height: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-      opacity: 0;
-      visibility: hidden;
-      transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s linear 280ms;
-    }
+    .hud-drawer.collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; border-color: transparent; visibility: hidden; transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s linear 280ms; }
 
     .slider-row {
       display: grid;
@@ -348,19 +362,25 @@
       margin-bottom: 8px;
     }
     .slider-row:last-child { margin-bottom: 0; }
-    .slider-name { font-weight: 600; color: var(--ink-secondary); }
-    .slider-val { font-family: var(--font-mono); text-align: right; font-weight: 600; font-size: 0.78rem; }
+    .slider-name { font-weight: 500; color: var(--text-secondary); }
+    .slider-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; font-weight: 500; font-size: 0.78rem; }
 
     input[type="range"] {
       -webkit-appearance: none; appearance: none;
       width: 100%; height: 8px;
-      background: var(--card-recessed);
+      background: linear-gradient(to right, var(--g-500) var(--p, 50%), var(--g-800) var(--p, 50%));
+      border: 1px solid var(--line);
       border-radius: 999px; outline: none;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none; appearance: none;
       width: 16px; height: 16px; border-radius: 50%;
-      background: var(--accent); border: 2px solid var(--g-900);
+      background: var(--accent); border: 2px solid var(--bg);
+      cursor: pointer;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--bg);
       cursor: pointer;
     }
 
@@ -368,135 +388,257 @@
     .section {
       padding: var(--space-16) 0 0;
       margin-top: var(--space-16);
-      border-top: 1px solid var(--border-hairline);
+      border-top: 1px solid var(--line);
+      scroll-margin-top: var(--space-4);
     }
 
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: var(--space-6);
+    /* Scroll reveal: one short fade and rise as each block enters the view */
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 400ms var(--ease-out), transform 400ms var(--ease-out);
+      transition-delay: var(--delay, 0ms);
     }
+    .js .reveal.is-visible { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      html:not(.force-motion) .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+    }
+
+    .section-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-6); }
 
     .section-label {
       font-family: var(--font-mono);
       font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--ink-muted);
+      font-weight: 500;
+      
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
     }
 
-    /* Pipeline Grid */
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-4);
-    }
+    .steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
 
     .step-card {
-      background: var(--card-surface);
-      border: 1px solid var(--border-hairline);
-      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
       padding: var(--space-5);
       text-align: left;
       transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
     }
-    .step-card:hover {
-      background: var(--card-hover);
-      border-color: var(--border-strong);
-    }
+    .step-card:hover { background: var(--surface-hover); border-color: var(--line-strong); }
     .step-idx {
       display: inline-block;
       font-family: var(--font-mono);
       font-size: 0.72rem;
-      font-weight: 600;
+      font-weight: 500;
       font-variant-numeric: tabular-nums;
-      color: var(--ink-muted);
+      color: var(--text-muted);
       margin-bottom: var(--space-3);
     }
     .step-card h2 { font-family: var(--font-display); font-size: 1.18rem; margin-bottom: 4px; }
-    .step-card p { font-size: 0.86rem; color: var(--ink-muted); }
+    .step-card p { font-size: 0.86rem; color: var(--text-secondary); }
 
-    /* Engines */
-    .engines-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-4);
-    }
+    .engines-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
 
     .engine-pill {
-      background: var(--card-surface);
-      border: 1px solid var(--border-hairline);
+      background: var(--surface);
+      border: 1px solid var(--line);
       border-radius: 12px;
       padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-weight: 600;
+      font-weight: 500;
       font-size: 0.94rem;
       transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out);
     }
-    .engine-pill:hover { background: var(--card-hover); border-color: var(--border-strong); }
+    .engine-pill:hover { background: var(--surface-hover); border-color: var(--line-strong); }
 
-    /* Status is quiet mono text with a dot */
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-family: var(--font-mono);
       font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--ink-muted);
+      font-weight: 500;
+      color: var(--text-muted);
     }
-    .badge::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--g-500);
-    }
-    .badge-soon::before { background: transparent; border: 1px solid var(--g-600); }
+    .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--g-400); }
+    .badge-soon::before { background: transparent; border: 1px solid var(--g-500); }
 
-    /* Team Grid */
-    .team-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-4);
-    }
+    .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
 
     .team-card {
-      background: var(--card-surface);
-      border: 1px solid var(--border-hairline);
-      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
       padding: var(--space-5);
       display: flex;
       align-items: center;
       gap: var(--space-4);
       text-decoration: none;
-      color: var(--ink);
+      color: var(--text);
       transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
     }
-    .team-card:hover {
-      background: var(--card-hover);
-      border-color: var(--border-strong);
-    }
+    .team-card:hover { background: var(--surface-hover); border-color: var(--line-strong); }
     .team-avatar {
       width: 56px; height: 56px; border-radius: 50%;
-      object-fit: cover; border: 1px solid var(--border-strong);
-      background: var(--card-recessed); flex-shrink: 0;
+      object-fit: cover; border: 1px solid var(--line-strong);
+      background: var(--g-800); flex-shrink: 0;
     }
     .team-meta { display: flex; flex-direction: column; min-width: 0; }
     .team-role {
-      align-self: flex-start;
       font-family: var(--font-mono);
-      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--ink-muted);
+      font-size: 0.72rem; font-weight: 500; 
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
       margin-bottom: 4px;
     }
-    .team-name { font-family: var(--font-display); font-size: 1.18rem; font-weight: 700; line-height: 1.2; margin-bottom: 4px; }
-    .team-handle { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-muted); }
+    .team-name { font-family: var(--font-display); font-size: 1.18rem; font-weight: 500; line-height: 1.2; margin-bottom: 4px; }
+    .team-handle { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); }
+
+    /* Closing call to action */
+    .btn-download .win { width: 16px; height: 16px; fill: var(--g-900); stroke: none; }
+
+    /* Full-width ending: starts at the exact page green, deepens toward the bottom */
+    .cta {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background: linear-gradient(to bottom, var(--bg) 0%, #0b281c 40%, #0f3a29 100%);
+    }
+    /* The download area; the keycaps live here, not in the footer */
+    .cta-main {
+      position: relative;
+      padding: clamp(64px, 11vw, 144px) 0 var(--space-12);
+    }
+
+    /* Footer: same forest green as the bottom of the download area, no color step */
+    .site-footer { position: relative; z-index: 1; padding-bottom: var(--space-12); }
+    .footer-inner {
+      border-top: 1px solid rgba(242, 249, 244, 0.1);
+      padding-top: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .site-footer .nav-links { flex-wrap: wrap; gap: var(--space-6); }
+    .site-footer .nav-link,
+    .site-footer .github-icon-link { color: var(--text-muted); }
+    .site-footer .nav-link:hover,
+    .site-footer .github-icon-link:hover { color: var(--text); }
+    .cta::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.35;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+      mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      background-size: 240px 240px;
+    }
+    .cta-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; }
+    .cta h2 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(2rem, 3.6vw, 2.75rem);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .cta p {
+      font-size: 1.15rem;
+      font-weight: 500;
+      line-height: 1.5;
+      color: var(--g-200);
+      margin-bottom: var(--space-6);
+    }
+    /* Compact button with a subtle bevel and a soft shadow */
+    .cta .btn-download {
+      padding: 12px 20px;
+      font-size: 0.9rem;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 0 rgba(7, 26, 18, 0.16),
+        0 8px 20px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Soft floating keycaps (Shift + F2, the overlay hotkey). They sit in the same row as the
+       copy, so the pair is vertically centered beside the headline, line and button. */
+    .cta-main .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-8);
+    }
+    .keycaps {
+      position: relative;
+      flex: none;
+      width: 252px;
+      height: 212px;
+      margin-right: 56px;
+      pointer-events: none;
+    }
+    /* One molded piece: the outer silhouette is the sloped shoulder (soft sage light on the
+       upper-left slope, deeper green on the lower-right), the flat top carries the legend. */
+    .keycap {
+      position: absolute;
+      height: 84px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(145deg, #93bca6 0%, #5f917c 24%, #2f604e 58%, #17382a 100%);
+      box-shadow: 12px 18px 34px -8px rgba(0, 0, 0, 0.5);
+    }
+    /* flat top surface: slightly smaller than the silhouette, matte eucalyptus */
+    .keycap::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 11px;
+      background:
+        linear-gradient(135deg, rgba(220, 245, 230, 0.16) 0%, rgba(220, 245, 230, 0) 42%),
+        linear-gradient(145deg, #40765f 0%, #31644f 52%, #254e3d 100%);
+      box-shadow:
+        0 0 7px 1px rgba(7, 28, 18, 0.2),
+        inset 0 0 0 1px rgba(214, 238, 224, 0.07);
+    }
+    .keycap-legend {
+      position: relative;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #dcebe1;
+    }
+    .keycap-shift { width: 118px; border-radius: 16px; bottom: 8px; left: 0; transform: rotate(-5deg); }
+    /* Shift: no hairline around the top face; a wide, faint falloff lets it melt into the slope */
+    .keycap-shift::before {
+      border-radius: 9px;
+      box-shadow: 0 0 12px 3px rgba(7, 28, 18, 0.1);
+    }
+    .keycap-f2 { width: 84px; top: 8px; right: 0; transform: rotate(6deg); }
+    /* the lit edge of F2 fades just beyond its silhouette (unchanged) */
+    .keycap-f2 {
+      box-shadow:
+        -3px -3px 12px rgba(170, 235, 205, 0.2),
+        12px 18px 34px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 1000px) {
+      .keycaps { display: none; }
+    }
+    @media (max-width: 880px) {
+      .footer-inner { flex-direction: column; align-items: flex-start; padding-top: 32px; }
+      .site-footer { padding-bottom: var(--space-8); }
+    }
 
     @media (max-width: 880px) {
       .hero { grid-template-columns: 1fr; }
@@ -510,39 +652,37 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <nav class="nav-bar" aria-label="Primary">
-        <a href="#" class="brand" aria-label="dubplay">
-          <img class="brand-logo" src="logo.png" alt="dubplay" width="44" height="44" />
-          <span>dubplay</span>
-        </a>
+  <div class="top">
+    <div class="top-art" aria-hidden="true"></div>
 
-        <div class="nav-links">
-          <a href="#pipeline" class="nav-link">Pipeline</a>
-          <a href="#engines" class="nav-link">Engines</a>
-          <a href="#about" class="nav-link">Team</a>
-          <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
-            </svg>
+    <div class="container">
+      <header>
+        <nav class="nav-bar" aria-label="Primary">
+          <a href="#" class="brand" aria-label="dubplay">
+            <img class="brand-logo" src="logo.png" alt="dubplay" width="32" height="32" />
+            <span>dubplay</span>
           </a>
-        </div>
-      </nav>
-    </header>
 
-    <main>
+          <div class="nav-links">
+            <a href="#pipeline" class="nav-link">Pipeline</a>
+            <a href="#engines" class="nav-link">Engines</a>
+            <a href="#about" class="nav-link">Team</a>
+            <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
+              </svg>
+            </a>
+          </div>
+        </nav>
+      </header>
+
       <section class="hero">
         <div class="hero-copy">
           <h1>Voice every <span>visual novel</span></h1>
           <p class="lead">One-click Steam hook. Real-time character voices tuned live inside your game window.</p>
           <div class="hero-controls">
             <a href="https://github.com/edwardvu7/dubplay/releases/latest/download/dub.game-Setup.exe" class="btn-download" download>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
+              <svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v6.6H3zM11.5 4.4 21 3v8.1h-9.5zM3 12.9h7.5v6.6L3 18.5zM11.5 12.9H21V21l-9.5-1.3z"/></svg>
               Download for Windows
             </a>
           </div>
@@ -550,7 +690,7 @@
 
         <aside class="vn-stage" aria-label="Interactive In-Game Overlay Sandbox">
           <div class="vn-topbar">
-            <span class="vn-status"><span class="pulse-dot"></span> DUBPLAY HOOK · 127.0.0.1:49210</span>
+            <span class="vn-status"><span class="pulse-dot"></span> dubplay</span>
             <button type="button" class="hud-toggle-btn" id="toggle-hud" aria-expanded="true" aria-controls="hud-drawer">Overlay [Shift + F2]</button>
           </div>
 
@@ -577,8 +717,7 @@
             </div>
 
             <div class="vn-controls-row">
-              <button type="button" class="btn-next-line" id="next-line-btn">Next Line ↵</button>
-              <span class="cache-readout" id="cache-readout">SHA256: 8f3a…9c12 · 18ms</span>
+              <button type="button" class="btn-next-line" id="next-line-btn">Next line</button>
             </div>
 
             <div class="hud-drawer" id="hud-drawer">
@@ -601,7 +740,11 @@
           </div>
         </aside>
       </section>
+    </div>
+  </div>
 
+  <div class="container">
+    <main>
       <section class="section" id="pipeline">
         <div class="section-header">
           <div class="section-label">Pipeline</div>
@@ -687,8 +830,49 @@
           </a>
         </div>
       </section>
+
     </main>
   </div>
+
+  <section class="cta" aria-labelledby="cta-title">
+   <div class="cta-main">
+    <div class="container">
+      <div class="cta-copy">
+        <h2 id="cta-title">Give every character a voice</h2>
+        <p>Try dubplay in your next session</p>
+        <a href="https://github.com/edwardvu7/dubplay/releases/latest/download/dub.game-Setup.exe" class="btn-download" download>
+          <svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v6.6H3zM11.5 4.4 21 3v8.1h-9.5zM3 12.9h7.5v6.6L3 18.5zM11.5 12.9H21V21l-9.5-1.3z"/></svg>
+          Download for Windows
+        </a>
+      </div>
+      <div class="keycaps" aria-hidden="true">
+        <span class="keycap keycap-shift"><span class="keycap-legend">Shift</span></span>
+        <span class="keycap keycap-f2"><span class="keycap-legend">F2</span></span>
+      </div>
+    </div>
+   </div>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-inner">
+          <a href="#" class="brand" aria-label="dubplay, back to top">
+            <img class="brand-logo" src="logo.png" alt="" width="32" height="32" />
+            <span>dubplay</span>
+          </a>
+          <nav class="nav-links" aria-label="Footer">
+            <a href="#pipeline" class="nav-link">Pipeline</a>
+            <a href="#engines" class="nav-link">Engines</a>
+            <a href="#about" class="nav-link">Team</a>
+            <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
+              </svg>
+            </a>
+          </nav>
+        </div>
+      </div>
+    </footer>
+  </section>
 
   <script>
     const profiles = {
@@ -739,7 +923,6 @@
     const speakerEl = document.getElementById("preview-speaker");
     const moodEl = document.getElementById("preview-mood");
     const lineEl = document.getElementById("preview-line");
-    const cacheEl = document.getElementById("cache-readout");
     const slStability = document.getElementById("sl-stability");
     const slStyle = document.getElementById("sl-style");
     const slSpeed = document.getElementById("sl-speed");
@@ -775,15 +958,19 @@
       const p = profiles[currentChar];
       speakerEl.textContent = p.speaker;
       moodEl.textContent = "Mood: " + p.moods[lineIdx % p.moods.length];
-      const hash = Math.random().toString(16).substring(2, 6) + "…" + Math.random().toString(16).substring(2, 6);
-      cacheEl.textContent = `SHA256: ${hash} · ${Math.floor(12 + Math.random() * 14)}ms`;
       typeLine(p.lines[lineIdx % p.lines.length]);
+    }
+
+    function setFill(input) {
+      const pct = ((input.value - input.min) / (input.max - input.min)) * 100;
+      input.style.setProperty("--p", pct + "%");
     }
 
     function updateReadouts() {
       valStability.textContent = Number(slStability.value).toFixed(2);
       valStyle.textContent = Number(slStyle.value).toFixed(2);
       valSpeed.textContent = Number(slSpeed.value).toFixed(2) + "×";
+      [slStability, slStyle, slSpeed].forEach(setFill);
       animateWaveform();
     }
 
@@ -820,7 +1007,93 @@
       .then((u) => { if (u && u.name) document.getElementById("name-Craz33matt").textContent = u.name; })
       .catch(() => {});
 
-    animateWaveform();
+    updateReadouts();
+  </script>
+
+  <script>
+    /* ---------- Smooth anchor scroll (requestAnimationFrame tween) ---------- */
+    (function () {
+      var root = document.documentElement;
+      var raf = 0;
+      var ease = function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+      var skipMotion = function () { return reduce.matches && !root.classList.contains("force-motion"); };
+
+      function cancel() { cancelAnimationFrame(raf); }
+      ["wheel", "touchstart", "keydown"].forEach(function (e) {
+        window.addEventListener(e, cancel, { passive: true });
+      });
+
+      function scrollToY(end, done) {
+        cancel();
+        var start = window.scrollY;
+        var max = root.scrollHeight - window.innerHeight;
+        end = Math.max(0, Math.min(max, end));
+        var dist = end - start;
+        if (skipMotion() || Math.abs(dist) < 2) { window.scrollTo(0, end); if (done) done(); return; }
+        var dur = Math.min(650, Math.max(350, 250 + Math.abs(dist) * 0.25));
+        var t0 = performance.now();
+        function step(now) {
+          var p = Math.min(1, (now - t0) / dur);
+          window.scrollTo(0, start + dist * ease(p));
+          if (p < 1) raf = requestAnimationFrame(step);
+          else if (done) done();
+        }
+        raf = requestAnimationFrame(step);
+      }
+
+      document.addEventListener("click", function (e) {
+        var a = e.target.closest('a[href^="#"]');
+        if (!a) return;
+        var hash = a.getAttribute("href");
+        var el = hash.length > 1 ? document.getElementById(hash.slice(1)) : null;
+        if (hash.length > 1 && !el) return;
+        e.preventDefault();
+        var end = 0;
+        if (el) {
+          var margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+          end = el.getBoundingClientRect().top + window.scrollY - margin;
+        }
+        scrollToY(end, function () {
+          if (!el) return;
+          if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
+          el.focus({ preventScroll: true });
+        });
+        history.pushState(null, "", el ? hash : window.location.pathname + window.location.search);
+      });
+    })();
+
+    /* ---------- Scroll reveal (IntersectionObserver, fires once) ---------- */
+    (function () {
+      if (!("IntersectionObserver" in window)) return;
+      var groups = document.querySelectorAll("main > .section, .cta");
+      var targets = [];
+      groups.forEach(function (group) {
+        var header = group.querySelector(".section-header");
+        if (header) targets.push([header, 0]);
+        var items = group.querySelectorAll(".step-card, .engine-pill, .team-card");
+        items.forEach(function (item, i) { targets.push([item, Math.min(i, 4) * 40]); });
+        if (group.classList.contains("cta")) targets.push([group.querySelector(".cta-copy"), 0]);
+      });
+
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var el = entry.target;
+          el.classList.add("is-visible");
+          io.unobserve(el);
+          // Once revealed, hand the element back to its own hover transitions
+          var wait = 400 + (parseInt(el.style.getPropertyValue("--delay"), 10) || 0) + 50;
+          setTimeout(function () { el.classList.remove("reveal", "is-visible"); }, wait);
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -4% 0px" });
+
+      targets.forEach(function (pair) {
+        pair[0].classList.add("reveal");
+        pair[0].style.setProperty("--delay", pair[1] + "ms");
+        io.observe(pair[0]);
+      });
+    })();
   </script>
 </body>
 </html>
