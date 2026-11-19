@@ -138,10 +138,10 @@ lines are not sent (cached lines still play).
 ### Steam scan result (A → UI)
 ```json
 [{ "appid": "1234", "name": "Some VN", "installDir": "C:/.../common/Some VN",
-   "engine": "renpy", "support": "full", "enabled": true, "hookInstalled": true,
+   "engine": "renpy", "support": "beta", "enabled": true, "hookInstalled": true,
    "coverUrl": "https://cdn.cloudflare.steamstatic.com/steam/apps/1234/header.jpg" }]
 ```
-`support` is `"full"` (Ren'Py, RPG Maker MV), `"beta"` (Godot adapter, only with `DUBGAME_BETA=1`) or `"soon"`
+`support` is `"beta"` (Ren'Py, Godot, RPG Maker MV: all three are labelled Beta) or `"soon"`
 (Godot, RPG Maker MZ, Unity: listed so players see them, but voices can't be switched on and
 `games:setEnabled` refuses them). Other engines are never returned.
 Steam games on Godot, RPG Maker and Unity are listed only when their Steam community tags include
@@ -220,7 +220,7 @@ See `docs/GODOT-GENERIC.md` for coverage and limitations.
 
 ## RPG Maker MV hook
 
-`engine: "rpgmaker-mv"`, `support: "full"`. Installing copies `mod/rpgmaker/dubgame.js` to
+`engine: "rpgmaker-mv"`, `support: "beta"`. Installing copies `mod/rpgmaker/dubgame.js` to
 `<game>/www/js/dubgame.js` and adds one `<script>` tag before `</body>` in `www/index.html`;
 uninstalling removes exactly that tag and the file. `hookInstalled` needs both. The hook wraps
 `Window_Message` (start = `/line`, terminate = `/stop`), takes the speaker from the
