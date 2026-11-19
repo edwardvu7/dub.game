@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dubplay</title>
+  <meta name="description" content="dubplay gives Steam visual novels per-character AI voices. One-click Steam hook, real-time character voices tuned live inside your game window." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="dubplay" />
+  <meta property="og:title" content="dubplay: voice every visual novel" />
+  <meta property="og:description" content="dubplay gives Steam visual novels per-character AI voices. One-click Steam hook, real-time character voices tuned live inside your game window." />
+  <meta property="og:url" content="https://dubplay.design/" />
+  <meta property="og:image" content="https://dubplay.design/logo.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="dubplay: voice every visual novel" />
+  <meta name="twitter:description" content="dubplay gives Steam visual novels per-character AI voices. One-click Steam hook, real-time character voices tuned live inside your game window." />
+  <meta name="twitter:image" content="https://dubplay.design/logo.png" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- "js" gates the hidden reveal state so nothing stays invisible if scripts fail.
+       "force-motion" keeps the scroll animations on even when the OS asks for reduced motion.
+       Remove 'force-motion' below to honor that setting again. -->
+  <script>document.documentElement.classList.add('js', 'force-motion');</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-sans/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.css" />
+  <!-- Website type (Fontshare): General Sans 500/600 (display), Switzer 400/500 (text). The overlay keeps Geist, like the desktop app. Previous fonts (Forma + Geist): index.fonts-backup.html -->
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,500&display=swap" />
+  <style>
+    :root {
+      /* Same green ramp as the light site, used the other way round */
+      --g-100: #c4dacb;
+      --g-200: #a4c6b3;
+      --g-300: #82b49b;
+      --g-400: #62a286;
+      --g-500: #458e72;
+      --g-600: #316d56;
+      --g-700: #224d3d;
+      --g-800: #143529;
+      --g-900: #071a12;
+
+      --bg: #071a12;
+      --surface: #0c2218;
+      --surface-hover: #112d21;
+      --line: rgba(242, 249, 244, 0.1);
+      --line-strong: rgba(242, 249, 244, 0.2);
+
+      /* Accent: the primary action and the active voice */
+      --accent: #e0f8c7;
+      --accent-hover: #eefbdd;
+
+      --text: #f2f9f4;
+      --text-secondary: #c4dacb;
+      --text-muted: #82b49b;
+
+      --font-display: "Switzer", "Geist Sans", -apple-system, sans-serif;
+      --font-sans: "Switzer", "Geist Sans", -apple-system, sans-serif;
+      --font-overlay: "Geist Sans", -apple-system, sans-serif; /* the desktop app's own face */
+      --font-mono: "Geist Mono", monospace;
+
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-10: 40px;
+      --space-12: 48px;
+      --space-16: 64px;
+      --space-24: 96px;
+
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+
+    /* Anchor scrolling is tweened in JS (native smooth scroll is skipped when the OS turns animations off) */
+    html { background-color: var(--bg); color: var(--text); color-scheme: dark; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    ::selection { background: var(--g-500); color: var(--text); }
+    html { scrollbar-color: var(--g-700) var(--bg); }
+
+    .container { position: relative; max-width: 1080px; margin: 0 auto; padding: 0 var(--space-8); }
+
+    /* Textured gradient: soft green light on near-black, with film grain over it */
+    .top { position: relative; isolation: isolate; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; }
+    /* Nav and hero share this wider container (the game gets two-thirds of the hero row); the sections below keep the 1080px column */
+    .top > .container { flex: 1; width: 100%; max-width: 1280px; display: flex; flex-direction: column; }
+
+    .top-art {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(60% 80% at 82% 48%, rgba(98, 162, 134, 0.85) 0%, rgba(69, 142, 114, 0.45) 35%, transparent 70%),
+        radial-gradient(55% 60% at 62% 85%, rgba(49, 109, 86, 0.9) 0%, rgba(34, 77, 61, 0.5) 40%, transparent 72%),
+        radial-gradient(45% 55% at 100% 40%, rgba(130, 180, 155, 0.5) 0%, transparent 65%),
+        radial-gradient(70% 80% at 0% 0%, rgba(20, 53, 41, 0.9) 0%, transparent 70%),
+        var(--bg);
+      -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    }
+
+    .top-art::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.5;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      background-size: 240px 240px;
+    }
+
+    header { height: 72px; display: flex; align-items: center; }
+    .nav-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      text-decoration: none;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.25rem;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    .brand span { position: relative; top: 1px; } /* optical centre beside the icon */
+
+    .brand-logo { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); }
+
+    .nav-links { display: flex; align-items: center; gap: var(--space-8); }
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 8px;
+      transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+    }
+    .nav-link:hover { background: var(--line); color: var(--text); }
+
+    .github-icon-link {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 8px; color: var(--text);
+      transition: background-color 160ms var(--ease-out);
+    }
+    .github-icon-link:hover { background: var(--line); }
+    .github-icon-link svg { width: 20px; height: 20px; fill: currentColor; }
+
+    /* Hero */
+    .hero {
+      flex: 1;
+      padding: var(--space-6) 0 var(--space-8);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: var(--space-12);
+      align-items: center;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(3rem, 5.2vw, 4.4rem);
+      line-height: 1.02;
+      letter-spacing: 0;
+      text-wrap: balance;
+      margin-bottom: var(--space-6);
+    }
+    h1 span { display: block; color: var(--g-300); }
+
+    .lead {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      font-weight: 400;
+      margin-bottom: var(--space-8);
+    }
+    .lead span { display: block; }
+    @media (min-width: 881px) { .lead span { white-space: nowrap; } }
+
+    .hero-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+    .btn-download {
+      display: inline-flex; align-items: center; gap: var(--space-3);
+      background: var(--accent); color: var(--g-900);
+      padding: 16px 24px; border-radius: 12px;
+      text-decoration: none; font-weight: 500; font-size: 0.95rem;
+      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
+    }
+    .btn-download:hover { background: var(--accent-hover); }
+    .btn-download:active { transform: scale(0.97); }
+    .btn-download svg { width: 16px; height: 16px; stroke: var(--g-900); }
+
+    /* Gameplay demo: a silent clip of the game, advanced one line at a time, with a live HTML copy of
+       the desktop overlay on top. Neutral values come from the app's ui/styles.css (--panel, --line,
+       --paper, --tally; the overlay window background is rgba(11,13,16,0.94)). Everything inside the
+       frame is sized from the frame's own width (cqw), so the panel scales with the footage. */
+    .demo {
+      --d-bg: rgba(11, 13, 16, 0.94);
+      --d-raised: #1b2027; --d-line: #2a313b;
+      --d-paper: #ebe7dd; --d-dim: #99a0ab; --d-tally: #b8cdbd;
+      position: relative;
+      min-width: 0;
+      font-family: var(--font-overlay);
+      container-type: inline-size;
+      container-name: demo;
+    }
+    .demo-frame {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #0b0d10;
+      border-radius: 16px;
+      border: 1px solid rgba(242, 249, 244, 0.14);
+      box-shadow: 0 24px 56px -16px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    .demo-frame video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+      transform: scale(1.014); /* trims the recording's 1px black edge row so the frame edge is clean */ }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .demo svg { fill: currentColor; }
+    .demo button, .demo select { font-family: var(--font-overlay); }
+    .demo button:focus-visible, .demo select:focus-visible, .demo input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* The whole frame is one big "next line" button, under the overlay controls (siblings, not parents,
+       so nothing inside the overlay can ever advance the scene). */
+    .demo-advance {
+      position: absolute; inset: 0; z-index: 0;
+      width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .demo-advance:focus-visible { outline-offset: -4px; border-radius: 14px; }
+
+    /* The scene fades to dark and back when the exchange resets (inside the frame only) */
+    .demo-frame video { transition: opacity 300ms ease; }
+    .demo.is-fading .demo-frame video { opacity: 0; }
+
+    /* One gentle pulse on the game's own dialogue arrow (opening frame only). This triangle sits exactly
+       on the arrow baked into the footage (x 51.0%, y 20.8% of the frame). */
+    .demo-arrow {
+      position: absolute; left: 51%; top: 20.8%; width: 1.146%; height: 2.222%;
+      pointer-events: none; opacity: 0; transform-origin: 35% 50%;
+      filter: drop-shadow(0 0 5px rgba(214, 240, 240, 0.85));
+    }
+    .demo-arrow::before { content: ""; position: absolute; inset: 0; background: rgb(214, 238, 238); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+    .demo.pulse .demo-arrow { animation: arrow-pulse 1500ms ease-in-out 1; }
+    @keyframes arrow-pulse { 0% { opacity: 0; transform: scale(1); } 35% { opacity: 1; transform: scale(2); } 100% { opacity: 0; transform: scale(1); } }
+
+    /* The overlay panel: upper right of the frame, sized from the frame */
+    .dp-wrap {
+      --gap: clamp(11px, 1.6cqw, 14px);
+      position: absolute; z-index: 2; top: var(--gap); right: var(--gap);
+      width: clamp(188px, 30cqw, 270px);
+      font-size: clamp(11px, 1.65cqw, 13.5px); line-height: 1.4;
+      pointer-events: none;
+    }
+    .dp-wrap > * { pointer-events: auto; }
+    .dp {
+      position: relative; width: 100%;
+      max-height: calc(56.25cqw - var(--gap) * 2); overflow-y: auto; scrollbar-width: thin;
+      color: var(--d-paper); background: var(--d-bg);
+      border: 1px solid var(--d-line); border-radius: 1.1em; padding: 0.65em;
+      animation: dp-in 520ms var(--ease-out) 350ms both;
+    }
+    @keyframes dp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .dp-cards { display: flex; flex-direction: column; gap: 0.5em; }
+    .dp-card { border: 1px solid var(--d-line); border-radius: 0.85em; padding: 0.55em 0.85em; transition: border-color 0.2s; }
+    .dp-card.speaking { border-color: color-mix(in srgb, var(--d-tally) 80%, var(--d-line)); background: color-mix(in srgb, var(--d-tally) 9%, transparent); }
+    .dp-card:not(.speaking) .dp-name { opacity: 0.62; }
+    .dp-card.speaking .dp-name { color: #fff; opacity: 1; }
+    .dp-head {
+      display: flex; align-items: center; gap: 0.6em; width: 100%; min-height: 1.9em; padding: 0;
+      color: inherit; background: none; border: 0; text-align: left; font-size: inherit; border-radius: 6px;
+    }
+    button.dp-head { cursor: pointer; }
+    .demo .dp-head:focus-visible { outline-color: var(--d-tally); outline-offset: 3px; }
+    .dp-name { flex: 1; min-width: 0; font-size: 1.12em; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; }
+    .dp-who { display: inline-flex; align-items: center; gap: 4px; }
+    .dp-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: #9fe8b0; visibility: hidden; }
+    .dp-card.speaking .dp-dot { visibility: visible; }
+    .dp-pick { margin-left: 0.5em; display: inline-flex; align-items: center; gap: 0.45em; font-size: 0.95em; font-weight: 500; color: var(--d-tally); white-space: nowrap; }
+    .dp-pick::before {
+      content: ""; width: 1.05em; height: 1.05em; background: currentColor;
+      -webkit-mask: var(--dp-icon) center / contain no-repeat; mask: var(--dp-icon) center / contain no-repeat;
+      --dp-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 4.5h12M2 11.5h12' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='10.5' cy='4.5' r='2.2'/%3E%3Ccircle cx='5.5' cy='11.5' r='2.2'/%3E%3C/svg%3E");
+    }
+    .dp-chev {
+      flex: none; width: 0.55em; height: 0.55em; margin: 0 0.2em 0.25em 0.1em;
+      border-right: 2px solid var(--d-dim); border-bottom: 2px solid var(--d-dim);
+      transform: translateY(-1px) rotate(45deg); transition: transform 0.25s ease;
+    }
+    .dp-card.is-open .dp-chev { transform: translateY(2px) rotate(225deg); }
+    .dp-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.25s ease, opacity 0.2s ease; }
+    .dp-card.is-open .dp-body, .dp-below .dp-body { grid-template-rows: 1fr; opacity: 1; }
+    .dp-inner { overflow: hidden; min-height: 0; display: flex; flex-direction: column; gap: 0.35em; }
+    .dp-card.is-open .dp-inner { padding-top: 0.8em; }
+    .dp-label { color: var(--d-dim); font: 500 0.92em/1.3 var(--font-mono); letter-spacing: 0.02em; }
+    .dp-field { display: grid; grid-template-columns: 4.8em minmax(0, 1fr); align-items: center; gap: 0.5em; margin-bottom: 0.15em; }
+    .dp-select {
+      width: 100%; min-height: 2.3em; padding: 0 0.6em; color: var(--d-paper); font-size: 0.95em;
+      background: var(--d-raised); border: 1px solid var(--d-line); border-radius: 0.6em; text-overflow: ellipsis;
+    }
+    .dp-fader { display: grid; grid-template-columns: 4.8em minmax(0, 1fr) 3.2em; align-items: center; gap: 0.5em; min-height: 1.8em; }
+    .dp-fader output { text-align: right; font: 500 0.92em/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--d-paper); }
+    .dp-note { color: var(--d-dim); font-size: 0.95em; }
+    .dp-actions { display: flex; padding-top: 0.15em; }
+    .dp-btn {
+      min-height: 2.1em; padding: 0 1em; color: var(--d-paper); font-size: 0.95em; font-weight: 500;
+      background: var(--d-raised); border: 1px solid var(--d-line); border-radius: 0.6em; cursor: pointer;
+    }
+    .dp-btn:hover { border-color: color-mix(in srgb, var(--d-dim) 55%, var(--d-line)); }
+    /* The app's fader: filled track, paper thumb */
+    .dp input[type="range"], .dp-below input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: none; cursor: pointer;
+      touch-action: pan-y;
+    }
+    .dp input[type="range"]::-webkit-slider-runnable-track, .dp-below input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px; border-radius: 2px;
+      background: linear-gradient(to right, var(--d-tally) var(--fill, 50%), var(--d-line) var(--fill, 50%));
+    }
+    .dp input[type="range"]::-webkit-slider-thumb, .dp-below input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 10px; height: 20px; margin-top: -8px;
+      border-radius: 3px; background: var(--d-paper); border: 1px solid #0b0d10;
+      box-shadow: inset 0 -7px 0 -5px var(--d-dim), inset 0 7px 0 -5px var(--d-dim);
+    }
+    .dp input[type="range"]::-moz-range-track, .dp-below input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--d-line); }
+    .dp input[type="range"]::-moz-range-progress, .dp-below input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--d-tally); }
+    .dp input[type="range"]::-moz-range-thumb, .dp-below input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius: 3px; background: var(--d-paper); border: 1px solid #0b0d10; }
+
+    /* Settings that open beneath the game (phones): same card, outside the footage */
+    .dp-below {
+      margin-top: 12px; padding: 0.9rem 1rem; font-size: 13px; line-height: 1.4;
+      color: var(--d-paper); background: var(--d-bg); border: 1px solid var(--d-line); border-radius: 14px;
+    }
+    .dp-below[hidden] { display: none; }
+    .demo-hint { margin-top: var(--space-3); font: 500 0.75rem/1.4 var(--font-mono); letter-spacing: 0.02em; color: var(--text-muted); }
+    .dp-below .dp-inner { padding-top: 0; }
+
+    /* Narrow frames: just the speaker list inside the footage, no badges; Louise's settings go below */
+    @container demo (max-width: 599.98px) {
+      .dp-wrap { width: 132px; font-size: 12px; }
+      .dp { max-height: none; overflow: visible; padding: 4px; border-radius: 12px; }
+      .dp-cards { gap: 3px; }
+      .dp-card { padding: 0 8px; border-radius: 9px; }
+      .dp-pick { display: none; }
+      .dp-head { min-height: 23px; gap: 8px; }
+      .dp-name { font-size: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dp { animation: none; }
+      .demo-arrow { display: none; }
+      .demo-frame video { transition: none; }
+      .dp-body, .dp-chev { transition: none; }
+    }
+
+    /* Sections */
+    .section {
+      padding: var(--space-16) 0 0;
+      margin-top: var(--space-16);
+      border-top: 1px solid var(--line);
+      scroll-margin-top: var(--space-4);
+    }
+
+    /* Scroll reveal: one short fade and rise as each block enters the view */
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 400ms var(--ease-out), transform 400ms var(--ease-out);
+      transition-delay: var(--delay, 0ms);
+    }
+    .js .reveal.is-visible { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      html:not(.force-motion) .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+    }
+
+    .section-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-6); }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
+    }
+
+    .steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: var(--space-5);
+      text-align: left;
+      transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
+    }
+    .step-idx {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      margin-bottom: var(--space-3);
+    }
+    .step-card h2 { font-family: var(--font-display); font-size: 1.18rem; margin-bottom: 4px; }
+    .step-card p { font-size: 0.86rem; color: var(--text-secondary); }
+
+    .engines-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+
+    .engine-pill {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 500;
+      font-size: 0.94rem;
+      transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--g-400); }
+    .badge-soon::before { background: transparent; border: 1px solid var(--g-500); }
+
+    .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+
+    .team-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: var(--space-5);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      text-decoration: none;
+      color: var(--text);
+      transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
+    }
+    .team-card:hover { background: var(--surface-hover); border-color: var(--line-strong); }
+    .team-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      object-fit: cover; border: 1px solid var(--line-strong);
+      background: var(--g-800); flex-shrink: 0;
+    }
+    .team-meta { display: flex; flex-direction: column; min-width: 0; }
+    .team-role {
+      font-family: var(--font-mono);
+      font-size: 0.75rem; font-weight: 500; 
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .team-name { font-family: var(--font-display); font-size: 1.18rem; font-weight: 500; line-height: 1.2; margin-bottom: 4px; }
+    .team-handle { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); }
+
+    /* Closing call to action */
+    .btn-download .win { width: 16px; height: 16px; fill: var(--g-900); stroke: none; }
+
+    /* Full-width ending: starts at the exact page green, deepens toward the bottom */
+    .cta {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      background: linear-gradient(to bottom, var(--bg) 0%, #0b281c 40%, #0f3a29 100%);
+    }
+    /* The download area; the keycaps live here, not in the footer */
+    .cta-main {
+      position: relative;
+      padding: clamp(64px, 11vw, 144px) 0 var(--space-12);
+    }
+
+    /* Footer: same forest green as the bottom of the download area, no color step */
+    .site-footer { position: relative; z-index: 1; padding-bottom: var(--space-12); }
+    .footer-inner {
+      border-top: 1px solid rgba(242, 249, 244, 0.1);
+      padding-top: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .site-footer .nav-links { flex-wrap: wrap; gap: var(--space-6); }
+    .site-footer .nav-link,
+    .site-footer .github-icon-link { color: var(--text-muted); }
+    .site-footer .nav-link:hover,
+    .site-footer .github-icon-link:hover { color: var(--text); }
+    .cta::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.35;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+      mask-image: linear-gradient(to bottom, transparent 0%, #000 45%);
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.2 -0.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      background-size: 240px 240px;
+    }
+    .cta-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; }
+    .cta h2 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(2rem, 3.6vw, 2.75rem);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin-bottom: var(--space-3);
+    }
+    .cta p {
+      font-size: 1.15rem;
+      font-weight: 400;
+      line-height: 1.5;
+      color: var(--g-200);
+      margin-bottom: var(--space-6);
+    }
+    /* Compact button with a subtle bevel and a soft shadow */
+    .cta .btn-download {
+      padding: 12px 20px;
+      font-size: 0.9rem;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 0 rgba(7, 26, 18, 0.16),
+        0 8px 20px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Soft floating keycaps (Shift + F2, the overlay hotkey). They sit in the same row as the
+       copy, so the pair is vertically centered beside the headline, line and button. */
+    .cta-main .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-8);
+    }
+    .keycaps {
+      position: relative;
+      flex: none;
+      width: 252px;
+      height: 212px;
+      margin-right: 56px;
+      pointer-events: none;
+    }
+    /* One molded piece: the outer silhouette is the sloped shoulder (soft sage light on the
+       upper-left slope, deeper green on the lower-right), the flat top carries the legend. */
+    .keycap {
+      position: absolute;
+      height: 84px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(145deg, #93bca6 0%, #5f917c 24%, #2f604e 58%, #17382a 100%);
+      box-shadow: 12px 18px 34px -8px rgba(0, 0, 0, 0.5);
+    }
+    /* flat top surface: slightly smaller than the silhouette, matte eucalyptus */
+    .keycap::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 11px;
+      background:
+        linear-gradient(135deg, rgba(220, 245, 230, 0.16) 0%, rgba(220, 245, 230, 0) 42%),
+        linear-gradient(145deg, #40765f 0%, #31644f 52%, #254e3d 100%);
+      box-shadow:
+        0 0 7px 1px rgba(7, 28, 18, 0.2),
+        inset 0 0 0 1px rgba(214, 238, 224, 0.07);
+    }
+    .keycap-legend {
+      position: relative;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #dcebe1;
+    }
+    .keycap-shift { width: 118px; border-radius: 16px; bottom: 8px; left: 0; transform: rotate(-5deg); }
+    /* Shift: no hairline around the top face; a wide, faint falloff lets it melt into the slope */
+    .keycap-shift::before {
+      border-radius: 9px;
+      box-shadow: 0 0 12px 3px rgba(7, 28, 18, 0.1);
+    }
+    .keycap-f2 { width: 84px; top: 8px; right: 0; transform: rotate(6deg); }
+    /* the lit edge of F2 fades just beyond its silhouette (unchanged) */
+    .keycap-f2 {
+      box-shadow:
+        -3px -3px 12px rgba(170, 235, 205, 0.2),
+        12px 18px 34px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 1000px) {
+      .keycaps { display: none; }
+    }
+    @media (max-width: 880px) {
+      .footer-inner { flex-direction: column; align-items: flex-start; padding-top: 32px; }
+      .site-footer { padding-bottom: var(--space-8); }
+    }
+
+    @media (max-width: 880px) {
+      .hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); }
+      .steps-grid, .engines-grid { grid-template-columns: repeat(2, 1fr); }
+      .team-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 540px) {
+      .steps-grid, .engines-grid { grid-template-columns: 1fr; }
+      header .nav-links .nav-link { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="top-art" aria-hidden="true"></div>
+
+    <div class="container">
+      <header>
+        <nav class="nav-bar" aria-label="Primary">
+          <a href="#" class="brand" aria-label="dubplay">
+            <img class="brand-logo" src="../../docs/logo.png" alt="" width="32" height="32" />
+            <span>dubplay</span>
+          </a>
+
+          <div class="nav-links">
+            <a href="#engines" class="nav-link">Engines</a>
+            <a href="#how-it-works" class="nav-link">How it works</a>
+            <a href="#about" class="nav-link">Team</a>
+            <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
+              </svg>
+            </a>
+          </div>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <h1>Voice every <span>visual novel</span></h1>
+          <p class="lead"><span>Hear characters speak as you play.</span> <span>Tune voices without leaving the game.</span></p>
+          <div class="hero-controls">
+            <a href="https://github.com/edwardvu7/dubplay/releases/latest/download/dub.game-Setup.exe" class="btn-download" download>
+              <svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v6.6H3zM11.5 4.4 21 3v8.1h-9.5zM3 12.9h7.5v6.6L3 18.5zM11.5 12.9H21V21l-9.5-1.3z"/></svg>
+              Download for Windows
+            </a>
+          </div>
+        </div>
+
+        <div class="demo" id="demo">
+          <div class="demo-frame" id="demo-frame">
+            <video id="demo-video" muted playsinline preload="auto" poster="../../docs/assets/dubplay-doorway-poster.jpg" aria-hidden="true" tabindex="-1">
+              <source src="../../docs/assets/dubplay-doorway.mp4" type="video/mp4" />
+            </video>
+            <audio id="demo-voice-1" preload="auto" src="../../docs/assets/voice-1.m4a"></audio>
+            <audio id="demo-voice-2" preload="auto" src="../../docs/assets/voice-2.m4a"></audio>
+            <audio id="demo-voice-3" preload="auto" src="../../docs/assets/voice-3.m4a"></audio>
+            <i class="demo-arrow" id="demo-arrow" aria-hidden="true"></i>
+
+            <button type="button" class="demo-advance" id="demo-advance" aria-label="Hear Louise’s line"></button>
+            <p class="sr-only" id="demo-line" aria-live="polite"></p>
+
+            <div class="dp-wrap">
+              <section class="dp" id="demo-panel" aria-label="dubplay overlay">
+                <div class="dp-cards">
+                  <div class="dp-card speaking" data-card data-speaker="louise">
+                    <button type="button" class="dp-head" id="dp-h-louise" aria-expanded="false" aria-controls="dp-b-louise">
+                      <span class="dp-name"><span class="dp-who">Louise<i class="dp-dot" role="img" aria-label="speaking"></i></span></span>
+                      <span class="dp-pick">Designed voice</span>
+                      <span class="dp-chev" aria-hidden="true"></span>
+                    </button>
+                    <div class="dp-body" id="dp-b-louise" role="region" aria-labelledby="dp-h-louise"><div class="dp-inner">
+                      <div class="dp-field">
+                        <label class="dp-label" for="dp-voice">Voice</label>
+                        <select class="dp-select" id="dp-voice">
+                          <option>Custom: dub.game Until Then - Lo…</option>
+                          <option>Rachel</option><option>Sarah</option><option>Lily</option><option>Matilda</option><option>Elli</option><option>Laura</option>
+                        </select>
+                      </div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-stability">Stability</label><input id="dp-stability" type="range" min="0" max="1" step="0.05" value="0.65" data-def="0.65" data-fmt="pct" /><output for="dp-stability">65%</output></div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-style">Style</label><input id="dp-style" type="range" min="0" max="1" step="0.05" value="0.2" data-def="0.2" data-fmt="pct" /><output for="dp-style">20%</output></div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-speed">Speed</label><input id="dp-speed" type="range" min="0.7" max="1.2" step="0.05" value="0.95" data-def="0.95" data-fmt="x" /><output for="dp-speed">0.95x</output></div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-volume">Volume</label><input id="dp-volume" type="range" min="0" max="1" step="0.05" value="0.55" data-def="0.55" data-fmt="pct" /><output for="dp-volume">55%</output></div>
+                      <div class="dp-actions"><button type="button" class="dp-btn" id="dp-reset">Reset</button></div>
+                    </div></div>
+                  </div>
+                  <div class="dp-card" data-card data-speaker="mark">
+                    <div class="dp-head">
+                      <span class="dp-name"><span class="dp-who">Mark<i class="dp-dot" role="img" aria-label="speaking"></i></span></span>
+                      <span class="dp-pick">Designed voice</span>
+                    </div>
+                  </div>
+                  <div class="dp-card" data-card data-speaker="narrator">
+                    <div class="dp-head">
+                      <span class="dp-name"><span class="dp-who">Narrator<i class="dp-dot" role="img" aria-label="speaking"></i></span></span>
+                      <span class="dp-pick">Locked</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+          <p class="demo-hint">Click the scene to hear it</p>
+          <div class="dp-below" id="dp-below" hidden></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="container">
+    <main>
+      <section class="section" id="engines">
+        <div class="section-header">
+          <div class="section-label">Supported engines</div>
+        </div>
+        <div class="engines-grid">
+          <div class="engine-pill">
+            <span>Ren'Py</span>
+            <span class="badge">Beta</span>
+          </div>
+          <div class="engine-pill">
+            <span>Godot</span>
+            <span class="badge">Beta</span>
+          </div>
+          <div class="engine-pill">
+            <span>RPG Maker</span>
+            <span class="badge">Beta</span>
+          </div>
+          <div class="engine-pill">
+            <span>Unity</span>
+            <span class="badge badge-soon">Soon</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="how-it-works">
+        <div class="section-header">
+          <div class="section-label">How it works</div>
+        </div>
+        <div class="steps-grid">
+          <article class="step-card">
+            <div class="step-idx">01</div>
+            <h2>Scan library</h2>
+            <p>Auto-detects installed Steam games</p>
+          </article>
+          <article class="step-card">
+            <div class="step-idx">02</div>
+            <h2>Hook script</h2>
+            <p>Captures exact dialogue lines</p>
+          </article>
+          <article class="step-card">
+            <div class="step-idx">03</div>
+            <h2>Cast voices</h2>
+            <p>Profiles every character once</p>
+          </article>
+          <article class="step-card">
+            <div class="step-idx">04</div>
+            <h2>Tune live</h2>
+            <p>Adjust sliders mid-scene</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="about">
+        <div class="section-header">
+          <div class="section-label">Team</div>
+        </div>
+        <div class="team-grid">
+          <a href="https://github.com/edwardvu7" class="team-card" target="_blank" rel="noopener noreferrer">
+            <img class="team-avatar" src="https://github.com/edwardvu7.png?size=160" onerror="this.src='logo.png'" alt="Edward Vu" width="56" height="56" loading="lazy" />
+            <div class="team-meta">
+              <span class="team-role">Engine hooks</span>
+              <div class="team-name">Edward Vu</div>
+              <div class="team-handle">@edwardvu7</div>
+            </div>
+          </a>
+
+          <a href="https://github.com/chadscheeks" class="team-card" target="_blank" rel="noopener noreferrer">
+            <img class="team-avatar" src="https://github.com/chadscheeks.png?size=160" onerror="this.src='logo.png'" alt="Alexander Miller" width="56" height="56" loading="lazy" />
+            <div class="team-meta">
+              <span class="team-role">Overlay &amp; UI</span>
+              <div class="team-name">Alexander Miller</div>
+              <div class="team-handle">@chadscheeks</div>
+            </div>
+          </a>
+
+          <a href="https://github.com/Craz33matt" class="team-card" target="_blank" rel="noopener noreferrer">
+            <img class="team-avatar" src="https://github.com/Craz33matt.png?size=160" onerror="this.src='logo.png'" alt="Matthew" width="56" height="56" loading="lazy" />
+            <div class="team-meta">
+              <span class="team-role">Core &amp; voice pipeline</span>
+              <div class="team-name" id="name-Craz33matt">Matthew</div>
+              <div class="team-handle">@Craz33matt</div>
+            </div>
+          </a>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <section class="cta" aria-labelledby="cta-title">
+   <div class="cta-main">
+    <div class="container">
+      <div class="cta-copy">
+        <h2 id="cta-title">Give every character a voice</h2>
+        <p>Try dubplay in your next session</p>
+        <a href="https://github.com/edwardvu7/dubplay/releases/latest/download/dub.game-Setup.exe" class="btn-download" download>
+          <svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v6.6H3zM11.5 4.4 21 3v8.1h-9.5zM3 12.9h7.5v6.6L3 18.5zM11.5 12.9H21V21l-9.5-1.3z"/></svg>
+          Download for Windows
+        </a>
+      </div>
+      <div class="keycaps" aria-hidden="true">
+        <span class="keycap keycap-shift"><span class="keycap-legend">Shift</span></span>
+        <span class="keycap keycap-f2"><span class="keycap-legend">F2</span></span>
+      </div>
+    </div>
+   </div>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-inner">
+          <a href="#" class="brand" aria-label="dubplay, back to top">
+            <img class="brand-logo" src="../../docs/logo.png" alt="" width="32" height="32" />
+            <span>dubplay</span>
+          </a>
+          <nav class="nav-links" aria-label="Footer">
+            <a href="#engines" class="nav-link">Engines</a>
+            <a href="#how-it-works" class="nav-link">How it works</a>
+            <a href="#about" class="nav-link">Team</a>
+            <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 0.3C5.37 0.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.69.83.57A12.01 12.01 0 0 0 24 12.3C24 5.67 18.63 0.3 12 0.3z"/>
+              </svg>
+            </a>
+          </nav>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <script>
+
+    fetch("https://api.github.com/users/Craz33matt")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => { if (u && u.name) document.getElementById("name-Craz33matt").textContent = u.name; })
+      .catch(() => {});
+
+
+    /* ---------- Gameplay demo ---------- */
+    (function () {
+      var demo = document.getElementById("demo");
+      var video = document.getElementById("demo-video");
+      var advanceBtn = document.getElementById("demo-advance");
+      var live = document.getElementById("demo-line");
+      var panel = document.getElementById("demo-panel");
+      var below = document.getElementById("dp-below");
+      var louise = document.querySelector('[data-speaker="louise"]');
+      var cards = Array.prototype.slice.call(panel.querySelectorAll("[data-card]"));
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      /* The clip is three back-to-back segments cut from the recording (frame-exact): Louise's line, Mark's
+         first, Mark's second. Each has a recorded voice (cut from the same timestamps, one source track).
+         Each segment runs past BOTH the bubble's last character and the voice's last word, then the picture
+         pauses on its final frame, so the complete sentence stays up until the next click. */
+      var B = [0, 3.1, 5.25, 8.05];
+      var LAST = 0.021; // pause on a segment's final frame (one frame is 0.0167 s)
+      var LINES = [
+        { speaker: "louise", text: "Louise: I yelled at you earlier and that was not necessary.", next: "Hear Mark’s line" },
+        { speaker: "mark",   text: "Mark: Hey, if we really had no slides…",                  next: "Hear Mark’s next line" },
+        { speaker: "mark",   text: "Mark: Then I deserved to be yelled at.",                       next: "Back to the start" }
+      ];
+      var voices = LINES.map(function (l, i) { return document.getElementById("demo-voice-" + (i + 1)); });
+      var HOLD_MS = 1000;  // after Mark's last word, before the scene fades back
+      var FADE_MS = 300;
+
+      var current = -1;    // line on screen (-1 = the opening frame)
+      var resetting = false;
+      var run = 0;         // bumped on every click, so stale timers and callbacks do nothing
+      var raf = 0, holdTimer = 0, fadeTimer = 0, pulseTimer = 0;
+
+      function setSpeaker(name) {
+        cards.forEach(function (c) { c.classList.toggle("speaking", c.getAttribute("data-speaker") === name); });
+      }
+      function openingFrame() { video.currentTime = B[1] - LAST; }
+
+      /* ----- voices: one at a time; a stop is a 30 ms fade, never a cut ----- */
+      function stopVoice(a) {
+        if (!a) return;
+        if (a._fade) { clearInterval(a._fade); a._fade = 0; }
+        a.onended = null;
+        if (a.paused) { a.currentTime = 0; a.volume = 1; return; }
+        var v = 1;
+        a._fade = setInterval(function () {
+          v -= 0.34;
+          if (v > 0) { try { a.volume = v; } catch (e) {} return; }
+          clearInterval(a._fade); a._fade = 0;
+          a.pause(); a.currentTime = 0; try { a.volume = 1; } catch (e) {}
+        }, 8);
+      }
+      function startVoice(a, onFail) {
+        if (a._fade) { clearInterval(a._fade); a._fade = 0; }
+        a.pause(); a.currentTime = 0; try { a.volume = 1; } catch (e) {}
+        var p = a.play();
+        if (p && p.catch) p.catch(function () { if (onFail) onFail(); });
+      }
+      function stopAll() { voices.forEach(stopVoice); }
+
+      /* ----- playing a line ----- */
+      function play(k) {
+        run += 1;
+        var my = run;
+        clearTimeout(holdTimer); clearTimeout(pulseTimer); cancelAnimationFrame(raf);
+        demo.classList.remove("pulse");
+        stopAll();
+        video.pause();
+        current = k;
+        var line = LINES[k];
+        setSpeaker(line.speaker);
+        advanceBtn.setAttribute("aria-label", line.next);
+        live.textContent = line.text;
+
+        var start = B[k], end = B[k + 1] - LAST, began = false;
+        function go() {
+          if (began || my !== run) return;
+          began = true;
+          var p = video.play();
+          if (p && p.catch) p.catch(function () {});
+          var voice = voices[k];
+          if (k === LINES.length - 1) {
+            voice.onended = function () { afterLastWord(my); };
+            startVoice(voice, function () { holdTimer = setTimeout(function () { afterLastWord(my); }, 2500); });
+          } else {
+            startVoice(voice);
+          }
+          (function tick() {
+            if (my !== run) return;
+            var t = video.currentTime;
+            if (t >= end || video.ended) {
+              video.pause();
+              if (t >= B[k + 1] - 0.005) video.currentTime = end; // overshot into the next segment: step back
+            } else {
+              raf = requestAnimationFrame(tick);
+            }
+          })();
+        }
+        if (Math.abs(video.currentTime - start) < 0.002) { go(); return; }
+        video.addEventListener("seeked", function onSeeked() { video.removeEventListener("seeked", onSeeked); go(); });
+        video.currentTime = start;
+        setTimeout(go, 400); // never get stuck waiting on a seek
+      }
+
+      /* Mark's last word has been heard: hold the finished bubble, then reset */
+      function afterLastWord(my) {
+        if (my !== run) return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(function () { if (my === run) reset(); }, HOLD_MS);
+      }
+
+      /* ----- back to the opening frame; Louise's voice waits for a fresh click ----- */
+      function reset() {
+        run += 1;
+        var my = run;
+        clearTimeout(holdTimer); cancelAnimationFrame(raf);
+        stopAll();
+        resetting = true;
+        function settle() {
+          current = -1;
+          setSpeaker("louise");
+          advanceBtn.setAttribute("aria-label", "Hear Louise’s line");
+          live.textContent = "";
+          resetting = false;
+          schedulePulse(reduce.matches ? 0 : 400);
+        }
+        if (reduce.matches) {
+          video.pause(); openingFrame(); settle(); return;
+        }
+        demo.classList.add("is-fading");
+        fadeTimer = setTimeout(function () {
+          if (my !== run) return;
+          video.pause();
+          var done = false;
+          function back() {
+            if (done) return; done = true;
+            video.removeEventListener("seeked", back);
+            setSpeaker("louise");
+            demo.classList.remove("is-fading");
+            fadeTimer = setTimeout(settle, FADE_MS);
+          }
+          video.addEventListener("seeked", back);
+          openingFrame();
+          setTimeout(back, 300);
+        }, FADE_MS);
+      }
+
+      /* ----- one gentle pulse on the game's dialogue arrow, on the opening frame only ----- */
+      function schedulePulse(delay) {
+        if (reduce.matches) return;
+        clearTimeout(pulseTimer);
+        pulseTimer = setTimeout(function () {
+          if (current !== -1 || resetting) return;
+          demo.classList.remove("pulse");
+          void demo.offsetWidth;
+          demo.classList.add("pulse");
+        }, delay);
+      }
+      document.getElementById("demo-arrow").addEventListener("animationend", function () { demo.classList.remove("pulse"); });
+
+      function advance() {
+        if (resetting) return;
+        if (current === LINES.length - 1) reset();   // advancing past the last line skips straight back
+        else play(current + 1);
+      }
+      advanceBtn.addEventListener("click", advance);
+
+      /* Park on Louise's finished bubble (the opening frame) until the first click */
+      function park() { if (current === -1) openingFrame(); }
+      if (video.readyState >= 1) park(); else video.addEventListener("loadedmetadata", park, { once: true });
+      schedulePulse(900);
+
+      /* ----- overlay (always on): Louise's settings expand ----- */
+      function inNarrow() { return demo.clientWidth < 600; }
+      var body = louise.querySelector(".dp-body");
+      function place() {
+        var open = louise.classList.contains("is-open");
+        if (open && inNarrow()) { below.appendChild(body); below.hidden = false; }
+        else { if (body.parentNode !== louise) louise.appendChild(body); below.hidden = true; }
+      }
+      var head = louise.querySelector(".dp-head");
+      head.addEventListener("click", function () {
+        var on = !louise.classList.contains("is-open");
+        louise.classList.toggle("is-open", on);
+        head.setAttribute("aria-expanded", String(on));
+        place();
+      });
+      if ("ResizeObserver" in window) new ResizeObserver(place).observe(demo);
+
+      demo.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && louise.classList.contains("is-open")) {
+          e.preventDefault();
+          louise.classList.remove("is-open");
+          head.setAttribute("aria-expanded", "false");
+          place();
+          head.focus({ preventScroll: true });
+        }
+      });
+
+      /* ----- Louise's settings: editable here, no effect on the clip or its voices ----- */
+      var sliders = Array.prototype.slice.call(document.querySelectorAll("#demo input[type=range]"));
+      function paint(input) {
+        var pct = (input.value - input.min) / (input.max - input.min) * 100;
+        input.style.setProperty("--fill", pct + "%");
+        var out = input.parentNode.querySelector("output");
+        out.textContent = input.getAttribute("data-fmt") === "x"
+          ? Number(input.value).toFixed(2) + "x"
+          : Math.round(input.value * 100) + "%";
+      }
+      sliders.forEach(function (s) { paint(s); s.addEventListener("input", function () { paint(s); }); });
+      document.getElementById("dp-reset").addEventListener("click", function () {
+        sliders.forEach(function (s) { s.value = s.getAttribute("data-def"); paint(s); });
+        document.getElementById("dp-voice").selectedIndex = 0;
+      });
+    })();
+  </script>
+
+  <script>
+    /* ---------- Smooth anchor scroll (requestAnimationFrame tween) ---------- */
+    (function () {
+      var root = document.documentElement;
+      var raf = 0;
+      var ease = function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+      var skipMotion = function () { return reduce.matches && !root.classList.contains("force-motion"); };
+
+      function cancel() { cancelAnimationFrame(raf); }
+      ["wheel", "touchstart", "keydown"].forEach(function (e) {
+        window.addEventListener(e, cancel, { passive: true });
+      });
+
+      function scrollToY(end, done) {
+        cancel();
+        var start = window.scrollY;
+        var max = root.scrollHeight - window.innerHeight;
+        end = Math.max(0, Math.min(max, end));
+        var dist = end - start;
+        if (skipMotion() || Math.abs(dist) < 2) { window.scrollTo(0, end); if (done) done(); return; }
+        var dur = Math.min(650, Math.max(350, 250 + Math.abs(dist) * 0.25));
+        var t0 = performance.now();
+        function step(now) {
+          var p = Math.min(1, (now - t0) / dur);
+          window.scrollTo(0, start + dist * ease(p));
+          if (p < 1) raf = requestAnimationFrame(step);
+          else if (done) done();
+        }
+        raf = requestAnimationFrame(step);
+      }
+
+      document.addEventListener("click", function (e) {
+        var a = e.target.closest('a[href^="#"]');
+        if (!a) return;
+        var hash = a.getAttribute("href");
+        var el = hash.length > 1 ? document.getElementById(hash.slice(1)) : null;
+        if (hash.length > 1 && !el) return;
+        e.preventDefault();
+        var end = 0;
+        if (el) {
+          var margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+          end = el.getBoundingClientRect().top + window.scrollY - margin;
+        }
+        scrollToY(end, function () {
+          if (!el) return;
+          if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
+          el.focus({ preventScroll: true });
+        });
+        history.pushState(null, "", el ? hash : window.location.pathname + window.location.search);
+      });
+    })();
+
+    /* ---------- Scroll reveal (IntersectionObserver, fires once) ---------- */
+    (function () {
+      if (!("IntersectionObserver" in window)) return;
+      var groups = document.querySelectorAll("main > .section, .cta");
+      var targets = [];
+      groups.forEach(function (group) {
+        var header = group.querySelector(".section-header");
+        if (header) targets.push([header, 0]);
+        var items = group.querySelectorAll(".step-card, .engine-pill, .team-card");
+        items.forEach(function (item, i) { targets.push([item, Math.min(i, 4) * 40]); });
+        if (group.classList.contains("cta")) targets.push([group.querySelector(".cta-copy"), 0]);
+      });
+
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var el = entry.target;
+          el.classList.add("is-visible");
+          io.unobserve(el);
+          // Once revealed, hand the element back to its own hover transitions
+          var wait = 400 + (parseInt(el.style.getPropertyValue("--delay"), 10) || 0) + 50;
+          setTimeout(function () { el.classList.remove("reveal", "is-visible"); }, wait);
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -4% 0px" });
+
+      targets.forEach(function (pair) {
+        pair[0].classList.add("reveal");
+        pair[0].style.setProperty("--delay", pair[1] + "ms");
+        io.observe(pair[0]);
+      });
+    })();
+  </script>
+</body>
+</html>

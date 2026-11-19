@@ -18,13 +18,17 @@
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <!-- "js" gates the hidden reveal state so nothing stays invisible if scripts fail.
-       TEMP: "force-motion" keeps scroll animations on even with OS reduced motion (for testing).
-       Remove 'force-motion' below to honor the system setting again. -->
+       "force-motion" keeps the scroll animations on even when the OS asks for reduced motion.
+       Remove 'force-motion' below to honor that setting again. -->
   <script>document.documentElement.classList.add('js', 'force-motion');</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-sans/style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.css" />
-  <link rel="stylesheet" href="https://use.typekit.net/ins2wgm.css" />
+  <!-- Website type (Fontshare): General Sans 500/600 (display), Switzer 400/500 (text). The overlay keeps Geist, like the desktop app. Previous fonts (Forma + Geist): index.fonts-backup.html -->
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600&display=swap" />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,500&display=swap" />
   <style>
     :root {
       /* Same green ramp as the light site, used the other way round */
@@ -52,8 +56,9 @@
       --text-secondary: #c4dacb;
       --text-muted: #82b49b;
 
-      --font-display: "forma-djr-display", "Forma DJR Display", "Forma", "Geist Sans", -apple-system, sans-serif;
-      --font-sans: "Geist Sans", -apple-system, sans-serif;
+      --font-display: "General Sans", "Geist Sans", -apple-system, sans-serif;
+      --font-sans: "Switzer", "Geist Sans", -apple-system, sans-serif;
+      --font-overlay: "Geist Sans", -apple-system, sans-serif; /* the desktop app's own face */
       --font-mono: "Geist Mono", monospace;
 
       --space-2: 8px;
@@ -84,12 +89,15 @@
     }
 
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    ::selection { background: var(--g-500); color: var(--text); }
+    html { scrollbar-color: var(--g-700) var(--bg); }
 
     .container { position: relative; max-width: 1080px; margin: 0 auto; padding: 0 var(--space-8); }
 
     /* Textured gradient: soft green light on near-black, with film grain over it */
     .top { position: relative; isolation: isolate; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; }
-    .top > .container { flex: 1; width: 100%; display: flex; flex-direction: column; }
+    /* Nav and hero share this wider container (the game gets two-thirds of the hero row); the sections below keep the 1080px column */
+    .top > .container { flex: 1; width: 100%; max-width: 1280px; display: flex; flex-direction: column; }
 
     .top-art {
       position: absolute;
@@ -126,10 +134,12 @@
       color: var(--text);
       text-decoration: none;
       font-family: var(--font-display);
-      font-weight: 500;
-      font-size: 1.125rem;
-      letter-spacing: -0.03em;
+      font-weight: 600;
+      font-size: 1.25rem;
+      line-height: 1;
+      letter-spacing: 0;
     }
+    .brand span { position: relative; top: 1px; } /* optical centre beside the icon */
 
     .brand-logo { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); }
 
@@ -158,7 +168,7 @@
       flex: 1;
       padding: var(--space-6) 0 var(--space-8);
       display: grid;
-      grid-template-columns: 0.95fr 1.05fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
       gap: var(--space-12);
       align-items: center;
     }
@@ -168,7 +178,8 @@
       font-weight: 500;
       font-size: clamp(3rem, 5.2vw, 4.4rem);
       line-height: 1.02;
-      letter-spacing: -0.035em;
+      letter-spacing: 0;
+      text-wrap: balance;
       margin-bottom: var(--space-6);
     }
     h1 span { display: block; color: var(--g-300); }
@@ -176,10 +187,11 @@
     .lead {
       font-size: 1.15rem;
       color: var(--text-secondary);
-      font-weight: 500;
-      max-width: 390px;
+      font-weight: 400;
       margin-bottom: var(--space-8);
     }
+    .lead span { display: block; }
+    @media (min-width: 881px) { .lead span { white-space: nowrap; } }
 
     .hero-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
@@ -194,194 +206,165 @@
     .btn-download:active { transform: scale(0.97); }
     .btn-download svg { width: 16px; height: 16px; stroke: var(--g-900); }
 
-    /* Interactive VN stage: the one rich object on the page */
-    .vn-stage {
-      background: rgba(12, 34, 24, 0.62);
-      -webkit-backdrop-filter: blur(14px) saturate(1.1);
-      backdrop-filter: blur(14px) saturate(1.1);
-      color: var(--text);
+    /* Gameplay demo: a silent clip of the game, advanced one line at a time, with a live HTML copy of
+       the desktop overlay on top. Neutral values come from the app's ui/styles.css (--panel, --line,
+       --paper, --tally; the overlay window background is rgba(11,13,16,0.94)). Everything inside the
+       frame is sized from the frame's own width (cqw), so the panel scales with the footage. */
+    .demo {
+      --d-bg: rgba(11, 13, 16, 0.94);
+      --d-raised: #1b2027; --d-line: #2a313b;
+      --d-paper: #ebe7dd; --d-dim: #99a0ab; --d-tally: #b8cdbd;
+      position: relative;
+      min-width: 0;
+      font-family: var(--font-overlay);
+      container-type: inline-size;
+      container-name: demo;
+    }
+    .demo-frame {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #0b0d10;
       border-radius: 16px;
       border: 1px solid rgba(242, 249, 244, 0.14);
-      overflow: hidden;
       box-shadow: 0 24px 56px -16px rgba(0, 0, 0, 0.5);
-      position: relative;
-    }
-    @supports not (backdrop-filter: blur(1px)) {
-      .vn-stage { background: #0c2218; }
-      .waveform-box, .hud-drawer { background: #071a12; }
-    }
-
-    .vn-topbar {
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--line);
-      font-family: var(--font-mono);
-      font-size: 0.74rem;
-    }
-
-    .vn-status { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
-    .pulse-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--accent);
-    }
-    /* TEMP: reduced-motion override disabled for testing (the min-width never matches). Remove "and (min-width: 99999px)" to restore. */
-    @media (prefers-reduced-motion: reduce) and (min-width: 99999px) {
-      .btn-download:hover, .btn-download:active, .char-chip:hover, .char-chip:active,
-      .hud-toggle-btn:hover, .hud-toggle-btn:active, .btn-next-line:hover, .btn-next-line:active { transform: none; }
-    }
-
-    .hud-toggle-btn {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      background: transparent;
-      color: var(--text-secondary);
-      border: 1px solid var(--line-strong);
-      border-radius: 8px;
-      padding: 4px 12px;
-      cursor: pointer;
-      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
-    }
-    .hud-toggle-btn:hover { background: var(--surface-hover); border-color: rgba(242, 249, 244, 0.34); color: var(--text); }
-    .hud-toggle-btn:active { transform: scale(0.97); }
-
-    .vn-scene-body { padding: var(--space-6); }
-
-    .char-selector {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: var(--space-4);
-    }
-
-    .char-chip {
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--text-secondary);
-      padding: 12px;
-      border-radius: 10px;
-      font-family: var(--font-sans);
-      font-size: 0.84rem;
-      font-weight: 500;
-      text-align: left;
-      cursor: pointer;
-      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out);
-    }
-    .char-chip:hover { background: var(--surface-hover); border-color: var(--line-strong); }
-    .char-chip:active { transform: scale(0.97); }
-    .char-chip.active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-    .char-chip small {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      margin-top: 4px;
-      color: var(--text-secondary);
-    }
-    .char-chip.active { background: var(--accent); color: var(--g-900); border-color: var(--accent); }
-    .char-chip.active small { color: var(--g-700); }
-
-    .waveform-box {
-      background: rgba(7, 26, 18, 0.45);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: var(--space-4);
-    }
-
-    .dialogue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-
-    .speaker-badge {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      
-      letter-spacing: 0.02em;
-      color: var(--accent);
-      font-weight: 500;
-    }
-
-    .mood-tag {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-secondary);
-    }
-
-    .dialogue-text {
-      font-size: 1.02rem;
-      min-height: 3rem;
-      line-height: 1.45;
-      color: var(--text);
-      margin-bottom: 16px;
-    }
-
-    .wave-bars { display: flex; align-items: center; gap: 4px; height: 28px; }
-    .wave-bar {
-      flex: 1;
-      background: var(--accent);
-      border-radius: 99px;
-      height: 100%;
-      transform: scaleY(0.3);
-      transition: transform 180ms var(--ease-out), opacity 180ms var(--ease-out);
-      opacity: 0.75;
-    }
-
-    .vn-controls-row { display: flex; justify-content: flex-start; align-items: center; margin-bottom: var(--space-4); }
-
-    .btn-next-line {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--line-strong);
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      cursor: pointer;
-      transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out);
-    }
-    .btn-next-line:hover { background: var(--surface-hover); border-color: rgba(242, 249, 244, 0.34); }
-    .btn-next-line:active { transform: scale(0.97); }
-
-    .hud-drawer {
-      background: rgba(7, 26, 18, 0.45);
-      border: 1px solid var(--line);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 16px;
-      transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s;
-      max-height: 240px;
       overflow: hidden;
     }
-    .hud-drawer.collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; border-color: transparent; visibility: hidden; transition: max-height 280ms var(--ease-out), opacity 220ms var(--ease-out), visibility 0s linear 280ms; }
+    .demo-frame video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+      transform: scale(1.014); /* trims the recording's 1px black edge row so the frame edge is clean */ }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .demo svg { fill: currentColor; }
+    .demo button, .demo select { font-family: var(--font-overlay); }
+    .demo button:focus-visible, .demo select:focus-visible, .demo input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .slider-row {
-      display: grid;
-      grid-template-columns: 76px 1fr 48px;
-      align-items: center;
-      gap: 12px;
-      font-size: 0.82rem;
-      margin-bottom: 8px;
+    /* The whole frame is one big "next line" button, under the overlay controls (siblings, not parents,
+       so nothing inside the overlay can ever advance the scene). */
+    .demo-advance {
+      position: absolute; inset: 0; z-index: 0;
+      width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
-    .slider-row:last-child { margin-bottom: 0; }
-    .slider-name { font-weight: 500; color: var(--text-secondary); }
-    .slider-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; font-weight: 500; font-size: 0.78rem; }
+    .demo-advance:focus-visible { outline-offset: -4px; border-radius: 14px; }
 
-    input[type="range"] {
-      -webkit-appearance: none; appearance: none;
-      width: 100%; height: 8px;
-      background: linear-gradient(to right, var(--g-500) var(--p, 50%), var(--g-800) var(--p, 50%));
-      border: 1px solid var(--line);
-      border-radius: 999px; outline: none;
+    /* The scene fades to dark and back when the exchange resets (inside the frame only) */
+    .demo-frame video { transition: opacity 300ms ease; }
+    .demo.is-fading .demo-frame video { opacity: 0; }
+
+    /* One gentle pulse on the game's own dialogue arrow (opening frame only). This triangle sits exactly
+       on the arrow baked into the footage (x 51.0%, y 20.8% of the frame). */
+    .demo-arrow {
+      position: absolute; left: 51%; top: 20.8%; width: 1.146%; height: 2.222%;
+      pointer-events: none; opacity: 0; transform-origin: 35% 50%;
+      filter: drop-shadow(0 0 5px rgba(214, 240, 240, 0.85));
     }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: var(--accent); border: 2px solid var(--bg);
-      cursor: pointer;
+    .demo-arrow::before { content: ""; position: absolute; inset: 0; background: rgb(214, 238, 238); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+    .demo.pulse .demo-arrow { animation: arrow-pulse 1500ms ease-in-out 1; }
+    @keyframes arrow-pulse { 0% { opacity: 0; transform: scale(1); } 35% { opacity: 1; transform: scale(2); } 100% { opacity: 0; transform: scale(1); } }
+
+    /* The overlay panel: upper right of the frame, sized from the frame */
+    .dp-wrap {
+      --gap: clamp(11px, 1.6cqw, 14px);
+      position: absolute; z-index: 2; top: var(--gap); right: var(--gap);
+      width: clamp(188px, 30cqw, 270px);
+      font-size: clamp(11px, 1.65cqw, 13.5px); line-height: 1.4;
+      pointer-events: none;
     }
-    input[type="range"]::-moz-range-thumb {
-      width: 12px; height: 12px; border-radius: 50%;
-      background: var(--accent); border: 2px solid var(--bg);
-      cursor: pointer;
+    .dp-wrap > * { pointer-events: auto; }
+    .dp {
+      position: relative; width: 100%;
+      max-height: calc(56.25cqw - var(--gap) * 2); overflow-y: auto; scrollbar-width: thin;
+      color: var(--d-paper); background: var(--d-bg);
+      border: 1px solid var(--d-line); border-radius: 1.1em; padding: 0.65em;
+      animation: dp-in 520ms var(--ease-out) 350ms both;
+    }
+    @keyframes dp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .dp-cards { display: flex; flex-direction: column; gap: 0.5em; }
+    .dp-card { border: 1px solid var(--d-line); border-radius: 0.85em; padding: 0.55em 0.85em; transition: border-color 0.2s; }
+    .dp-card.speaking { border-color: color-mix(in srgb, var(--d-tally) 80%, var(--d-line)); background: color-mix(in srgb, var(--d-tally) 9%, transparent); }
+    .dp-card:not(.speaking) .dp-name { opacity: 0.62; }
+    .dp-card.speaking .dp-name { color: #fff; opacity: 1; }
+    .dp-head {
+      display: flex; align-items: center; gap: 0.6em; width: 100%; min-height: 1.9em; padding: 0;
+      color: inherit; background: none; border: 0; text-align: left; font-size: inherit; border-radius: 6px;
+    }
+    button.dp-head { cursor: pointer; }
+    .demo .dp-head:focus-visible { outline-color: var(--d-tally); outline-offset: 3px; }
+    .dp-name { flex: 1; min-width: 0; font-size: 1.12em; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; }
+    .dp-who { display: inline-flex; align-items: center; gap: 4px; }
+    .dp-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: #9fe8b0; visibility: hidden; }
+    .dp-card.speaking .dp-dot { visibility: visible; }
+    .dp-pick { margin-left: 0.5em; display: inline-flex; align-items: center; gap: 0.45em; font-size: 0.95em; font-weight: 500; color: var(--d-tally); white-space: nowrap; }
+    .dp-pick::before {
+      content: ""; width: 1.05em; height: 1.05em; background: currentColor;
+      -webkit-mask: var(--dp-icon) center / contain no-repeat; mask: var(--dp-icon) center / contain no-repeat;
+      --dp-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 4.5h12M2 11.5h12' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='10.5' cy='4.5' r='2.2'/%3E%3Ccircle cx='5.5' cy='11.5' r='2.2'/%3E%3C/svg%3E");
+    }
+    .dp-chev {
+      flex: none; width: 0.55em; height: 0.55em; margin: 0 0.2em 0.25em 0.1em;
+      border-right: 2px solid var(--d-dim); border-bottom: 2px solid var(--d-dim);
+      transform: translateY(-1px) rotate(45deg); transition: transform 0.25s ease;
+    }
+    .dp-card.is-open .dp-chev { transform: translateY(2px) rotate(225deg); }
+    .dp-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.25s ease, opacity 0.2s ease; }
+    .dp-card.is-open .dp-body, .dp-below .dp-body { grid-template-rows: 1fr; opacity: 1; }
+    .dp-inner { overflow: hidden; min-height: 0; display: flex; flex-direction: column; gap: 0.35em; }
+    .dp-card.is-open .dp-inner { padding-top: 0.8em; }
+    .dp-label { color: var(--d-dim); font: 500 0.92em/1.3 var(--font-mono); letter-spacing: 0.02em; }
+    .dp-field { display: grid; grid-template-columns: 4.8em minmax(0, 1fr); align-items: center; gap: 0.5em; margin-bottom: 0.15em; }
+    .dp-select {
+      width: 100%; min-height: 2.3em; padding: 0 0.6em; color: var(--d-paper); font-size: 0.95em;
+      background: var(--d-raised); border: 1px solid var(--d-line); border-radius: 0.6em; text-overflow: ellipsis;
+    }
+    .dp-fader { display: grid; grid-template-columns: 4.8em minmax(0, 1fr) 3.2em; align-items: center; gap: 0.5em; min-height: 1.8em; }
+    .dp-fader output { text-align: right; font: 500 0.92em/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--d-paper); }
+    .dp-note { color: var(--d-dim); font-size: 0.95em; }
+    .dp-actions { display: flex; padding-top: 0.15em; }
+    .dp-btn {
+      min-height: 2.1em; padding: 0 1em; color: var(--d-paper); font-size: 0.95em; font-weight: 500;
+      background: var(--d-raised); border: 1px solid var(--d-line); border-radius: 0.6em; cursor: pointer;
+    }
+    .dp-btn:hover { border-color: color-mix(in srgb, var(--d-dim) 55%, var(--d-line)); }
+    /* The app's fader: filled track, paper thumb */
+    .dp input[type="range"], .dp-below input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: none; cursor: pointer;
+      touch-action: pan-y;
+    }
+    .dp input[type="range"]::-webkit-slider-runnable-track, .dp-below input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px; border-radius: 2px;
+      background: linear-gradient(to right, var(--d-tally) var(--fill, 50%), var(--d-line) var(--fill, 50%));
+    }
+    .dp input[type="range"]::-webkit-slider-thumb, .dp-below input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 10px; height: 20px; margin-top: -8px;
+      border-radius: 3px; background: var(--d-paper); border: 1px solid #0b0d10;
+      box-shadow: inset 0 -7px 0 -5px var(--d-dim), inset 0 7px 0 -5px var(--d-dim);
+    }
+    .dp input[type="range"]::-moz-range-track, .dp-below input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--d-line); }
+    .dp input[type="range"]::-moz-range-progress, .dp-below input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--d-tally); }
+    .dp input[type="range"]::-moz-range-thumb, .dp-below input[type="range"]::-moz-range-thumb { width: 10px; height: 20px; border-radius: 3px; background: var(--d-paper); border: 1px solid #0b0d10; }
+
+    /* Settings that open beneath the game (phones): same card, outside the footage */
+    .dp-below {
+      margin-top: 12px; padding: 0.9rem 1rem; font-size: 13px; line-height: 1.4;
+      color: var(--d-paper); background: var(--d-bg); border: 1px solid var(--d-line); border-radius: 14px;
+    }
+    .dp-below[hidden] { display: none; }
+    .demo-hint { margin-top: var(--space-3); font: 500 0.75rem/1.4 var(--font-mono); letter-spacing: 0.02em; color: var(--text-muted); }
+    .dp-below .dp-inner { padding-top: 0; }
+
+    /* Narrow frames: just the speaker list inside the footage, no badges; Louise's settings go below */
+    @container demo (max-width: 599.98px) {
+      .dp-wrap { width: 132px; font-size: 12px; }
+      .dp { max-height: none; overflow: visible; padding: 4px; border-radius: 12px; }
+      .dp-cards { gap: 3px; }
+      .dp-card { padding: 0 8px; border-radius: 9px; }
+      .dp-pick { display: none; }
+      .dp-head { min-height: 23px; gap: 8px; }
+      .dp-name { font-size: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dp { animation: none; }
+      .demo-arrow { display: none; }
+      .demo-frame video { transition: none; }
+      .dp-body, .dp-chev { transition: none; }
     }
 
     /* Sections */
@@ -410,7 +393,6 @@
       font-family: var(--font-mono);
       font-size: 0.75rem;
       font-weight: 500;
-      
       letter-spacing: 0.02em;
       color: var(--text-muted);
     }
@@ -425,11 +407,10 @@
       text-align: left;
       transition: background-color 180ms var(--ease-out), border-color 180ms var(--ease-out);
     }
-    .step-card:hover { background: var(--surface-hover); border-color: var(--line-strong); }
     .step-idx {
       display: inline-block;
       font-family: var(--font-mono);
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 500;
       font-variant-numeric: tabular-nums;
       color: var(--text-muted);
@@ -452,14 +433,13 @@
       font-size: 0.94rem;
       transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out);
     }
-    .engine-pill:hover { background: var(--surface-hover); border-color: var(--line-strong); }
 
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-family: var(--font-mono);
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 500;
       color: var(--text-muted);
     }
@@ -489,7 +469,7 @@
     .team-meta { display: flex; flex-direction: column; min-width: 0; }
     .team-role {
       font-family: var(--font-mono);
-      font-size: 0.72rem; font-weight: 500; 
+      font-size: 0.75rem; font-weight: 500; 
       letter-spacing: 0.02em;
       color: var(--text-muted);
       margin-bottom: 4px;
@@ -554,7 +534,7 @@
     }
     .cta p {
       font-size: 1.15rem;
-      font-weight: 500;
+      font-weight: 400;
       line-height: 1.5;
       color: var(--g-200);
       margin-bottom: var(--space-6);
@@ -641,7 +621,7 @@
     }
 
     @media (max-width: 880px) {
-      .hero { grid-template-columns: 1fr; }
+      .hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); }
       .steps-grid, .engines-grid { grid-template-columns: repeat(2, 1fr); }
       .team-grid { grid-template-columns: 1fr; }
     }
@@ -659,13 +639,13 @@
       <header>
         <nav class="nav-bar" aria-label="Primary">
           <a href="#" class="brand" aria-label="dubplay">
-            <img class="brand-logo" src="logo.png" alt="dubplay" width="32" height="32" />
+            <img class="brand-logo" src="logo.png" alt="" width="32" height="32" />
             <span>dubplay</span>
           </a>
 
           <div class="nav-links">
-            <a href="#pipeline" class="nav-link">Pipeline</a>
             <a href="#engines" class="nav-link">Engines</a>
+            <a href="#how-it-works" class="nav-link">How it works</a>
             <a href="#about" class="nav-link">Team</a>
             <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -679,7 +659,7 @@
       <section class="hero">
         <div class="hero-copy">
           <h1>Voice every <span>visual novel</span></h1>
-          <p class="lead">One-click Steam hook. Real-time character voices tuned live inside your game window.</p>
+          <p class="lead"><span>Hear characters speak as you play.</span> <span>Tune voices without leaving the game.</span></p>
           <div class="hero-controls">
             <a href="https://github.com/edwardvu7/dubplay/releases/latest/download/dub.game-Setup.exe" class="btn-download" download>
               <svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v6.6H3zM11.5 4.4 21 3v8.1h-9.5zM3 12.9h7.5v6.6L3 18.5zM11.5 12.9H21V21l-9.5-1.3z"/></svg>
@@ -688,66 +668,95 @@
           </div>
         </div>
 
-        <aside class="vn-stage" aria-label="Interactive In-Game Overlay Sandbox">
-          <div class="vn-topbar">
-            <span class="vn-status"><span class="pulse-dot"></span> dubplay</span>
-            <button type="button" class="hud-toggle-btn" id="toggle-hud" aria-expanded="true" aria-controls="hud-drawer">Overlay [Shift + F2]</button>
+        <div class="demo" id="demo">
+          <div class="demo-frame" id="demo-frame">
+            <video id="demo-video" muted playsinline preload="auto" poster="assets/dubplay-doorway-poster.jpg" aria-hidden="true" tabindex="-1">
+              <source src="assets/dubplay-doorway.mp4" type="video/mp4" />
+            </video>
+            <audio id="demo-voice-1" preload="auto" src="assets/voice-1.m4a"></audio>
+            <audio id="demo-voice-2" preload="auto" src="assets/voice-2.m4a"></audio>
+            <audio id="demo-voice-3" preload="auto" src="assets/voice-3.m4a"></audio>
+            <i class="demo-arrow" id="demo-arrow" aria-hidden="true"></i>
+
+            <button type="button" class="demo-advance" id="demo-advance" aria-label="Hear Louise’s line"></button>
+            <p class="sr-only" id="demo-line" aria-live="polite"></p>
+
+            <div class="dp-wrap">
+              <section class="dp" id="demo-panel" aria-label="dubplay overlay">
+                <div class="dp-cards">
+                  <div class="dp-card speaking" data-card data-speaker="louise">
+                    <button type="button" class="dp-head" id="dp-h-louise" aria-expanded="false" aria-controls="dp-b-louise">
+                      <span class="dp-name"><span class="dp-who">Louise<i class="dp-dot" role="img" aria-label="speaking"></i></span></span>
+                      <span class="dp-pick">Designed voice</span>
+                      <span class="dp-chev" aria-hidden="true"></span>
+                    </button>
+                    <div class="dp-body" id="dp-b-louise" role="region" aria-labelledby="dp-h-louise"><div class="dp-inner">
+                      <div class="dp-field">
+                        <label class="dp-label" for="dp-voice">Voice</label>
+                        <select class="dp-select" id="dp-voice">
+                          <option>Custom: dub.game Until Then - Lo…</option>
+                          <option>Rachel</option><option>Sarah</option><option>Lily</option><option>Matilda</option><option>Elli</option><option>Laura</option>
+                        </select>
+                      </div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-stability">Stability</label><input id="dp-stability" type="range" min="0" max="1" step="0.05" value="0.65" data-def="0.65" data-fmt="pct" /><output for="dp-stability">65%</output></div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-style">Style</label><input id="dp-style" type="range" min="0" max="1" step="0.05" value="0.2" data-def="0.2" data-fmt="pct" /><output for="dp-style">20%</output></div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-speed">Speed</label><input id="dp-speed" type="range" min="0.7" max="1.2" step="0.05" value="0.95" data-def="0.95" data-fmt="x" /><output for="dp-speed">0.95x</output></div>
+                      <div class="dp-fader"><label class="dp-label" for="dp-volume">Volume</label><input id="dp-volume" type="range" min="0" max="1" step="0.05" value="0.55" data-def="0.55" data-fmt="pct" /><output for="dp-volume">55%</output></div>
+                      <div class="dp-actions"><button type="button" class="dp-btn" id="dp-reset">Reset</button></div>
+                    </div></div>
+                  </div>
+                  <div class="dp-card" data-card data-speaker="mark">
+                    <div class="dp-head">
+                      <span class="dp-name"><span class="dp-who">Mark<i class="dp-dot" role="img" aria-label="speaking"></i></span></span>
+                      <span class="dp-pick">Designed voice</span>
+                    </div>
+                  </div>
+                  <div class="dp-card" data-card data-speaker="narrator">
+                    <div class="dp-head">
+                      <span class="dp-name"><span class="dp-who">Narrator<i class="dp-dot" role="img" aria-label="speaking"></i></span></span>
+                      <span class="dp-pick">Locked</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
           </div>
-
-          <div class="vn-scene-body">
-            <div class="char-selector" role="group" aria-label="Character voice">
-              <button class="char-chip active" type="button" aria-pressed="true" data-char="sylvie">
-                Sylvie <small>Warm · Lead</small>
-              </button>
-              <button class="char-chip" type="button" aria-pressed="false" data-char="voss">
-                Voss <small>Gruff · Detective</small>
-              </button>
-              <button class="char-chip" type="button" aria-pressed="false" data-char="narrator">
-                Narrator <small>Calm · Omniscient</small>
-              </button>
-            </div>
-
-            <div class="waveform-box">
-              <div class="dialogue-header">
-                <span class="speaker-badge" id="preview-speaker">Sylvie</span>
-                <span class="mood-tag" id="preview-mood">Mood: Apprehensive</span>
-              </div>
-              <div class="dialogue-text" id="preview-line">"Did you hear footsteps on the stairs?"</div>
-              <div class="wave-bars" id="wave-bars"></div>
-            </div>
-
-            <div class="vn-controls-row">
-              <button type="button" class="btn-next-line" id="next-line-btn">Next line</button>
-            </div>
-
-            <div class="hud-drawer" id="hud-drawer">
-              <div class="slider-row">
-                <span class="slider-name">Stability</span>
-                <input type="range" id="sl-stability" aria-label="Stability" min="0" max="1" step="0.05" value="0.45" />
-                <span class="slider-val" id="val-stability">0.45</span>
-              </div>
-              <div class="slider-row">
-                <span class="slider-name">Style</span>
-                <input type="range" id="sl-style" aria-label="Style" min="0" max="1" step="0.05" value="0.65" />
-                <span class="slider-val" id="val-style">0.65</span>
-              </div>
-              <div class="slider-row">
-                <span class="slider-name">Speed</span>
-                <input type="range" id="sl-speed" aria-label="Speed" min="0.7" max="1.2" step="0.05" value="1.05" />
-                <span class="slider-val" id="val-speed">1.05×</span>
-              </div>
-            </div>
-          </div>
-        </aside>
+          <p class="demo-hint">Click the scene to hear it</p>
+          <div class="dp-below" id="dp-below" hidden></div>
+        </div>
       </section>
     </div>
   </div>
 
   <div class="container">
     <main>
-      <section class="section" id="pipeline">
+      <section class="section" id="engines">
         <div class="section-header">
-          <div class="section-label">Pipeline</div>
+          <div class="section-label">Supported engines</div>
+        </div>
+        <div class="engines-grid">
+          <div class="engine-pill">
+            <span>Ren'Py</span>
+            <span class="badge">Beta</span>
+          </div>
+          <div class="engine-pill">
+            <span>Godot</span>
+            <span class="badge">Beta</span>
+          </div>
+          <div class="engine-pill">
+            <span>RPG Maker</span>
+            <span class="badge">Beta</span>
+          </div>
+          <div class="engine-pill">
+            <span>Unity</span>
+            <span class="badge badge-soon">Soon</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="how-it-works">
+        <div class="section-header">
+          <div class="section-label">How it works</div>
         </div>
         <div class="steps-grid">
           <article class="step-card">
@@ -770,30 +779,6 @@
             <h2>Tune live</h2>
             <p>Adjust sliders mid-scene</p>
           </article>
-        </div>
-      </section>
-
-      <section class="section" id="engines">
-        <div class="section-header">
-          <div class="section-label">Engines</div>
-        </div>
-        <div class="engines-grid">
-          <div class="engine-pill">
-            <span>Ren'Py</span>
-            <span class="badge">Beta</span>
-          </div>
-          <div class="engine-pill">
-            <span>Godot</span>
-            <span class="badge">Beta</span>
-          </div>
-          <div class="engine-pill">
-            <span>RPG Maker</span>
-            <span class="badge">Beta</span>
-          </div>
-          <div class="engine-pill">
-            <span>Unity</span>
-            <span class="badge badge-soon">Soon</span>
-          </div>
         </div>
       </section>
 
@@ -860,8 +845,8 @@
             <span>dubplay</span>
           </a>
           <nav class="nav-links" aria-label="Footer">
-            <a href="#pipeline" class="nav-link">Pipeline</a>
             <a href="#engines" class="nav-link">Engines</a>
+            <a href="#how-it-works" class="nav-link">How it works</a>
             <a href="#about" class="nav-link">Team</a>
             <a href="https://github.com/edwardvu7/dubplay" class="github-icon-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -875,139 +860,227 @@
   </section>
 
   <script>
-    const profiles = {
-      sylvie: {
-        speaker: "Sylvie",
-        moods: ["Apprehensive", "Urgent", "Relieved"],
-        lines: [
-          '"Did you hear footsteps on the stairs?"',
-          '"Wait—the lantern by the cellar door is still warm."',
-          '"Stay close. I know a shortcut through the conservatory."'
-        ],
-        stability: 0.45, style: 0.65, speed: 1.05
-      },
-      voss: {
-        speaker: "Voss",
-        moods: ["Stoic", "Suspicious", "Grim"],
-        lines: [
-          '"The station logs were wiped at midnight."',
-          '"Whoever keyed that airlock had clearance from the director."',
-          '"Check the ballast tanks before the storm hits."'
-        ],
-        stability: 0.75, style: 0.35, speed: 0.90
-      },
-      narrator: {
-        speaker: "Narrator",
-        moods: ["Atmospheric", "Melancholic", "Serene"],
-        lines: [
-          '"Rain streaked across the terminal glass."',
-          '"Far below the viaduct, the last commuter train hummed into the fog."',
-          '"Dawn arrived without a sound over the harbor."'
-        ],
-        stability: 0.85, style: 0.20, speed: 0.95
-      }
-    };
-
-    let currentChar = "sylvie";
-    let lineIdx = 0;
-    let typeTimer = null;
-
-    const waveContainer = document.getElementById("wave-bars");
-    for (let i = 0; i < 28; i++) {
-      const bar = document.createElement("div");
-      bar.className = "wave-bar";
-      waveContainer.appendChild(bar);
-    }
-    const bars = document.querySelectorAll(".wave-bar");
-
-    const speakerEl = document.getElementById("preview-speaker");
-    const moodEl = document.getElementById("preview-mood");
-    const lineEl = document.getElementById("preview-line");
-    const slStability = document.getElementById("sl-stability");
-    const slStyle = document.getElementById("sl-style");
-    const slSpeed = document.getElementById("sl-speed");
-    const valStability = document.getElementById("val-stability");
-    const valStyle = document.getElementById("val-style");
-    const valSpeed = document.getElementById("val-speed");
-
-    function animateWaveform() {
-      const styleVal = Number(slStyle.value);
-      const stabVal = Number(slStability.value);
-      bars.forEach((bar, i) => {
-        const variance = (1 - stabVal) * 55 + styleVal * 45;
-        const height = Math.max(15, Math.min(100, 22 + Math.sin(i * 0.65 + lineIdx) * variance + Math.random() * 25));
-        bar.style.transform = "scaleY(" + (height / 100).toFixed(2) + ")";
-        bar.style.opacity = (0.45 + (height / 200)).toFixed(2);
-      });
-    }
-
-    function typeLine(text) {
-      clearInterval(typeTimer);
-      lineEl.textContent = "";
-      let i = 0;
-      const delay = Math.round(18 / Number(slSpeed.value));
-      typeTimer = setInterval(() => {
-        lineEl.textContent += text.charAt(i);
-        i++;
-        if (i % 3 === 0) animateWaveform();
-        if (i >= text.length) clearInterval(typeTimer);
-      }, delay);
-    }
-
-    function renderScene() {
-      const p = profiles[currentChar];
-      speakerEl.textContent = p.speaker;
-      moodEl.textContent = "Mood: " + p.moods[lineIdx % p.moods.length];
-      typeLine(p.lines[lineIdx % p.lines.length]);
-    }
-
-    function setFill(input) {
-      const pct = ((input.value - input.min) / (input.max - input.min)) * 100;
-      input.style.setProperty("--p", pct + "%");
-    }
-
-    function updateReadouts() {
-      valStability.textContent = Number(slStability.value).toFixed(2);
-      valStyle.textContent = Number(slStyle.value).toFixed(2);
-      valSpeed.textContent = Number(slSpeed.value).toFixed(2) + "×";
-      [slStability, slStyle, slSpeed].forEach(setFill);
-      animateWaveform();
-    }
-
-    document.querySelectorAll(".char-chip").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        document.querySelectorAll(".char-chip").forEach((c) => { c.classList.remove("active"); c.setAttribute("aria-pressed", "false"); });
-        chip.classList.add("active");
-        chip.setAttribute("aria-pressed", "true");
-        currentChar = chip.dataset.char;
-        lineIdx = 0;
-        const p = profiles[currentChar];
-        slStability.value = p.stability;
-        slStyle.value = p.style;
-        slSpeed.value = p.speed;
-        updateReadouts();
-        renderScene();
-      });
-    });
-
-    document.getElementById("next-line-btn").addEventListener("click", () => {
-      lineIdx++;
-      renderScene();
-    });
-
-    document.getElementById("toggle-hud").addEventListener("click", () => {
-      const collapsed = document.getElementById("hud-drawer").classList.toggle("collapsed");
-      document.getElementById("toggle-hud").setAttribute("aria-expanded", String(!collapsed));
-    });
-
-    [slStability, slStyle, slSpeed].forEach((s) => s.addEventListener("input", updateReadouts));
 
     fetch("https://api.github.com/users/Craz33matt")
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => { if (u && u.name) document.getElementById("name-Craz33matt").textContent = u.name; })
       .catch(() => {});
 
-    updateReadouts();
+
+    /* ---------- Gameplay demo ---------- */
+    (function () {
+      var demo = document.getElementById("demo");
+      var video = document.getElementById("demo-video");
+      var advanceBtn = document.getElementById("demo-advance");
+      var live = document.getElementById("demo-line");
+      var panel = document.getElementById("demo-panel");
+      var below = document.getElementById("dp-below");
+      var louise = document.querySelector('[data-speaker="louise"]');
+      var cards = Array.prototype.slice.call(panel.querySelectorAll("[data-card]"));
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      /* The clip is three back-to-back segments cut from the recording (frame-exact): Louise's line, Mark's
+         first, Mark's second. Each has a recorded voice (cut from the same timestamps, one source track).
+         Each segment runs past BOTH the bubble's last character and the voice's last word, then the picture
+         pauses on its final frame, so the complete sentence stays up until the next click. */
+      var B = [0, 3.1, 5.25, 8.05];
+      var LAST = 0.021; // pause on a segment's final frame (one frame is 0.0167 s)
+      var LINES = [
+        { speaker: "louise", text: "Louise: I yelled at you earlier and that was not necessary.", next: "Hear Mark’s line" },
+        { speaker: "mark",   text: "Mark: Hey, if we really had no slides…",                  next: "Hear Mark’s next line" },
+        { speaker: "mark",   text: "Mark: Then I deserved to be yelled at.",                       next: "Back to the start" }
+      ];
+      var voices = LINES.map(function (l, i) { return document.getElementById("demo-voice-" + (i + 1)); });
+      var HOLD_MS = 1000;  // after Mark's last word, before the scene fades back
+      var FADE_MS = 300;
+
+      var current = -1;    // line on screen (-1 = the opening frame)
+      var resetting = false;
+      var run = 0;         // bumped on every click, so stale timers and callbacks do nothing
+      var raf = 0, holdTimer = 0, fadeTimer = 0, pulseTimer = 0;
+
+      function setSpeaker(name) {
+        cards.forEach(function (c) { c.classList.toggle("speaking", c.getAttribute("data-speaker") === name); });
+      }
+      function openingFrame() { video.currentTime = B[1] - LAST; }
+
+      /* ----- voices: one at a time; a stop is a 30 ms fade, never a cut ----- */
+      function stopVoice(a) {
+        if (!a) return;
+        if (a._fade) { clearInterval(a._fade); a._fade = 0; }
+        a.onended = null;
+        if (a.paused) { a.currentTime = 0; a.volume = 1; return; }
+        var v = 1;
+        a._fade = setInterval(function () {
+          v -= 0.34;
+          if (v > 0) { try { a.volume = v; } catch (e) {} return; }
+          clearInterval(a._fade); a._fade = 0;
+          a.pause(); a.currentTime = 0; try { a.volume = 1; } catch (e) {}
+        }, 8);
+      }
+      function startVoice(a, onFail) {
+        if (a._fade) { clearInterval(a._fade); a._fade = 0; }
+        a.pause(); a.currentTime = 0; try { a.volume = 1; } catch (e) {}
+        var p = a.play();
+        if (p && p.catch) p.catch(function () { if (onFail) onFail(); });
+      }
+      function stopAll() { voices.forEach(stopVoice); }
+
+      /* ----- playing a line ----- */
+      function play(k) {
+        run += 1;
+        var my = run;
+        clearTimeout(holdTimer); clearTimeout(pulseTimer); cancelAnimationFrame(raf);
+        demo.classList.remove("pulse");
+        stopAll();
+        video.pause();
+        current = k;
+        var line = LINES[k];
+        setSpeaker(line.speaker);
+        advanceBtn.setAttribute("aria-label", line.next);
+        live.textContent = line.text;
+
+        var start = B[k], end = B[k + 1] - LAST, began = false;
+        function go() {
+          if (began || my !== run) return;
+          began = true;
+          var p = video.play();
+          if (p && p.catch) p.catch(function () {});
+          var voice = voices[k];
+          if (k === LINES.length - 1) {
+            voice.onended = function () { afterLastWord(my); };
+            startVoice(voice, function () { holdTimer = setTimeout(function () { afterLastWord(my); }, 2500); });
+          } else {
+            startVoice(voice);
+          }
+          (function tick() {
+            if (my !== run) return;
+            var t = video.currentTime;
+            if (t >= end || video.ended) {
+              video.pause();
+              if (t >= B[k + 1] - 0.005) video.currentTime = end; // overshot into the next segment: step back
+            } else {
+              raf = requestAnimationFrame(tick);
+            }
+          })();
+        }
+        if (Math.abs(video.currentTime - start) < 0.002) { go(); return; }
+        video.addEventListener("seeked", function onSeeked() { video.removeEventListener("seeked", onSeeked); go(); });
+        video.currentTime = start;
+        setTimeout(go, 400); // never get stuck waiting on a seek
+      }
+
+      /* Mark's last word has been heard: hold the finished bubble, then reset */
+      function afterLastWord(my) {
+        if (my !== run) return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(function () { if (my === run) reset(); }, HOLD_MS);
+      }
+
+      /* ----- back to the opening frame; Louise's voice waits for a fresh click ----- */
+      function reset() {
+        run += 1;
+        var my = run;
+        clearTimeout(holdTimer); cancelAnimationFrame(raf);
+        stopAll();
+        resetting = true;
+        function settle() {
+          current = -1;
+          setSpeaker("louise");
+          advanceBtn.setAttribute("aria-label", "Hear Louise’s line");
+          live.textContent = "";
+          resetting = false;
+          schedulePulse(reduce.matches ? 0 : 400);
+        }
+        if (reduce.matches) {
+          video.pause(); openingFrame(); settle(); return;
+        }
+        demo.classList.add("is-fading");
+        fadeTimer = setTimeout(function () {
+          if (my !== run) return;
+          video.pause();
+          var done = false;
+          function back() {
+            if (done) return; done = true;
+            video.removeEventListener("seeked", back);
+            setSpeaker("louise");
+            demo.classList.remove("is-fading");
+            fadeTimer = setTimeout(settle, FADE_MS);
+          }
+          video.addEventListener("seeked", back);
+          openingFrame();
+          setTimeout(back, 300);
+        }, FADE_MS);
+      }
+
+      /* ----- one gentle pulse on the game's dialogue arrow, on the opening frame only ----- */
+      function schedulePulse(delay) {
+        if (reduce.matches) return;
+        clearTimeout(pulseTimer);
+        pulseTimer = setTimeout(function () {
+          if (current !== -1 || resetting) return;
+          demo.classList.remove("pulse");
+          void demo.offsetWidth;
+          demo.classList.add("pulse");
+        }, delay);
+      }
+      document.getElementById("demo-arrow").addEventListener("animationend", function () { demo.classList.remove("pulse"); });
+
+      function advance() {
+        if (resetting) return;
+        if (current === LINES.length - 1) reset();   // advancing past the last line skips straight back
+        else play(current + 1);
+      }
+      advanceBtn.addEventListener("click", advance);
+
+      /* Park on Louise's finished bubble (the opening frame) until the first click */
+      function park() { if (current === -1) openingFrame(); }
+      if (video.readyState >= 1) park(); else video.addEventListener("loadedmetadata", park, { once: true });
+      schedulePulse(900);
+
+      /* ----- overlay (always on): Louise's settings expand ----- */
+      function inNarrow() { return demo.clientWidth < 600; }
+      var body = louise.querySelector(".dp-body");
+      function place() {
+        var open = louise.classList.contains("is-open");
+        if (open && inNarrow()) { below.appendChild(body); below.hidden = false; }
+        else { if (body.parentNode !== louise) louise.appendChild(body); below.hidden = true; }
+      }
+      var head = louise.querySelector(".dp-head");
+      head.addEventListener("click", function () {
+        var on = !louise.classList.contains("is-open");
+        louise.classList.toggle("is-open", on);
+        head.setAttribute("aria-expanded", String(on));
+        place();
+      });
+      if ("ResizeObserver" in window) new ResizeObserver(place).observe(demo);
+
+      demo.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && louise.classList.contains("is-open")) {
+          e.preventDefault();
+          louise.classList.remove("is-open");
+          head.setAttribute("aria-expanded", "false");
+          place();
+          head.focus({ preventScroll: true });
+        }
+      });
+
+      /* ----- Louise's settings: editable here, no effect on the clip or its voices ----- */
+      var sliders = Array.prototype.slice.call(document.querySelectorAll("#demo input[type=range]"));
+      function paint(input) {
+        var pct = (input.value - input.min) / (input.max - input.min) * 100;
+        input.style.setProperty("--fill", pct + "%");
+        var out = input.parentNode.querySelector("output");
+        out.textContent = input.getAttribute("data-fmt") === "x"
+          ? Number(input.value).toFixed(2) + "x"
+          : Math.round(input.value * 100) + "%";
+      }
+      sliders.forEach(function (s) { paint(s); s.addEventListener("input", function () { paint(s); }); });
+      document.getElementById("dp-reset").addEventListener("click", function () {
+        sliders.forEach(function (s) { s.value = s.getAttribute("data-def"); paint(s); });
+        document.getElementById("dp-voice").selectedIndex = 0;
+      });
+    })();
   </script>
 
   <script>

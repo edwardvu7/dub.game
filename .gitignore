@@ -226,3 +226,6 @@ dist/
 out/
 .env
 *.log
+
+# Raw 4-minute gameplay recording used to cut the homepage demo (keep out of git, docs/ and the app build)
+demo-inputs/original-gameplay.mp4
