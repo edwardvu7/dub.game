@@ -440,7 +440,7 @@
       opacity: 0; display: grid; place-items: center;
     }
     .how-flash.show { animation: how-flash 700ms ease-out; }
-    .how-flash::before { content: ""; display: block; width: 18px; height: 22px; border-left: 6px solid currentColor; border-right: 6px solid currentColor; }
+    .how-flash::before { content: ""; display: block; width: 6px; height: 22px; border-left: 6px solid currentColor; border-right: 6px solid currentColor; }
     .how-flash.is-play::before { width: 0; height: 0; margin-left: 5px; border: 12px solid transparent; border-left: 20px solid currentColor; border-right: 0; }
     @keyframes how-flash { 0% { opacity: 1; transform: scale(0.9); } 100% { opacity: 0; transform: scale(1.15); } }
     .how-toggle {
@@ -465,7 +465,7 @@
       html:not(.force-motion) .how-toggle { opacity: 1; pointer-events: auto; }
     }
     /* pause bars, or a play triangle while paused */
-    .how-toggle::before { content: ""; display: block; width: 10px; height: 12px; margin: auto; border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
+    .how-toggle::before { content: ""; display: block; width: 3px; height: 12px; margin: auto; border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
     .how-toggle[aria-pressed="true"]::before { width: 0; height: 0; margin: auto auto auto 12px; border: 6px solid transparent; border-left: 10px solid currentColor; border-right: 0; }
 
     /* Engine compatibility: logo on a raised, slightly rotated tile; name and status level underneath */
@@ -843,6 +843,14 @@
           <h2>The team</h2>
         </div>
         <div class="team-list">
+          <a href="https://github.com/Craz33matt" class="team-row" target="_blank" rel="noopener noreferrer">
+            <img class="team-avatar" src="assets/team/Craz33matt.jpg" alt="Matthew" width="52" height="52" loading="lazy" />
+            <span class="team-meta">
+              <span class="team-name">Matthew Harber</span>
+              <span class="team-role">Core &amp; voice pipeline</span>
+            </span>
+            <span class="team-handle">@Craz33matt</span>
+          </a>
           <a href="https://github.com/edwardvu7" class="team-row" target="_blank" rel="noopener noreferrer">
             <img class="team-avatar" src="assets/team/edwardvu7.jpg" alt="Edward Vu" width="52" height="52" loading="lazy" />
             <span class="team-meta">
@@ -858,14 +866,6 @@
               <span class="team-role">Overlay &amp; UI</span>
             </span>
             <span class="team-handle">@chadscheeks</span>
-          </a>
-          <a href="https://github.com/Craz33matt" class="team-row" target="_blank" rel="noopener noreferrer">
-            <img class="team-avatar" src="assets/team/Craz33matt.jpg" alt="Matthew" width="52" height="52" loading="lazy" />
-            <span class="team-meta">
-              <span class="team-name">Matthew Harber</span>
-              <span class="team-role">Core &amp; voice pipeline</span>
-            </span>
-            <span class="team-handle">@Craz33matt</span>
           </a>
         </div>
       </section>
